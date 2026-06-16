@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Event\EventNotificationRecord;
-use App\Domain\Job\JobRecord;
-use App\Domain\Job\JobState;
-use App\Services\Auth\AuthService;
-use App\Services\Event\EventPublisher;
+use App\Auth\AuthService;
+use App\Jobs\JobRecord;
+use App\Jobs\JobState;
+use App\System\Event\EventNotificationRecord;
+use App\System\Event\EventPublisher;
 use Tempest\Http\Responses\EventStream;
 use Tempest\Http\Status;
 
@@ -144,7 +144,7 @@ test('event notifications are ephemeral and not authoritative over domain record
 });
 
 test('bearer auth takes precedence over session for the same request', function (): void {
-    $users = $this->container->get(\App\Infrastructure\Persistence\UserRepository::class);
+    $users = $this->container->get(\App\Auth\UserRepository::class);
     $auth = $this->container->get(AuthService::class);
 
     $owner = $users->createOwner(
@@ -167,7 +167,7 @@ test('bearer auth takes precedence over session for the same request', function 
 
 test('revoked bearer token is rejected even when session cookie would authenticate', function (): void {
     $auth = $this->container->get(AuthService::class);
-    $users = $this->container->get(\App\Infrastructure\Persistence\UserRepository::class);
+    $users = $this->container->get(\App\Auth\UserRepository::class);
 
     $owner = $users->createOwner(
         email: 'owner@stashd.test',
@@ -183,7 +183,7 @@ test('revoked bearer token is rejected even when session cookie would authentica
     $created = $auth->createApiToken($owner, 'revoke-with-session');
     $headers = ['Authorization' => 'Bearer ' . $created['token']];
 
-    $auth->revokeApiToken($owner, \App\Domain\Support\PrefixedUlid::parse($created['id']));
+    $auth->revokeApiToken($owner, \App\Support\PrefixedUlid::parse($created['id']));
 
     $this->http->get('/api/v1/auth/me', headers: $headers)->assertStatus(Status::UNAUTHORIZED);
 });

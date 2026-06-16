@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\State;
 
-use App\Domain\Command\CommandState;
-use App\Domain\Job\JobState;
-use App\Domain\Media\MediaItemState;
-use App\Domain\Stash\StashInputState;
-use App\Domain\Stash\StashItemState;
-use App\Domain\Stash\StashState;
+use App\Commands\CommandState;
+use App\Jobs\JobState;
+use App\Stashes\StashInputState;
+use App\Stashes\StashItemState;
+use App\Stashes\StashState;
+use App\Vault\MediaItemState;
 
 test('command state allows accepted to running and completed path', function (): void {
     expect(CommandState::Accepted->canTransitionTo(CommandState::Running))->toBeTrue()

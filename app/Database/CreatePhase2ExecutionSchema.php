@@ -30,7 +30,7 @@ final class CreatePhase2ExecutionSchema implements MigratesUp
     private function activityEvents(): CreateTableStatement
     {
         return $this->prefixedIdTableCreatedOnly('activity_events')
-            ->enum('level', \App\Domain\Activity\ActivityLevel::class)
+            ->enum('level', \App\System\Activity\ActivityLevel::class)
             ->string('type')
             ->text('message')
             ->string('entityType', nullable: true)

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Download\Ytdlp\YtdlpGatewayImpl;
+use App\Downloads\Ytdlp\YtdlpGatewayImpl;
 
 /**
  * Opt-in live ytdlphp download tests — never run in normal CI.

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console;
 
-use App\Services\Scheduler\RoutineDiscoveryScheduler;
+use App\System\Scheduler\RoutineDiscoveryScheduler;
 use Tempest\Console\ConsoleCommand;
 use Tempest\Console\ExitCode;
 use Tempest\Console\HasConsole;

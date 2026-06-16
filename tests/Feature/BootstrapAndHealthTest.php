@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Command\CommandRecord;
-use App\Domain\Job\JobRecord;
-use App\Domain\Storage\StorageCheckRecord;
-use App\Domain\Storage\StorageLocationKey;
-use App\Domain\Storage\StorageLocationRecord;
-use App\Services\Boot\BootstrapService;
-use App\Services\Boot\MigrationRunner;
-use App\Services\Boot\SqliteConfigurator;
-use App\Services\Storage\StorageCapabilityChecker;
-use App\Services\Storage\StorageRootService;
+use App\Commands\CommandRecord;
+use App\Jobs\JobRecord;
+use App\System\Boot\BootstrapService;
+use App\System\Boot\MigrationRunner;
+use App\System\Boot\SqliteConfigurator;
+use App\System\Storage\StorageCapabilityChecker;
+use App\System\Storage\StorageCheckRecord;
+use App\System\Storage\StorageLocationKey;
+use App\System\Storage\StorageLocationRecord;
+use App\System\Storage\StorageRootService;
 use Tempest\Database\PrimaryKey;
 
 test('boot creates sqlite schema command and job records', function (): void {
@@ -41,15 +41,15 @@ test('health endpoint returns ok after boot', function (): void {
 });
 
 test('provider registry resolves fake uris', function (): void {
-    $registry = $this->container->get(\App\Domain\Provider\ProviderRegistry::class);
-    $provider = $registry->resolveForUri(\App\Domain\Provider\StashdUri::parse('fake://channel/demo'));
+    $registry = $this->container->get(\App\Providers\ProviderRegistry::class);
+    $provider = $registry->resolveForUri(\App\Providers\StashdUri::parse('fake://channel/demo'));
 
     expect($provider->key())->toBe('fake');
 });
 
 test('provider registry resolves youtube uris', function (): void {
-    $registry = $this->container->get(\App\Domain\Provider\ProviderRegistry::class);
-    $provider = $registry->resolveForUri(\App\Domain\Provider\StashdUri::parse('https://www.youtube.com/watch?v=demoVideo01'));
+    $registry = $this->container->get(\App\Providers\ProviderRegistry::class);
+    $provider = $registry->resolveForUri(\App\Providers\StashdUri::parse('https://www.youtube.com/watch?v=demoVideo01'));
 
     expect($provider->key())->toBe('youtube');
 });

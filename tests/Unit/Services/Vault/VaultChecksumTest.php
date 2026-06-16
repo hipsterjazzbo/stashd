@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Vault;
 
-use App\Services\Vault\VaultChecksum;
+use App\Vault\VaultChecksum;
 
 test('vault checksum formats and verifies sha256 digests', function (): void {
     $path = sys_get_temp_dir() . '/stashd-checksum-' . bin2hex(random_bytes(4));

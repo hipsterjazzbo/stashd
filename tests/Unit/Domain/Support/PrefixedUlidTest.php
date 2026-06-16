@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domain\Support;
 
-use App\Domain\Support\PrefixedUlid;
-use App\Domain\Support\PrefixedUlidGenerator;
+use App\Support\PrefixedUlid;
+use App\Support\PrefixedUlidGenerator;
 
 test('prefixed ulid validates format', function (): void {
     $id = new PrefixedUlid('stash', '01ARZ3NDEKTSV4RRFFQ69G5FAV');

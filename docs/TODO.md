@@ -1,5 +1,13 @@
 # Stashd implementation roadmap (foundation → v1)
 
+## Code organization (complete)
+
+- [x] Feature-first `app/` layout — see [docs/architecture/code-organization.md](architecture/code-organization.md)
+- [x] Removed `app/Domain`, `app/Services`, `app/Infrastructure`, `app/Controllers`, `app/Bootstrap`
+- [x] Consolidated broadcast + media-server command handlers; inlined broadcast lifecycle helpers
+- [x] Renamed download/vault/stash/provider types (behavior, routes, API JSON unchanged)
+- [x] Pest suite green after namespace migration (172 passed)
+
 ## Foundation (complete)
 
 - [x] Tempest app boot + configuration
@@ -78,7 +86,7 @@
 - [x] YouTube URL resolution (`@handle`, `/channel/UC…`, playlist, watch, youtu.be)
 - [x] RSS discovery strategy (`youtube.rss`) — no API key, fixture-driven CI tests
 - [x] Optional Data API metadata strategy (`youtube.data_api`) — skipped without `YOUTUBE_DATA_API_KEY`
-- [x] ytdlphp download adapter boundary (`YtdlpDownloadAdapter` + placeholder; no Vault/temp writes)
+- [x] ytdlphp download adapter boundary (`YouTubeYtdlpDownloadStrategy` + placeholder; no Vault/temp writes)
 - [x] Provider capability split (`DiscoveryStrategyHandler`, `MetadataStrategyHandler`, `DownloadStrategyHandler`)
 - [x] `ProviderStrategySelector` filters unavailable/last-resort strategies
 - [x] Typed provider domain boundaries (per engineering spec — raw strings at I/O edges only)
@@ -124,8 +132,8 @@
 - [x] `YtdlpGateway` / `YtdlpGatewayImpl` — only Stashd boundary to ytdlphp (no direct process calls)
 - [x] `StubYtdlpGateway` for tests/CI (no network)
 - [x] `YtdlpDownloader` + `YtdlpOptionsBuilder` (video 1080p merge, audio mp3 128k)
-- [x] `RoutingDownloader` — fake provider → `FakeDownloader`; others → ytdlphp when enabled
-- [x] `YtdlphpDownloadAdapter` for YouTube provider strategy registry
+- [x] `DelegatingDownloader` — fake provider → `FakeDownloader`; others → ytdlphp when enabled
+- [x] `YouTubeYtdlpDownloadStrategy` for YouTube provider strategy registry
 - [x] Phase 4A pipeline unchanged: temp → batch ingest → checksum → Vault → sidecars
 - [x] Tests: `tests/Unit/Services/Download/YtdlpDownloaderTest.php`, `tests/Feature/YtdlpDownloadTest.php`
 - [x] Opt-in live probe test: `STASHD_LIVE_DOWNLOAD_TESTS=1` (`tests/Feature/LiveYtdlpDownloadTest.php`)
@@ -136,8 +144,8 @@
 
 ### Phase 5A — Broadcast engine + hardlink-first filesystem publishing (complete)
 
-- [x] `BroadcastTypeHandler` interface + `BroadcastTypeRegistry`
-- [x] Lifecycle services: `BroadcastPlanner`, `BroadcastPublisher`, `BroadcastVerifier`, `BroadcastPruner`, `BroadcastLifecycleService`
+- [x] `BroadcastFormat` interface + `BroadcastTypeRegistry`
+- [x] Lifecycle service: `BroadcastLifecycleService` (plan/publish/verify/prune inlined)
 - [x] `filesystem_series` broadcast type (hardlinked media under `/media/broadcasts/{broadcastId}/`)
 - [x] Hardlink-first publish via `HardlinkPublisher` — no silent copy; `broadcast_hardlink_unavailable` on failure
 - [x] Async commands: `broadcast.plan`, `broadcast.rebuild`, `broadcast.verify`, `broadcast.prune`
@@ -180,7 +188,7 @@
 - [x] Docker smoke: Phase 2 schema tables (`activity_events`, `event_notifications`) on fresh boot
 - [x] Docker smoke: supervisord worker + scheduler + roadrunner process health
 - [x] Docker smoke: authenticated `/api/v1/system/health` with `vault_broadcast_hardlink` on bind mounts
-- [x] Pest suite green (174 tests: … Phase 5B Jellyfin/Plex broadcasts + scan triggers)
+- [x] Pest suite green (172 tests: … Phase 5B Jellyfin/Plex broadcasts + scan triggers)
 - [x] Docker smoke: fake-provider preflight → create-from-preflight end-to-end
 - [x] Docker smoke: fake-provider download → temp → Vault → asset ready (+ restart persistence)
 - [x] Docker smoke: filesystem broadcast create → rebuild → verify after restart

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Provider;
 
-use App\Domain\Provider\Fake\FakeProvider;
-use App\Domain\Provider\StrategyCost;
-use App\Domain\Provider\StrategyPurpose;
-use App\Services\Provider\ProviderStrategySelector;
+use App\Providers\Fake\FakeProvider;
+use App\Providers\ProviderStrategySelector;
+use App\Providers\StrategyCost;
+use App\Providers\StrategyPurpose;
 
 test('provider strategy selector picks the lowest cost discovery strategy', function (): void {
     $provider = new FakeProvider();

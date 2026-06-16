@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Api;
 
-use App\Domain\Broadcast\BroadcastItemRecord;
-use App\Domain\Broadcast\BroadcastRecord;
-use App\Domain\Command\CommandRecord;
-use App\Domain\Job\JobRecord;
-use App\Domain\Media\AssetRecord;
-use App\Domain\Media\MediaItemRecord;
-use App\Domain\MediaServer\MediaServerConnectionRecord;
+use App\Broadcasts\BroadcastItemRecord;
+use App\Broadcasts\BroadcastRecord;
+use App\Commands\CommandRecord;
+use App\Jobs\JobRecord;
+use App\MediaServers\MediaServerConnectionRecord;
+use App\Vault\AssetRecord;
+use App\Vault\MediaItemRecord;
 
 final class ApiResourceMapper
 {

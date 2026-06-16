@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Activity\ActivityEventRecord;
-use App\Domain\Broadcast\BroadcastTriggerRunRecord;
-use App\Domain\Broadcast\BroadcastType;
-use App\Domain\Secret\SecretRecord;
-use App\Services\Broadcast\BroadcastNfoBuilder;
-use App\Services\Broadcast\BroadcastPlanner;
-use App\Services\Secret\SecretsService;
+use App\Broadcasts\BroadcastLifecycleService;
+use App\Broadcasts\BroadcastNfoBuilder;
+use App\Broadcasts\BroadcastTriggerRunRecord;
+use App\Broadcasts\BroadcastType;
+use App\System\Activity\ActivityEventRecord;
+use App\System\Secret\SecretRecord;
+use App\System\Secret\SecretsService;
 use Tempest\Http\Status;
 
 test('jellyfin_series broadcast plan includes SxxExxx filenames and nfo sidecars', function (): void {
@@ -26,8 +26,8 @@ test('jellyfin_series broadcast plan includes SxxExxx filenames and nfo sidecars
     ], headers: $headers);
     $this->processAllJobs();
 
-    $plan = $this->container->get(BroadcastPlanner::class)
-        ->plan(\App\Domain\Support\PrefixedUlid::parse($broadcastId));
+    $plan = $this->container->get(BroadcastLifecycleService::class)
+        ->plan(\App\Support\PrefixedUlid::parse($broadcastId));
 
     expect($plan->files[0]->filename)->toMatch('/^S\d{2}E\d{3} - /')
         ->and($plan->sidecars)->not->toBeEmpty();
@@ -96,7 +96,7 @@ test('media server connection stores token through secrets service', function ()
         'token' => 'super-secret-jellyfin-token-value',
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $connection = \App\Domain\MediaServer\MediaServerConnectionRecord::findById(
+    $connection = \App\MediaServers\MediaServerConnectionRecord::findById(
         new \Tempest\Database\PrimaryKey($response->body['media_server']['id']),
     );
 
@@ -268,7 +268,7 @@ test('broadcast nfo builder escapes unsafe xml characters', function (): void {
 });
 
 test('jellyfin and plex broadcast types are registered distinctly from filesystem_series', function (): void {
-    $registry = $this->container->get(\App\Services\Broadcast\BroadcastTypeRegistry::class);
+    $registry = $this->container->get(\App\Broadcasts\BroadcastTypeRegistry::class);
 
     expect($registry->handlerFor(BroadcastType::FilesystemSeries)->key())->toBe('filesystem_series')
         ->and($registry->handlerFor(BroadcastType::JellyfinSeries)->key())->toBe('jellyfin_series')

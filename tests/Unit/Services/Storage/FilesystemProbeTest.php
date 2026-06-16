@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Storage;
 
-use App\Services\Storage\FilesystemProbe;
+use App\System\Storage\FilesystemProbe;
 
 test('hardlink failure returns actionable error code', function (): void {
     $probe = new FilesystemProbe();

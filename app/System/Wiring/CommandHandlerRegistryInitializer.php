@@ -1,0 +1,49 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\System\Wiring;
+
+use App\Broadcasts\BroadcastCommandHandler;
+use App\Broadcasts\BroadcastRepository;
+use App\Commands\CommandHandlerRegistry;
+use App\Commands\CommandRepository;
+use App\Commands\CommandType;
+use App\Downloads\ItemDownloadCommandHandler;
+use App\Jobs\JobRepository;
+use App\MediaServers\MediaServerCommandHandler;
+use App\MediaServers\MediaServerConnectionRepository;
+use App\Stashes\StashCreateFromPreflightCommandHandler;
+use App\Stashes\StashPreflightCommandHandler;
+use App\System\SystemStorageCheckCommandHandler;
+use App\Vault\AssetVerifyCommandHandler;
+use App\Vault\SystemVerifyVaultCommandHandler;
+use Tempest\Container\Container;
+use Tempest\Container\Initializer;
+
+final class CommandHandlerRegistryInitializer implements Initializer
+{
+    public function initialize(Container $container): CommandHandlerRegistry
+    {
+        $commands = $container->get(CommandRepository::class);
+        $jobs = $container->get(JobRepository::class);
+        $broadcasts = $container->get(BroadcastRepository::class);
+        $connections = $container->get(MediaServerConnectionRepository::class);
+
+        return new CommandHandlerRegistry([
+            $container->get(StashPreflightCommandHandler::class),
+            $container->get(StashCreateFromPreflightCommandHandler::class),
+            $container->get(ItemDownloadCommandHandler::class),
+            $container->get(SystemStorageCheckCommandHandler::class),
+            $container->get(SystemVerifyVaultCommandHandler::class),
+            $container->get(AssetVerifyCommandHandler::class),
+            new BroadcastCommandHandler($commands, $jobs, $broadcasts, CommandType::BroadcastPlan),
+            new BroadcastCommandHandler($commands, $jobs, $broadcasts, CommandType::BroadcastRebuild),
+            new BroadcastCommandHandler($commands, $jobs, $broadcasts, CommandType::BroadcastVerify),
+            new BroadcastCommandHandler($commands, $jobs, $broadcasts, CommandType::BroadcastPrune),
+            new BroadcastCommandHandler($commands, $jobs, $broadcasts, CommandType::BroadcastTrigger),
+            new MediaServerCommandHandler($commands, $jobs, $connections, CommandType::MediaServerTestConnection),
+            new MediaServerCommandHandler($commands, $jobs, $connections, CommandType::MediaServerListLibraries),
+        ]);
+    }
+}

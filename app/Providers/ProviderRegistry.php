@@ -1,0 +1,51 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Providers;
+
+use App\Providers\Fake\FakeProvider;
+use App\Providers\YouTube\YouTubeProvider;
+use InvalidArgumentException;
+use Tempest\Container\Singleton;
+
+#[Singleton]
+final class ProviderRegistry
+{
+    /** @var array<string, Provider> */
+    private array $providers = [];
+
+    public function __construct(FakeProvider $fakeProvider, YouTubeProvider $youtubeProvider)
+    {
+        $this->register($fakeProvider);
+        $this->register($youtubeProvider);
+    }
+
+    public function register(Provider $provider): void
+    {
+        $this->providers[$provider->key()] = $provider;
+    }
+
+    public function get(string $key): Provider
+    {
+        return $this->providers[$key]
+            ?? throw new InvalidArgumentException("Unknown provider: {$key}");
+    }
+
+    /** @return list<Provider> */
+    public function all(): array
+    {
+        return array_values($this->providers);
+    }
+
+    public function resolveForUri(StashdUri $uri): Provider
+    {
+        foreach ($this->providers as $provider) {
+            if ($provider->supportsUri($uri)) {
+                return $provider;
+            }
+        }
+
+        throw new InvalidArgumentException("No provider supports URI: {$uri}");
+    }
+}

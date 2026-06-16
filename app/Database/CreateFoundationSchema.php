@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Database;
 
-use App\Domain\Command\CommandState;
-use App\Domain\Command\CommandType;
-use App\Domain\Job\JobIntent;
-use App\Domain\Job\JobState;
-use App\Domain\Storage\StorageCheckState;
-use App\Domain\Storage\StorageCheckType;
-use App\Domain\Storage\StorageLocationKey;
-use App\Domain\Storage\StorageLocationState;
+use App\Commands\CommandState;
+use App\Commands\CommandType;
+use App\Jobs\JobIntent;
+use App\Jobs\JobState;
+use App\System\Storage\StorageCheckState;
+use App\System\Storage\StorageCheckType;
+use App\System\Storage\StorageLocationKey;
+use App\System\Storage\StorageLocationState;
 use Tempest\Database\MigratesUp;
 use Tempest\Database\QueryStatement;
 use Tempest\Database\QueryStatements\CompoundStatement;

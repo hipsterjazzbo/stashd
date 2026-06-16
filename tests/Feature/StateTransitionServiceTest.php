@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Command\CommandState;
-use App\Domain\Command\CommandType;
-use App\Domain\Job\JobIntent;
-use App\Domain\Job\JobState;
-use App\Infrastructure\Persistence\CommandRepository;
-use App\Infrastructure\Persistence\JobRepository;
-use App\Services\State\InvalidStateTransition;
-use App\Services\State\StateTransitionService;
+use App\Commands\CommandRepository;
+use App\Commands\CommandState;
+use App\Commands\CommandType;
+use App\Jobs\JobIntent;
+use App\Jobs\JobRepository;
+use App\Jobs\JobState;
+use App\System\State\InvalidStateTransition;
+use App\System\State\StateTransitionService;
 
 test('state transition service persists valid command transitions', function (): void {
     $commands = $this->container->get(CommandRepository::class);

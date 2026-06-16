@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console;
 
-use App\Infrastructure\RoadRunner\RoadRunnerProcessLauncher;
+use App\System\RoadRunner\RoadRunnerProcessLauncher;
 use Tempest\Console\ConsoleArgument;
 use Tempest\Console\ConsoleCommand;
 use Tempest\Console\ExitCode;

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Broadcast;
 
-use App\Domain\Broadcast\BroadcastItemState;
-use App\Domain\Broadcast\BroadcastState;
-use App\Services\Broadcast\BroadcastFilenameBuilder;
-use App\Services\Broadcast\InodeHelper;
+use App\Broadcasts\BroadcastFilenameBuilder;
+use App\Broadcasts\BroadcastItemState;
+use App\Broadcasts\BroadcastState;
+use App\Broadcasts\HardlinkPublisher;
 
 test('broadcast state transitions follow lifecycle rules', function (): void {
     expect(BroadcastState::Pending->canTransitionTo(BroadcastState::Processing))->toBeTrue()
@@ -32,10 +32,10 @@ test('inode helper detects hardlinked files', function (): void {
     file_put_contents($source, 'linked');
     link($source, $target);
 
-    expect(InodeHelper::sameFile($source, $target))->toBeTrue();
+    expect(HardlinkPublisher::sameFile($source, $target))->toBeTrue();
 
     file_put_contents($dir . '/copy.txt', 'linked');
-    expect(InodeHelper::sameFile($source, $dir . '/copy.txt'))->toBeFalse();
+    expect(HardlinkPublisher::sameFile($source, $dir . '/copy.txt'))->toBeFalse();
 
     unlink($source);
     unlink($target);
@@ -46,10 +46,10 @@ test('inode helper detects hardlinked files', function (): void {
 test('broadcast filename builder produces safe readable names', function (): void {
     $builder = new BroadcastFilenameBuilder();
 
-    expect($builder->seasonFolder(new \App\Domain\Stash\StashItemRecord(
+    expect($builder->seasonFolder(new \App\Stashes\StashItemRecord(
         stashId: 's',
         mediaItemId: 'm',
-        state: \App\Domain\Stash\StashItemState::Active,
+        state: \App\Stashes\StashItemState::Active,
         seasonNumber: 2,
     )))->toBe('Season 02');
 });

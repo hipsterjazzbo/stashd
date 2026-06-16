@@ -1,0 +1,54 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Providers\Core;
+
+use App\Providers\StashdUri;
+use Tempest\DateTime\DateTime;
+
+final readonly class DiscoveredItem
+{
+    /**
+     * @param array<string, mixed>|null $rawMetadata
+     */
+    public function __construct(
+        public string $providerItemId,
+        public StashdUri $canonicalUri,
+        public string $title,
+        public ?int $durationSeconds = null,
+        public ?DateTime $publishedAt = null,
+        public ?StashdUri $thumbnailUri = null,
+        public ?array $rawMetadata = null,
+    ) {
+    }
+
+    /** @return array<string, mixed> */
+    public static function toArray(self $item): array
+    {
+        $payload = [
+            'provider_item_id' => $item->providerItemId,
+            'canonical_uri' => $item->canonicalUri->toString(),
+            'title' => $item->title,
+            'duration_seconds' => $item->durationSeconds,
+            'published_at' => $item->publishedAt?->toRfc3339(useZ: true),
+            'thumbnail_uri' => $item->thumbnailUri?->toString(),
+        ];
+
+        if ($item->rawMetadata !== null) {
+            $payload['raw_metadata'] = $item->rawMetadata;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param list<self> $items
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function manyToArray(array $items): array
+    {
+        return array_map(self::toArray(...), $items);
+    }
+}

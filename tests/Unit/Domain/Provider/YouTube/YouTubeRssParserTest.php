@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domain\Provider\YouTube;
 
-use App\Domain\Provider\ProviderException;
-use App\Domain\Provider\YouTube\YouTubeRssParser;
+use App\Providers\ProviderException;
+use App\Providers\YouTube\YouTubeRssParser;
 
 test('youtube rss parser maps atom entries to discovered items', function (): void {
     $xml = file_get_contents(__DIR__ . '/../../../../fixtures/providers/youtube/http/channel_rss.xml');

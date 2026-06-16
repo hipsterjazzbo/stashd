@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Config\StashdConfig;
-use App\Domain\Media\AssetRole;
-use App\Domain\Media\AssetState;
-use App\Domain\Media\MediaItemRecord;
-use App\Domain\Media\MediaItemState;
-use App\Domain\Storage\StorageLocationKey;
-use App\Domain\Storage\StorageLocationState;
-use App\Infrastructure\Persistence\AssetRepository;
-use App\Infrastructure\Persistence\StorageLocationRepository;
-use App\Services\Vault\VaultVerifyService;
-use App\Services\Vault\VerifyAssetOutcome;
+use App\System\Storage\StorageLocationKey;
+use App\System\Storage\StorageLocationRepository;
+use App\System\Storage\StorageLocationState;
+use App\Vault\AssetRepository;
+use App\Vault\AssetRole;
+use App\Vault\AssetState;
+use App\Vault\MediaItemRecord;
+use App\Vault\MediaItemState;
+use App\Vault\VerifyAssetOutcome;
+use App\Vault\VerifyVaultAssets;
 use Tempest\Http\Status;
 
 test('item.download command response uses snake_case keys', function (): void {
@@ -150,7 +150,7 @@ test('second download skips without overwriting vault original bytes', function 
 
     $assets = $this->container->get(AssetRepository::class)
         ->findByMediaItemAndRole(
-            \App\Domain\Support\PrefixedUlid::parse($mediaItemId),
+            \App\Support\PrefixedUlid::parse($mediaItemId),
             AssetRole::VaultOriginal,
         );
     expect($assets?->checksum)->toBe('sha256:' . $checksum);
@@ -194,7 +194,7 @@ test('retry after failed temp download reuses a clean temp directory', function 
 test('asset verify detects checksum mismatch distinctly from missing files', function (): void {
     [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('checksum-drift');
     $assets = $this->container->get(AssetRepository::class);
-    $verify = $this->container->get(VaultVerifyService::class);
+    $verify = $this->container->get(VerifyVaultAssets::class);
 
     $this->http->post('/api/v1/commands', [
         'type' => 'item.download',
@@ -206,14 +206,14 @@ test('asset verify detects checksum mismatch distinctly from missing files', fun
     $this->processAllJobs();
 
     $original = $assets->findByMediaItemAndRole(
-        \App\Domain\Support\PrefixedUlid::parse($mediaItemId),
+        \App\Support\PrefixedUlid::parse($mediaItemId),
         AssetRole::VaultOriginal,
     );
     file_put_contents((string) $original?->path, 'corrupted-by-test');
 
-    $outcome = $verify->verifyAsset(\App\Domain\Support\PrefixedUlid::parse((string) $original?->id));
+    $outcome = $verify->verifyAsset(\App\Support\PrefixedUlid::parse((string) $original?->id));
     $original = $assets->findByMediaItemAndRole(
-        \App\Domain\Support\PrefixedUlid::parse($mediaItemId),
+        \App\Support\PrefixedUlid::parse($mediaItemId),
         AssetRole::VaultOriginal,
     );
 
@@ -228,7 +228,7 @@ test('asset verify detects checksum mismatch distinctly from missing files', fun
 test('missing sidecar metadata does not mark media item missing', function (): void {
     [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('sidecar-missing');
     $assets = $this->container->get(AssetRepository::class);
-    $verify = $this->container->get(VaultVerifyService::class);
+    $verify = $this->container->get(VerifyVaultAssets::class);
 
     $this->http->post('/api/v1/commands', [
         'type' => 'item.download',
@@ -240,12 +240,12 @@ test('missing sidecar metadata does not mark media item missing', function (): v
     $this->processAllJobs();
 
     $metadata = $assets->findByMediaItemAndRole(
-        \App\Domain\Support\PrefixedUlid::parse($mediaItemId),
+        \App\Support\PrefixedUlid::parse($mediaItemId),
         AssetRole::MetadataJson,
     );
     unlink((string) $metadata?->path);
 
-    $outcome = $verify->verifyAsset(\App\Domain\Support\PrefixedUlid::parse((string) $metadata?->id));
+    $outcome = $verify->verifyAsset(\App\Support\PrefixedUlid::parse((string) $metadata?->id));
     $item = MediaItemRecord::findById(new \Tempest\Database\PrimaryKey($mediaItemId));
 
     expect($outcome)->toBe(VerifyAssetOutcome::Missing)
@@ -294,7 +294,7 @@ test('verify vault skips when storage root is unavailable', function (): void {
         ->and($command->body['command']['result']['checked'])->toBe(0);
 
     $original = $assets->findByMediaItemAndRole(
-        \App\Domain\Support\PrefixedUlid::parse($mediaItemId),
+        \App\Support\PrefixedUlid::parse($mediaItemId),
         AssetRole::VaultOriginal,
     );
     expect($original?->state)->toBe(AssetState::Ready);

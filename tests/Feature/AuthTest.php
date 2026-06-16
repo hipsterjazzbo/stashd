@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Services\Auth\AuthService;
+use App\Auth\AuthService;
 use Tempest\Http\Status;
 
 test('owner setup creates the first user', function (): void {

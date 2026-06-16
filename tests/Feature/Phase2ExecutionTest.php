@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Activity\ActivityEventRecord;
-use App\Domain\Command\CommandType;
-use App\Domain\Event\EventNotificationRecord;
-use App\Domain\Job\JobIntent;
-use App\Domain\Job\JobRecord;
-use App\Domain\Job\JobState;
-use App\Infrastructure\Persistence\RecordTimestamps;
-use App\Services\Auth\AuthContext;
-use App\Services\Auth\AuthService;
-use App\Services\Event\EventPublisher;
-use App\Services\Job\JobWorkerService;
+use App\Auth\AuthContext;
+use App\Auth\AuthService;
+use App\Commands\CommandType;
+use App\Jobs\JobIntent;
+use App\Jobs\JobRecord;
+use App\Jobs\JobState;
+use App\Jobs\JobWorkerService;
+use App\Support\RecordTimestamps;
+use App\System\Activity\ActivityEventRecord;
+use App\System\Event\EventNotificationRecord;
+use App\System\Event\EventPublisher;
 use Tempest\Http\Status;
 
 test('commands api dispatches stash preflight command', function (): void {
@@ -100,7 +100,7 @@ test('jobs api lists recent jobs', function (): void {
 
 test('job worker records failure with last error', function (): void {
     $headers = $this->authHeaders();
-    $jobs = $this->container->get(\App\Infrastructure\Persistence\JobRepository::class);
+    $jobs = $this->container->get(\App\Jobs\JobRepository::class);
 
     $job = $jobs->create(
         intent: JobIntent::Enrich,
@@ -195,7 +195,7 @@ test('event publisher writes sse notification rows', function (): void {
 });
 
 test('events endpoint requires authentication', function (): void {
-    $users = $this->container->get(\App\Infrastructure\Persistence\UserRepository::class);
+    $users = $this->container->get(\App\Auth\UserRepository::class);
     $users->createOwner(
         email: 'owner@stashd.test',
         username: 'owner',
@@ -224,7 +224,7 @@ test('bearer auth does not leak to subsequent unauthenticated requests', functio
 });
 
 test('api token uses stashd_pat prefix and supports lookup and revoke', function (): void {
-    $users = $this->container->get(\App\Infrastructure\Persistence\UserRepository::class);
+    $users = $this->container->get(\App\Auth\UserRepository::class);
     $auth = $this->container->get(AuthService::class);
     $user = $users->createOwner(
         email: 'owner@stashd.test',
@@ -239,29 +239,29 @@ test('api token uses stashd_pat prefix and supports lookup and revoke', function
     $headers = ['Authorization' => 'Bearer ' . $created['token']];
     $this->http->get('/api/v1/auth/me', headers: $headers)->assertOk();
 
-    $auth->revokeApiToken($user, \App\Domain\Support\PrefixedUlid::parse($created['id']));
+    $auth->revokeApiToken($user, \App\Support\PrefixedUlid::parse($created['id']));
     $this->http->get('/api/v1/auth/me', headers: $headers)->assertStatus(Status::UNAUTHORIZED);
 });
 
 test('scheduler creates preflight commands for due automatic stash inputs', function (): void {
-    $stashRepo = $this->container->get(\App\Infrastructure\Persistence\StashRepository::class);
-    $inputRepo = $this->container->get(\App\Infrastructure\Persistence\StashInputRepository::class);
-    $scheduler = $this->container->get(\App\Services\Scheduler\RoutineDiscoveryScheduler::class);
+    $stashRepo = $this->container->get(\App\Stashes\StashRepository::class);
+    $inputRepo = $this->container->get(\App\Stashes\StashInputRepository::class);
+    $scheduler = $this->container->get(\App\System\Scheduler\RoutineDiscoveryScheduler::class);
 
     $stash = $stashRepo->create('Scheduler Stash', 'scheduler-stash');
     $inputRepo->create(
-        stashId: \App\Domain\Support\PrefixedUlid::parse((string) $stash->id),
+        stashId: \App\Support\PrefixedUlid::parse((string) $stash->id),
         providerKey: 'fake',
-        inputType: \App\Domain\Stash\StashInputType::Channel,
+        inputType: \App\Stashes\StashInputType::Channel,
         sourceUri: 'fake://channel/scheduler-demo',
         providerInputId: 'scheduler-demo',
         title: 'Scheduler Channel',
-        syncMode: \App\Domain\Stash\SyncMode::Automatic,
+        syncMode: \App\Stashes\SyncMode::Automatic,
     );
 
     expect($scheduler->runDueChecks())->toBe(1);
 
-    $command = \App\Domain\Command\CommandRecord::select()
+    $command = \App\Commands\CommandRecord::select()
         ->where('type = ?', CommandType::StashPreflight)
         ->orderBy('createdAt', \Tempest\Database\Direction::DESC)
         ->first();

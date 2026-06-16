@@ -13,8 +13,8 @@ abstract class IntegrationTestCase extends IntegrationTest
     /** @return array{Authorization: string} */
     public function authHeaders(): array
     {
-        $auth = $this->container->get(\App\Services\Auth\AuthService::class);
-        $users = $this->container->get(\App\Infrastructure\Persistence\UserRepository::class);
+        $auth = $this->container->get(\App\Auth\AuthService::class);
+        $users = $this->container->get(\App\Auth\UserRepository::class);
 
         if ($auth->isSetupRequired()) {
             $user = $users->createOwner(
@@ -34,7 +34,7 @@ abstract class IntegrationTestCase extends IntegrationTest
 
     public function processAllJobs(): void
     {
-        $worker = $this->container->get(\App\Services\Job\JobWorkerService::class);
+        $worker = $this->container->get(\App\Jobs\JobWorkerService::class);
 
         while ($worker->processNextJob()) {
         }
@@ -60,12 +60,12 @@ abstract class IntegrationTestCase extends IntegrationTest
         ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
         $this->processAllJobs();
 
-        $stash = \App\Domain\Stash\StashRecord::select()->orderBy('createdAt', \Tempest\Database\Direction::DESC)->first();
-        $stashItem = \App\Domain\Stash\StashItemRecord::select()
+        $stash = \App\Stashes\StashRecord::select()->orderBy('createdAt', \Tempest\Database\Direction::DESC)->first();
+        $stashItem = \App\Stashes\StashItemRecord::select()
             ->where('stashId = ?', (string) $stash->id)
             ->orderBy('position', \Tempest\Database\Direction::ASC)
             ->first();
-        $media = \App\Domain\Media\MediaItemRecord::findById(new \Tempest\Database\PrimaryKey((string) $stashItem->mediaItemId));
+        $media = \App\Vault\MediaItemRecord::findById(new \Tempest\Database\PrimaryKey((string) $stashItem->mediaItemId));
 
         return [$headers, (string) $stash->id, (string) $media->id];
     }
@@ -93,12 +93,12 @@ abstract class IntegrationTestCase extends IntegrationTest
         ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
         $this->processAllJobs();
 
-        $stash = \App\Domain\Stash\StashRecord::select()->orderBy('createdAt', \Tempest\Database\Direction::DESC)->first();
-        $stashItem = \App\Domain\Stash\StashItemRecord::select()
+        $stash = \App\Stashes\StashRecord::select()->orderBy('createdAt', \Tempest\Database\Direction::DESC)->first();
+        $stashItem = \App\Stashes\StashItemRecord::select()
             ->where('stashId = ?', (string) $stash->id)
             ->orderBy('position', \Tempest\Database\Direction::ASC)
             ->first();
-        $media = \App\Domain\Media\MediaItemRecord::findById(new \Tempest\Database\PrimaryKey((string) $stashItem->mediaItemId));
+        $media = \App\Vault\MediaItemRecord::findById(new \Tempest\Database\PrimaryKey((string) $stashItem->mediaItemId));
 
         return [$headers, (string) $stash->id, (string) $media->id];
     }

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Secret\SecretType;
-use App\Services\Secret\SecretsService;
+use App\System\Secret\SecretsService;
+use App\System\Secret\SecretType;
 
 test('secrets service encrypts and decrypts roundtrip', function (): void {
     $secrets = $this->container->get(SecretsService::class);

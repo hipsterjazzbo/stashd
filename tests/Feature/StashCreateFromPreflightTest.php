@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Media\MediaItemRecord;
-use App\Domain\Stash\StashInputRecord;
-use App\Domain\Stash\StashItemRecord;
-use App\Domain\Stash\StashRecord;
+use App\Stashes\StashInputRecord;
+use App\Stashes\StashItemRecord;
+use App\Stashes\StashRecord;
+use App\Vault\MediaItemRecord;
 use Tempest\Http\Status;
 
 test('create from preflight command creates stash domain records asynchronously', function (): void {
@@ -55,7 +55,7 @@ test('create from preflight command creates stash domain records asynchronously'
 
 test('create from preflight reuses existing media items by provider identity', function (): void {
     $headers = $this->authHeaders();
-    $mediaItems = $this->container->get(\App\Infrastructure\Persistence\MediaItemRepository::class);
+    $mediaItems = $this->container->get(\App\Vault\MediaItemRepository::class);
 
     $mediaItems->create(
         providerKey: 'fake',

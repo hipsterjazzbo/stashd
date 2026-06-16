@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\Vault;
 
 use App\Config\StashdConfig;
-use App\Domain\Support\PrefixedUlid;
-use App\Services\Vault\TempStagingService;
+use App\Support\PrefixedUlid;
+use App\Vault\StageDownloadFiles;
 
 test('temp staging reuses job directory by cleaning stale partial files', function (): void {
     $media = sys_get_temp_dir() . '/stashd-temp-staging/media';
@@ -20,7 +20,7 @@ test('temp staging reuses job directory by cleaning stale partial files', functi
         umask: '0022',
         httpPort: '8474',
     );
-    $service = new TempStagingService($config);
+    $service = new StageDownloadFiles($config);
     $jobId = PrefixedUlid::parse('job_01J00000000000000000000001');
     $path = $service->createWorkDirectory($jobId);
     file_put_contents($path . '/partial.bin', 'partial');

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Command\CommandState;
-use App\Domain\Command\CommandType;
-use App\Domain\Job\JobIntent;
-use App\Domain\Stash\PreflightOrigin;
+use App\Commands\CommandState;
+use App\Commands\CommandType;
+use App\Jobs\JobIntent;
+use App\Stashes\PreflightOrigin;
 use Tempest\Http\Status;
 
 test('stash preflight endpoint accepts command and completes after worker processing', function (): void {
@@ -47,7 +47,7 @@ test('preflight persists completed command and ready job after worker run', func
         'origin' => 'api',
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $command = \App\Domain\Command\CommandRecord::select()
+    $command = \App\Commands\CommandRecord::select()
         ->where('type = ?', CommandType::StashPreflight)
         ->orderBy('createdAt', \Tempest\Database\Direction::DESC)
         ->first();
@@ -57,11 +57,11 @@ test('preflight persists completed command and ready job after worker run', func
 
     $this->processAllJobs();
 
-    $command = \App\Domain\Command\CommandRecord::findById($command->id);
+    $command = \App\Commands\CommandRecord::findById($command->id);
     expect($command->state->value)->toBe('completed')
         ->and($command->resultJson)->not->toBeNull();
 
-    $job = \App\Domain\Job\JobRecord::select()
+    $job = \App\Jobs\JobRecord::select()
         ->where('commandId = ?', (string) $command->id)
         ->first();
 

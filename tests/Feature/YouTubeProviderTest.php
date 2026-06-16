@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Media\MediaItemRecord;
-use App\Domain\Stash\StashItemRecord;
-use App\Domain\Stash\StashRecord;
+use App\Stashes\StashItemRecord;
+use App\Stashes\StashRecord;
+use App\Vault\MediaItemRecord;
 use Tempest\Http\Status;
 
 test('youtube preflight command completes asynchronously using fixtures', function (): void {
@@ -73,7 +73,7 @@ test('youtube create from preflight creates domain records without downloading',
 
 test('youtube media items deduplicate across multiple stashes', function (): void {
     $headers = $this->authHeaders();
-    $mediaItems = $this->container->get(\App\Infrastructure\Persistence\MediaItemRepository::class);
+    $mediaItems = $this->container->get(\App\Vault\MediaItemRepository::class);
 
     $mediaItems->create(
         providerKey: 'youtube',

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domain\Provider;
 
-use App\Domain\Provider\Fake\FakeProvider;
-use App\Domain\Provider\StashdUri;
+use App\Providers\Fake\FakeProvider;
+use App\Providers\StashdUri;
 
 test('fake provider discovers three channel items initially', function (): void {
     $provider = new FakeProvider();

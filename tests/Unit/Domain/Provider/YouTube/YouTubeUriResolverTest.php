@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domain\Provider\YouTube;
 
-use App\Domain\Provider\ProviderException;
-use App\Domain\Provider\StashdUri;
-use App\Domain\Provider\YouTube\YouTubeUriResolver;
+use App\Providers\ProviderException;
+use App\Providers\StashdUri;
+use App\Providers\YouTube\YouTubeUriResolver;
 
 test('youtube uri resolver accepts channel urls', function (): void {
     $input = YouTubeUriResolver::resolve(StashdUri::parse('https://www.youtube.com/channel/UCStashdDemoCh0012345678'));

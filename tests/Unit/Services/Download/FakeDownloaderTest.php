@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Download;
 
-use App\Domain\Download\DownloadRequest;
-use App\Domain\Download\Fake\FakeDownloader;
-use App\Domain\Provider\StashdUri;
-use App\Domain\Stash\DownloadPolicy;
-use App\Domain\Support\PrefixedUlid;
-use App\Domain\Vault\VaultSidecarBuilder;
+use App\Downloads\DownloadRequest;
+use App\Downloads\Fake\FakeDownloader;
+use App\Providers\StashdUri;
+use App\Stashes\DownloadPolicy;
+use App\Support\PrefixedUlid;
+use App\Vault\VaultSidecarBuilder;
 
 test('fake downloader writes deterministic files to temp directory', function (): void {
     $temp = sys_get_temp_dir() . '/stashd-fake-download-' . bin2hex(random_bytes(4));
@@ -51,4 +51,4 @@ test('fake downloader rejects metadata-only policy', function (): void {
     );
 
     $downloader->download($request);
-})->throws(\App\Domain\Download\DownloadException::class);
+})->throws(\App\Downloads\DownloadException::class);

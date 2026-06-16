@@ -6,18 +6,18 @@ namespace Tests\Unit\Domain\Provider\YouTube;
 
 use App\Config\YouTubeConfig;
 use App\Config\YtdlpConfig;
-use App\Domain\Provider\StrategyCost;
-use App\Domain\Provider\StrategyPurpose;
-use App\Domain\Provider\YouTube\YouTubeChannelIdResolver;
-use App\Domain\Provider\YouTube\YouTubeDataApiMetadataStrategy;
-use App\Domain\Provider\YouTube\YouTubeProvider;
-use App\Domain\Provider\YouTube\YouTubeRssDiscoveryStrategy;
-use App\Domain\Provider\YouTube\YouTubeRssParser;
-use App\Domain\Provider\YouTube\YouTubeVideoDiscovery;
-use App\Domain\Provider\YouTube\YtdlphpDownloadAdapter;
-use App\Infrastructure\Provider\FixtureProviderHttpClient;
-use App\Services\Provider\ProviderStrategySelector;
-use App\Services\Provider\StrategySelectionOptions;
+use App\Providers\Http\FixtureProviderHttpClient;
+use App\Providers\ProviderStrategySelector;
+use App\Providers\StrategyCost;
+use App\Providers\StrategyPurpose;
+use App\Providers\StrategySelectionOptions;
+use App\Providers\YouTube\YouTubeChannelIdResolver;
+use App\Providers\YouTube\YouTubeDataApiMetadataStrategy;
+use App\Providers\YouTube\YouTubeProvider;
+use App\Providers\YouTube\YouTubeRssDiscoveryStrategy;
+use App\Providers\YouTube\YouTubeRssParser;
+use App\Providers\YouTube\YouTubeVideoDiscovery;
+use App\Providers\YouTube\YouTubeYtdlpDownloadStrategy;
 
 function youtubeProviderWithFixtures(?string $apiKey = null, bool $realDownloads = false): YouTubeProvider
 {
@@ -45,9 +45,9 @@ function youtubeProviderWithFixtures(?string $apiKey = null, bool $realDownloads
             config: new YouTubeConfig(dataApiKey: $apiKey),
             http: $http,
         ),
-        downloadAdapter: new YtdlphpDownloadAdapter(
+        downloadAdapter: new YouTubeYtdlpDownloadStrategy(
             config: $ytdlpConfig,
-            gateway: new \App\Domain\Download\Ytdlp\StubYtdlpGateway(),
+            gateway: new \App\Downloads\Ytdlp\StubYtdlpGateway(),
         ),
     );
 }
@@ -60,7 +60,7 @@ test('youtube provider fixture channel discovery matches committed expectations'
     );
 
     $provider = youtubeProviderWithFixtures();
-    $input = $provider->resolveInput(\App\Domain\Provider\StashdUri::parse($fixture['source_uri']));
+    $input = $provider->resolveInput(\App\Providers\StashdUri::parse($fixture['source_uri']));
     $strategy = (new ProviderStrategySelector())->select($provider, StrategyPurpose::Discovery);
 
     expect($input->providerKey)->toBe($fixture['resolved_input']['provider_key'])
@@ -116,7 +116,7 @@ test('youtube strategy selector can include ytdlp when explicitly allowed and en
 });
 
 test('fake provider strategy selection remains unchanged', function (): void {
-    $provider = new \App\Domain\Provider\Fake\FakeProvider();
+    $provider = new \App\Providers\Fake\FakeProvider();
     $selector = new ProviderStrategySelector();
 
     expect($selector->select($provider, StrategyPurpose::Discovery)->key)->toBe('fake.feed');

@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Broadcasts\BroadcastFilenameBuilder;
+use App\Broadcasts\BroadcastLifecycleService;
+use App\Broadcasts\HardlinkPublisher;
 use App\Config\StashdConfig;
-use App\Domain\Activity\ActivityEventRecord;
-use App\Domain\Media\AssetRole;
-use App\Domain\Media\MediaItemRecord;
-use App\Domain\Stash\StashItemRecord;
-use App\Services\Broadcast\BroadcastFilenameBuilder;
-use App\Services\Broadcast\BroadcastPlanner;
-use App\Services\Broadcast\InodeHelper;
+use App\Stashes\StashItemRecord;
+use App\System\Activity\ActivityEventRecord;
+use App\Vault\AssetRole;
+use App\Vault\MediaItemRecord;
 use Tempest\Http\Status;
 
 test('create filesystem broadcast for stash returns snake_case json', function (): void {
@@ -46,8 +46,8 @@ test('broadcast.plan produces intended files without writing to disk', function 
         ->toBe('completed');
 
     $config = $this->container->get(StashdConfig::class);
-    $planner = $this->container->get(BroadcastPlanner::class);
-    $plan = $planner->plan(\App\Domain\Support\PrefixedUlid::parse($broadcastId));
+    $planner = $this->container->get(BroadcastLifecycleService::class);
+    $plan = $planner->plan(\App\Support\PrefixedUlid::parse($broadcastId));
 
     expect($plan->files)->toHaveCount(1)
         ->and($plan->files[0]->absolutePath)->toStartWith($config->broadcastsPath())
@@ -101,8 +101,8 @@ test('broadcast.rebuild publishes hardlinks from vault originals', function (): 
     expect(is_file($publishedPath))->toBeTrue()
         ->and(is_file($vaultPath))->toBeTrue();
 
-    if (InodeHelper::sameFile($vaultPath, $publishedPath)) {
-        expect(InodeHelper::sameFile($vaultPath, $publishedPath))->toBeTrue();
+    if (HardlinkPublisher::sameFile($vaultPath, $publishedPath)) {
+        expect(HardlinkPublisher::sameFile($vaultPath, $publishedPath))->toBeTrue();
     } else {
         expect(filesize($vaultPath))->toBe(filesize($publishedPath));
         expect(file_get_contents($vaultPath))->toBe(file_get_contents($publishedPath));
@@ -282,7 +282,7 @@ test('broadcast filename builder rejects path traversal segments', function (): 
     $stashItem = new StashItemRecord(
         stashId: 'stash_test',
         mediaItemId: 'media_test',
-        state: \App\Domain\Stash\StashItemState::Active,
+        state: \App\Stashes\StashItemState::Active,
         displayTitle: '../../etc/passwd',
     );
     $mediaItem = new MediaItemRecord(
@@ -290,8 +290,8 @@ test('broadcast filename builder rejects path traversal segments', function (): 
         providerItemId: 'item-1',
         canonicalUri: 'fake://item/1',
         title: '../secret',
-        state: \App\Domain\Media\MediaItemState::Ready,
-        upstreamState: \App\Domain\Media\UpstreamState::Available,
+        state: \App\Vault\MediaItemState::Ready,
+        upstreamState: \App\Vault\UpstreamState::Available,
     );
 
     $filename = $builder->episodeFilename($stashItem, $mediaItem, '/vault/original.fake', 1);
@@ -318,7 +318,7 @@ test('broadcast hardlink assets are recorded with derived vault source', functio
     ], headers: $headers);
     $this->processAllJobs();
 
-    $hardlink = \App\Domain\Media\AssetRecord::select()
+    $hardlink = \App\Vault\AssetRecord::select()
         ->where('broadcastId = ? AND role = ?', $broadcastId, AssetRole::Hardlink)
         ->first();
 

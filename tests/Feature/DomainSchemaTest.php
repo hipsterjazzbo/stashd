@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Domain\Broadcast\BroadcastRecord;
-use App\Domain\Broadcast\BroadcastType;
-use App\Domain\Media\MediaItemRecord;
-use App\Domain\Stash\StashInputRecord;
-use App\Domain\Stash\StashItemRecord;
-use App\Domain\Stash\StashRecord;
+use App\Broadcasts\BroadcastRecord;
+use App\Broadcasts\BroadcastType;
+use App\Stashes\StashInputRecord;
+use App\Stashes\StashItemRecord;
+use App\Stashes\StashRecord;
+use App\Vault\MediaItemRecord;
 use Tempest\Database\Database;
 use Tempest\Database\Query;
 
@@ -47,7 +47,7 @@ test('domain schema migration creates all v1 tables on a fresh database', functi
 });
 
 test('media item provider identity is unique', function (): void {
-    $repo = $this->container->get(\App\Infrastructure\Persistence\MediaItemRepository::class);
+    $repo = $this->container->get(\App\Vault\MediaItemRepository::class);
 
     $repo->create(
         providerKey: 'fake',
@@ -65,40 +65,40 @@ test('media item provider identity is unique', function (): void {
 });
 
 test('stash item enforces stash and media item relationship uniqueness', function (): void {
-    $stashes = $this->container->get(\App\Infrastructure\Persistence\StashRepository::class);
-    $media = $this->container->get(\App\Infrastructure\Persistence\MediaItemRepository::class);
-    $items = $this->container->get(\App\Infrastructure\Persistence\StashItemRepository::class);
+    $stashes = $this->container->get(\App\Stashes\StashRepository::class);
+    $media = $this->container->get(\App\Vault\MediaItemRepository::class);
+    $items = $this->container->get(\App\Stashes\StashItemRepository::class);
 
     $stash = $stashes->create('Test Stash', 'test-stash');
     $mediaItem = $media->create('fake', 'rel-item', 'fake://item/rel-item', 'Rel Item');
 
     $items->create(
-        stashId: \App\Domain\Support\PrefixedUlid::parse((string) $stash->id),
-        mediaItemId: \App\Domain\Support\PrefixedUlid::parse((string) $mediaItem->id),
+        stashId: \App\Support\PrefixedUlid::parse((string) $stash->id),
+        mediaItemId: \App\Support\PrefixedUlid::parse((string) $mediaItem->id),
     );
 
     expect(fn () => $items->create(
-        stashId: \App\Domain\Support\PrefixedUlid::parse((string) $stash->id),
-        mediaItemId: \App\Domain\Support\PrefixedUlid::parse((string) $mediaItem->id),
+        stashId: \App\Support\PrefixedUlid::parse((string) $stash->id),
+        mediaItemId: \App\Support\PrefixedUlid::parse((string) $mediaItem->id),
     ))->toThrow(\Tempest\Database\Exceptions\QueryWasInvalid::class);
 });
 
 test('job requires a valid command foreign key', function (): void {
-    $jobs = $this->container->get(\App\Infrastructure\Persistence\JobRepository::class);
+    $jobs = $this->container->get(\App\Jobs\JobRepository::class);
 
     expect(fn () => $jobs->create(
-        intent: \App\Domain\Job\JobIntent::Preflight,
-        commandId: \App\Domain\Support\PrefixedUlid::parse('cmd_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
+        intent: \App\Jobs\JobIntent::Preflight,
+        commandId: \App\Support\PrefixedUlid::parse('cmd_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
     ))->toThrow(\Tempest\Database\Exceptions\QueryWasInvalid::class);
 });
 
 test('broadcast belongs to stash via foreign key', function (): void {
-    $stashes = $this->container->get(\App\Infrastructure\Persistence\StashRepository::class);
-    $broadcasts = $this->container->get(\App\Infrastructure\Persistence\BroadcastRepository::class);
+    $stashes = $this->container->get(\App\Stashes\StashRepository::class);
+    $broadcasts = $this->container->get(\App\Broadcasts\BroadcastRepository::class);
 
     $stash = $stashes->create('Broadcast Stash', 'broadcast-stash');
     $broadcast = $broadcasts->create(
-        stashId: \App\Domain\Support\PrefixedUlid::parse((string) $stash->id),
+        stashId: \App\Support\PrefixedUlid::parse((string) $stash->id),
         type: BroadcastType::AudioPodcast,
         name: 'Podcast',
         slug: 'podcast',
@@ -107,7 +107,7 @@ test('broadcast belongs to stash via foreign key', function (): void {
     expect($broadcast->stashId)->toBe((string) $stash->id);
 
     expect(fn () => $broadcasts->create(
-        stashId: \App\Domain\Support\PrefixedUlid::parse('stash_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
+        stashId: \App\Support\PrefixedUlid::parse('stash_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
         type: BroadcastType::AudioPodcast,
         name: 'Orphan',
         slug: 'orphan',
@@ -115,19 +115,19 @@ test('broadcast belongs to stash via foreign key', function (): void {
 });
 
 test('repository smoke creates stash with input media item stash item and broadcast', function (): void {
-    $stashes = $this->container->get(\App\Infrastructure\Persistence\StashRepository::class);
-    $inputs = $this->container->get(\App\Infrastructure\Persistence\StashInputRepository::class);
-    $media = $this->container->get(\App\Infrastructure\Persistence\MediaItemRepository::class);
-    $items = $this->container->get(\App\Infrastructure\Persistence\StashItemRepository::class);
-    $broadcasts = $this->container->get(\App\Infrastructure\Persistence\BroadcastRepository::class);
+    $stashes = $this->container->get(\App\Stashes\StashRepository::class);
+    $inputs = $this->container->get(\App\Stashes\StashInputRepository::class);
+    $media = $this->container->get(\App\Vault\MediaItemRepository::class);
+    $items = $this->container->get(\App\Stashes\StashItemRepository::class);
+    $broadcasts = $this->container->get(\App\Broadcasts\BroadcastRepository::class);
 
     $stash = $stashes->create('Demo', 'demo-stash');
-    $stashId = \App\Domain\Support\PrefixedUlid::parse((string) $stash->id);
+    $stashId = \App\Support\PrefixedUlid::parse((string) $stash->id);
 
     $input = $inputs->create(
         stashId: $stashId,
         providerKey: 'fake',
-        inputType: \App\Domain\Stash\StashInputType::Channel,
+        inputType: \App\Stashes\StashInputType::Channel,
         sourceUri: 'fake://channel/demo',
         providerInputId: 'channel:demo',
         title: 'Demo Channel',
@@ -143,8 +143,8 @@ test('repository smoke creates stash with input media item stash item and broadc
 
     $stashItem = $items->create(
         stashId: $stashId,
-        mediaItemId: \App\Domain\Support\PrefixedUlid::parse((string) $mediaItem->id),
-        stashInputId: \App\Domain\Support\PrefixedUlid::parse((string) $input->id),
+        mediaItemId: \App\Support\PrefixedUlid::parse((string) $mediaItem->id),
+        stashInputId: \App\Support\PrefixedUlid::parse((string) $input->id),
         position: 1,
     );
 

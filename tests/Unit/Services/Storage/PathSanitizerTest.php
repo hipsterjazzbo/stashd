@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\Storage;
 
 use App\Config\StashdConfig;
-use App\Services\Storage\PathSanitizer;
-use App\Services\Vault\VaultPathBuilder;
+use App\System\Storage\PathSanitizer;
+use App\Vault\VaultPathBuilder;
 use InvalidArgumentException;
 
 test('path sanitizer rejects traversal segments', function (string $value): void {

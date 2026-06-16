@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Config\StashdConfig;
-use App\Domain\Download\Ytdlp\StubYtdlpGateway;
-use App\Domain\Download\Ytdlp\YtdlpGateway;
-use App\Domain\Media\AssetRole;
-use App\Domain\Media\AssetState;
-use App\Domain\Media\MediaItemRecord;
-use App\Domain\Stash\DownloadPolicy;
-use App\Domain\Stash\StashRecord;
+use App\Downloads\Ytdlp\StubYtdlpGateway;
+use App\Downloads\Ytdlp\YtdlpGateway;
+use App\Stashes\DownloadPolicy;
+use App\Stashes\StashRecord;
+use App\Vault\AssetRole;
+use App\Vault\AssetState;
+use App\Vault\MediaItemRecord;
 use Tempest\Http\Status;
 
 beforeEach(function (): void {
@@ -59,9 +59,9 @@ test('youtube item.download uses ytdlp stub and ingests into vault when enabled'
     expect($source['downloader']['implementation'])->toBe('ytdlphp')
         ->and($source['result']['ytdlp_binary'])->toBe('stub-yt-dlp');
 
-    $assets = $this->container->get(\App\Infrastructure\Persistence\AssetRepository::class)
+    $assets = $this->container->get(\App\Vault\AssetRepository::class)
         ->findByMediaItemAndRole(
-            \App\Domain\Support\PrefixedUlid::parse($mediaItemId),
+            \App\Support\PrefixedUlid::parse($mediaItemId),
             AssetRole::VaultOriginal,
         );
     expect($assets?->state)->toBe(AssetState::Ready)
@@ -130,9 +130,9 @@ test('ytdlp download failure leaves no ready vault original', function (): void 
     $command = $this->http->get('/api/v1/commands/' . $download->body['command_id'], headers: $headers);
     expect($command->body['command']['state'])->toBe('failed');
 
-    $assets = $this->container->get(\App\Infrastructure\Persistence\AssetRepository::class)
+    $assets = $this->container->get(\App\Vault\AssetRepository::class)
         ->findByMediaItemAndRole(
-            \App\Domain\Support\PrefixedUlid::parse($mediaItemId),
+            \App\Support\PrefixedUlid::parse($mediaItemId),
             AssetRole::VaultOriginal,
         );
 

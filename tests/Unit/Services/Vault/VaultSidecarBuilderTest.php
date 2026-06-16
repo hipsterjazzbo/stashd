@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Vault;
 
-use App\Domain\Download\DownloadRequest;
-use App\Domain\Download\DownloadResult;
-use App\Domain\Provider\StashdUri;
-use App\Domain\Stash\DownloadPolicy;
-use App\Domain\Support\PrefixedUlid;
-use App\Domain\Vault\VaultSidecarBuilder;
+use App\Downloads\DownloadRequest;
+use App\Downloads\DownloadResult;
+use App\Providers\StashdUri;
+use App\Stashes\DownloadPolicy;
+use App\Support\PrefixedUlid;
+use App\Vault\VaultSidecarBuilder;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 

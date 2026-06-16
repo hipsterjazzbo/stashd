@@ -1,0 +1,482 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\System\Activity;
+
+use App\Commands\CommandRecord;
+use App\Jobs\JobRecord;
+use App\Support\PrefixedUlid;
+use App\System\Event\EventPublisher;
+use App\System\Secret\SecretsService;
+
+final readonly class ActivityEventService
+{
+    public function __construct(
+        private ActivityEventRepository $events,
+        private SecretsService $secrets,
+        private EventPublisher $publisher,
+    ) {
+    }
+
+    public function commandAccepted(CommandRecord $command): ActivityEventRecord
+    {
+        $record = $this->events->create(
+            level: ActivityLevel::Info,
+            type: 'command.accepted',
+            message: sprintf('Command %s accepted.', $command->type->value),
+            entityType: 'command',
+            entityId: (string) $command->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    public function jobStarted(JobRecord $job): ActivityEventRecord
+    {
+        $record = $this->events->create(
+            level: ActivityLevel::Info,
+            type: 'job.started',
+            message: sprintf('Job %s started.', $job->intent->value),
+            entityType: 'job',
+            entityId: (string) $job->id,
+            jobId: (string) $job->id,
+            commandId: $job->commandId,
+            groupKey: $job->commandId === null ? 'job:' . (string) $job->id : 'command:' . $job->commandId,
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    public function preflightCompleted(CommandRecord $command, JobRecord $job, int $itemCount): ActivityEventRecord
+    {
+        $record = $this->events->create(
+            level: ActivityLevel::Success,
+            type: 'preflight.completed',
+            message: sprintf('Preflight completed with %d estimated items.', $itemCount),
+            entityType: 'command',
+            entityId: (string) $command->id,
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+            metadata: ['estimated_item_count' => $itemCount],
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    public function storageCheckCompleted(JobRecord $job, bool $ok): ActivityEventRecord
+    {
+        $record = $this->events->create(
+            level: $ok ? ActivityLevel::Success : ActivityLevel::Warning,
+            type: 'storage_check.completed',
+            message: $ok ? 'Storage check completed successfully.' : 'Storage check completed with warnings.',
+            entityType: 'job',
+            entityId: (string) $job->id,
+            jobId: (string) $job->id,
+            commandId: $job->commandId,
+            groupKey: $job->commandId === null ? 'job:' . (string) $job->id : 'command:' . $job->commandId,
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    public function jobFailed(JobRecord $job, string $error): ActivityEventRecord
+    {
+        $record = $this->events->create(
+            level: ActivityLevel::Error,
+            type: 'job.failed',
+            message: $this->secrets->redact($error),
+            entityType: 'job',
+            entityId: (string) $job->id,
+            jobId: (string) $job->id,
+            commandId: $job->commandId,
+            groupKey: $job->commandId === null ? 'job:' . (string) $job->id : 'command:' . $job->commandId,
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    public function commandCompleted(CommandRecord $command): ActivityEventRecord
+    {
+        $record = $this->events->create(
+            level: ActivityLevel::Success,
+            type: 'command.completed',
+            message: sprintf('Command %s completed.', $command->type->value),
+            entityType: 'command',
+            entityId: (string) $command->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    public function commandFailed(CommandRecord $command, string $error): ActivityEventRecord
+    {
+        $record = $this->events->create(
+            level: ActivityLevel::Error,
+            type: 'command.failed',
+            message: $this->secrets->redact($error),
+            entityType: 'command',
+            entityId: (string) $command->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    public function stashCreatedFromPreflight(
+        CommandRecord $command,
+        JobRecord $job,
+        \App\Stashes\StashFromPreflightResult $result,
+    ): ActivityEventRecord {
+        $record = $this->events->create(
+            level: ActivityLevel::Success,
+            type: 'stash.created_from_preflight',
+            message: sprintf(
+                'Stash created from preflight with %d new media items.',
+                $result->mediaItemsCreated,
+            ),
+            entityType: 'stash',
+            entityId: $result->stashId,
+            stashId: $result->stashId,
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+            metadata: $result->toArray(),
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    public function downloadCompleted(
+        CommandRecord $command,
+        JobRecord $job,
+        \App\Downloads\DownloadExecutionResult $result,
+    ): ActivityEventRecord {
+        $record = $this->events->create(
+            level: ActivityLevel::Success,
+            type: 'download.completed',
+            message: $result->skipped
+                ? 'Download skipped because Vault original already exists.'
+                : sprintf('Download completed with %d ready assets.', $result->assetsReady),
+            entityType: 'media_item',
+            entityId: $result->mediaItemId,
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+            metadata: $result->toArray(),
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    public function downloadFailed(JobRecord $job, string $code, string $error): ActivityEventRecord
+    {
+        $record = $this->events->create(
+            level: ActivityLevel::Error,
+            type: 'download.failed',
+            message: $this->secrets->redact($error),
+            entityType: 'job',
+            entityId: (string) $job->id,
+            jobId: (string) $job->id,
+            commandId: $job->commandId,
+            groupKey: $job->commandId === null ? 'job:' . (string) $job->id : 'command:' . $job->commandId,
+            metadata: ['code' => $code],
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    /** @param array<string, mixed> $result */
+    public function vaultVerifyCompleted(CommandRecord $command, JobRecord $job, array $result): ActivityEventRecord
+    {
+        $record = $this->events->create(
+            level: ActivityLevel::Info,
+            type: 'vault.verify_completed',
+            message: 'Vault verification completed.',
+            entityType: 'command',
+            entityId: (string) $command->id,
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+            metadata: $result,
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    /** @param array<string, mixed> $plan */
+    public function broadcastPlanned(
+        CommandRecord $command,
+        JobRecord $job,
+        PrefixedUlid $broadcastId,
+        array $plan,
+    ): ActivityEventRecord {
+        $record = $this->events->create(
+            level: ActivityLevel::Info,
+            type: 'broadcast.planned',
+            message: sprintf('Broadcast planned with %d files.', (int) ($plan['file_count'] ?? 0)),
+            entityType: 'broadcast',
+            entityId: $broadcastId->toString(),
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+            metadata: ['file_count' => (int) ($plan['file_count'] ?? 0)],
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    public function broadcastRebuildStarted(
+        CommandRecord $command,
+        JobRecord $job,
+        PrefixedUlid $broadcastId,
+    ): ActivityEventRecord {
+        $record = $this->events->create(
+            level: ActivityLevel::Info,
+            type: 'broadcast.rebuild_started',
+            message: 'Broadcast rebuild started.',
+            entityType: 'broadcast',
+            entityId: $broadcastId->toString(),
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    /** @param array<string, mixed> $publish */
+    public function broadcastPublished(
+        CommandRecord $command,
+        JobRecord $job,
+        PrefixedUlid $broadcastId,
+        array $publish,
+    ): ActivityEventRecord {
+        $record = $this->events->create(
+            level: ActivityLevel::Success,
+            type: 'broadcast.published',
+            message: sprintf('Broadcast published %d files.', (int) ($publish['published_count'] ?? 0)),
+            entityType: 'broadcast',
+            entityId: $broadcastId->toString(),
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+            metadata: ['published_count' => (int) ($publish['published_count'] ?? 0)],
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    /** @param array<string, mixed> $verify */
+    public function broadcastVerified(
+        CommandRecord $command,
+        JobRecord $job,
+        PrefixedUlid $broadcastId,
+        array $verify,
+    ): ActivityEventRecord {
+        $record = $this->events->create(
+            level: ($verify['ok'] ?? false) ? ActivityLevel::Success : ActivityLevel::Warning,
+            type: 'broadcast.verified',
+            message: ($verify['ok'] ?? false)
+                ? 'Broadcast verification succeeded.'
+                : 'Broadcast verification found stale or missing files.',
+            entityType: 'broadcast',
+            entityId: $broadcastId->toString(),
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+            metadata: [
+                'valid_count' => (int) ($verify['valid_count'] ?? 0),
+                'stale_count' => (int) ($verify['stale_count'] ?? 0),
+            ],
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    /** @param array<string, mixed> $verify */
+    public function broadcastStale(
+        CommandRecord $command,
+        JobRecord $job,
+        PrefixedUlid $broadcastId,
+        array $verify,
+    ): ActivityEventRecord {
+        $record = $this->events->create(
+            level: ActivityLevel::Warning,
+            type: 'broadcast.stale',
+            message: 'Broadcast is stale and needs regeneration.',
+            entityType: 'broadcast',
+            entityId: $broadcastId->toString(),
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+            metadata: [
+                'stale_count' => (int) ($verify['stale_count'] ?? 0),
+            ],
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    public function broadcastFailed(
+        CommandRecord $command,
+        JobRecord $job,
+        PrefixedUlid $broadcastId,
+        string $code,
+        string $error,
+    ): ActivityEventRecord {
+        $record = $this->events->create(
+            level: ActivityLevel::Error,
+            type: 'broadcast.failed',
+            message: $this->secrets->redact($error),
+            entityType: 'broadcast',
+            entityId: $broadcastId->toString(),
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+            metadata: ['code' => $code],
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    /** @param array<string, mixed> $prune */
+    public function broadcastPruned(
+        CommandRecord $command,
+        JobRecord $job,
+        PrefixedUlid $broadcastId,
+        array $prune,
+    ): ActivityEventRecord {
+        $record = $this->events->create(
+            level: ActivityLevel::Info,
+            type: 'broadcast.pruned',
+            message: sprintf('Broadcast pruned %d stale files.', (int) ($prune['removed_count'] ?? 0)),
+            entityType: 'broadcast',
+            entityId: $broadcastId->toString(),
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+            metadata: ['removed_count' => (int) ($prune['removed_count'] ?? 0)],
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    /** @param array<string, mixed> $status */
+    public function mediaServerTestCompleted(
+        CommandRecord $command,
+        JobRecord $job,
+        PrefixedUlid $connectionId,
+        array $status,
+    ): ActivityEventRecord {
+        $record = $this->events->create(
+            level: ($status['ok'] ?? false) ? ActivityLevel::Success : ActivityLevel::Warning,
+            type: 'media_server.test_completed',
+            message: $this->secrets->redact((string) ($status['message'] ?? 'Media server test completed.')),
+            entityType: 'media_server_connection',
+            entityId: $connectionId->toString(),
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+            metadata: ['ok' => (bool) ($status['ok'] ?? false)],
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    /** @param array<string, mixed> $trigger */
+    public function broadcastTriggerSucceeded(
+        CommandRecord $command,
+        JobRecord $job,
+        PrefixedUlid $broadcastId,
+        array $trigger,
+    ): ActivityEventRecord {
+        $record = $this->events->create(
+            level: ActivityLevel::Success,
+            type: 'broadcast.trigger_succeeded',
+            message: 'Media server scan trigger succeeded.',
+            entityType: 'broadcast',
+            entityId: $broadcastId->toString(),
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+            metadata: [
+                'success_count' => (int) ($trigger['success_count'] ?? 0),
+            ],
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    /** @param array<string, mixed> $trigger */
+    public function broadcastTriggerFailed(
+        CommandRecord $command,
+        JobRecord $job,
+        PrefixedUlid $broadcastId,
+        array $trigger,
+    ): ActivityEventRecord {
+        $record = $this->events->create(
+            level: ActivityLevel::Warning,
+            type: 'broadcast.trigger_failed',
+            message: 'Media server scan trigger failed; broadcast files remain valid.',
+            entityType: 'broadcast',
+            entityId: $broadcastId->toString(),
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+            metadata: [
+                'failure_count' => (int) ($trigger['failure_count'] ?? 0),
+            ],
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+}

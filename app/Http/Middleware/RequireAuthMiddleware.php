@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Services\Auth\AuthContext;
-use App\Services\Auth\AuthService;
+use App\Auth\AuthContext;
+use App\Auth\AuthService;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;

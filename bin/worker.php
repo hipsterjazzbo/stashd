@@ -9,7 +9,7 @@ declare(strict_types=1);
  * requests over the Go↔PHP relay. See docs/runtime/roadrunner.md.
  */
 
-use App\Infrastructure\RoadRunner\TempestPsr7Bridge;
+use App\System\RoadRunner\TempestPsr7Bridge;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../bootstrap/tempest_internal_storage.php';

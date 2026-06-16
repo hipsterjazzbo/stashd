@@ -53,6 +53,6 @@ pest()->extend(IntegrationTestCase::class)
         $this->database->reset();
 
         $sqlite = $this->container->get(\Tempest\Database\Config\SQLiteConfig::class);
-        $this->container->get(\App\Services\Boot\SqliteConfigurator::class)->configure($sqlite);
+        $this->container->get(\App\System\Boot\SqliteConfigurator::class)->configure($sqlite);
     })
     ->in('Feature');
