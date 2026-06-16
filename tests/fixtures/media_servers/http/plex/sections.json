@@ -1,0 +1,11 @@
+{
+  "MediaContainer": {
+    "Directory": [
+      {
+        "key": "1",
+        "title": "TV Shows",
+        "type": "show"
+      }
+    ]
+  }
+}

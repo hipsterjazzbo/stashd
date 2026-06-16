@@ -1,0 +1,19 @@
+{
+  "items": [
+    {
+      "id": "demoVideo01",
+      "snippet": {
+        "title": "Fixture Video Title",
+        "publishedAt": "2026-03-01T10:00:00Z",
+        "thumbnails": {
+          "high": {
+            "url": "https://i.ytimg.com/vi/demoVideo01/hqdefault.jpg"
+          }
+        }
+      },
+      "contentDetails": {
+        "duration": "PT5M30S"
+      }
+    }
+  ]
+}

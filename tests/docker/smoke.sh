@@ -1,0 +1,482 @@
+#!/usr/bin/env sh
+# Docker smoke test — release gate starter.
+# Run from repo root: composer test:docker-smoke
+# If composer fails to find docker, run: bash tests/docker/smoke.sh
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)"
+IMAGE="${STASHD_SMOKE_IMAGE:-stashd:smoke}"
+SKIP_BUILD="${STASHD_SMOKE_SKIP_BUILD:-0}"
+TIMEOUT="${STASHD_SMOKE_TIMEOUT:-180}"
+NAME="stashd-smoke-$$"
+TMP="$(mktemp -d)"
+
+if command -v docker >/dev/null 2>&1; then
+    CONTAINER=docker
+elif command -v podman >/dev/null 2>&1; then
+    CONTAINER=podman
+else
+    echo "smoke failed: docker or podman is required" >&2
+    exit 127
+fi
+
+cleanup() {
+    $CONTAINER rm -f "$NAME" >/dev/null 2>&1 || true
+    rm -f "/tmp/stashd-smoke-cookies-$$"
+    rm -rf "$TMP"
+}
+trap cleanup EXIT INT TERM
+
+mkdir -p "$TMP/data" "$TMP/media"
+
+if [ "$SKIP_BUILD" != "1" ]; then
+    echo "Building ${IMAGE}..."
+    $CONTAINER build -t "$IMAGE" "$ROOT"
+else
+    echo "Skipping image build (STASHD_SMOKE_SKIP_BUILD=1); using ${IMAGE}"
+fi
+
+echo "Starting container..."
+$CONTAINER run -d --name "$NAME" \
+    -e STASHD_DATA_PATH=/data \
+    -e STASHD_MEDIA_PATH=/media \
+    -v "$TMP/data:/data" \
+    -v "$TMP/media:/media" \
+    -p 18474:8474 \
+    "$IMAGE" >/dev/null
+
+wait_for_health() {
+    deadline=$(( $(date +%s) + TIMEOUT ))
+
+    while [ "$(date +%s)" -lt "$deadline" ]; do
+        if ! $CONTAINER ps -q --filter "name=^${NAME}$" | grep -q .; then
+            echo "smoke failed: container exited early" >&2
+            $CONTAINER logs "$NAME" 2>&1 || true
+            exit 1
+        fi
+
+        if curl -fsS "http://127.0.0.1:18474/health" >/dev/null 2>&1; then
+            return 0
+        fi
+
+        sleep 3
+    done
+
+    echo "smoke failed: health endpoint not ready within ${TIMEOUT}s" >&2
+    $CONTAINER logs "$NAME" 2>&1 || true
+    exit 1
+}
+
+assert_supervisor_program() {
+    program="$1"
+    if ! $CONTAINER exec "$NAME" supervisorctl status "$program" 2>/dev/null | grep -q RUNNING; then
+        echo "smoke failed: supervisord program not running: ${program}" >&2
+        $CONTAINER exec "$NAME" supervisorctl status 2>&1 || true
+        exit 1
+    fi
+}
+
+wait_for_health
+
+body="$(curl -fsS "http://127.0.0.1:18474/health")"
+echo "$body"
+
+case "$body" in
+    *'"status":"ok"'*) ;;
+    *)
+        echo "smoke failed: health status not ok" >&2
+        exit 1
+        ;;
+esac
+
+if [ ! -f "$TMP/data/stashd.sqlite" ]; then
+    echo "smoke failed: sqlite database not created" >&2
+    exit 1
+fi
+
+for dir in vault broadcasts temp cache; do
+    if [ ! -d "$TMP/media/$dir" ]; then
+        echo "smoke failed: /media/$dir not created" >&2
+        exit 1
+    fi
+done
+
+echo "Checking Phase 2 schema tables exist..."
+if ! $CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite "SELECT name FROM sqlite_master WHERE type='table' AND name='activity_events';" | grep -q activity_events; then
+    echo "smoke failed: activity_events table missing (migrations did not run cleanly)" >&2
+    exit 1
+fi
+
+if ! $CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite "SELECT name FROM sqlite_master WHERE type='table' AND name='event_notifications';" | grep -q event_notifications; then
+    echo "smoke failed: event_notifications table missing (migrations did not run cleanly)" >&2
+    exit 1
+fi
+
+echo "Checking supervisord worker + scheduler + roadrunner programs..."
+assert_supervisor_program roadrunner
+assert_supervisor_program worker
+assert_supervisor_program scheduler
+
+echo "Creating owner account for authenticated API checks..."
+setup_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/auth/setup" \
+    -H 'Content-Type: application/json' \
+    -c /tmp/stashd-smoke-cookies-$$ \
+    -b /tmp/stashd-smoke-cookies-$$ \
+    -d '{"email":"smoke@stashd.test","username":"smoke","password":"smoke-password"}')"
+echo "$setup_body"
+
+echo "Logging in to establish session (setup cookie alone is not persisted across RR requests)..."
+login_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/auth/login" \
+    -H 'Content-Type: application/json' \
+    -c /tmp/stashd-smoke-cookies-$$ \
+    -b /tmp/stashd-smoke-cookies-$$ \
+    -d '{"email":"smoke@stashd.test","password":"smoke-password"}')"
+echo "$login_body"
+
+token="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/auth/tokens" \
+    -H 'Content-Type: application/json' \
+    -b /tmp/stashd-smoke-cookies-$$ \
+    -c /tmp/stashd-smoke-cookies-$$ \
+    -d '{"name":"smoke"}' | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')"
+
+if [ -z "$token" ]; then
+    echo "smoke failed: could not obtain API token for authenticated checks" >&2
+    exit 1
+fi
+
+system_health="$(curl -fsS "http://127.0.0.1:18474/api/v1/system/health" \
+    -H "Authorization: Bearer ${token}")"
+echo "$system_health"
+
+case "$system_health" in
+    *'"vault_broadcast_hardlink"'*) ;;
+    *)
+        echo "smoke failed: /api/v1/system/health missing vault_broadcast_hardlink field" >&2
+        exit 1
+        ;;
+esac
+
+echo "Restarting container to verify data persistence..."
+$CONTAINER restart "$NAME" >/dev/null
+wait_for_health
+
+body_after_restart="$(curl -fsS "http://127.0.0.1:18474/health")"
+echo "$body_after_restart"
+
+case "$body_after_restart" in
+    *'"status":"ok"'*) ;;
+    *)
+        echo "smoke failed: health not ok after restart" >&2
+        $CONTAINER logs "$NAME" 2>&1 || true
+        exit 1
+        ;;
+esac
+
+if [ ! -f "$TMP/data/stashd.sqlite" ]; then
+    echo "smoke failed: sqlite missing after restart" >&2
+    exit 1
+fi
+
+echo "Running fake-provider preflight → create-from-preflight end-to-end check..."
+preflight_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/commands" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer ${token}" \
+    -d '{"type":"stash.preflight","options":{"source_uri":"fake://channel/smoke-e2e","source_title":"Smoke E2E Channel"}}')"
+echo "$preflight_body"
+
+preflight_command_id="$(printf '%s' "$preflight_body" | sed -n 's/.*"command_id":"\([^"]*\)".*/\1/p')"
+if [ -z "$preflight_command_id" ]; then
+    echo "smoke failed: could not parse preflight command id" >&2
+    exit 1
+fi
+
+deadline=$(( $(date +%s) + 60 ))
+preflight_state=""
+while [ "$(date +%s)" -lt "$deadline" ]; do
+    preflight_show="$(curl -fsS "http://127.0.0.1:18474/api/v1/commands/${preflight_command_id}" \
+        -H "Authorization: Bearer ${token}")"
+    command_json="$(printf '%s' "$preflight_show" | sed 's/,"jobs":\[.*//')"
+    preflight_state="$(printf '%s' "$command_json" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')"
+    if [ "$preflight_state" = "completed" ] || [ "$preflight_state" = "failed" ]; then
+        break
+    fi
+    sleep 2
+done
+
+if [ "$preflight_state" != "completed" ]; then
+    echo "smoke failed: preflight command did not complete (state=${preflight_state})" >&2
+    echo "$preflight_show" >&2
+    exit 1
+fi
+
+review_body="$(curl -fsS "http://127.0.0.1:18474/api/v1/stashes/preflight/${preflight_command_id}/review" \
+    -H "Authorization: Bearer ${token}")"
+echo "$review_body"
+
+case "$review_body" in
+    *'"discovered_items"'*) ;;
+    *)
+        echo "smoke failed: preflight review missing discovered_items" >&2
+        exit 1
+        ;;
+esac
+
+create_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/commands" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer ${token}" \
+    -d "{\"type\":\"stash.create_from_preflight\",\"options\":{\"preflight_command_id\":\"${preflight_command_id}\",\"slug\":\"smoke-e2e-stash\"}}")"
+echo "$create_body"
+
+create_command_id="$(printf '%s' "$create_body" | sed -n 's/.*"command_id":"\([^"]*\)".*/\1/p')"
+deadline=$(( $(date +%s) + 60 ))
+create_state=""
+while [ "$(date +%s)" -lt "$deadline" ]; do
+    create_show="$(curl -fsS "http://127.0.0.1:18474/api/v1/commands/${create_command_id}" \
+        -H "Authorization: Bearer ${token}")"
+    command_json="$(printf '%s' "$create_show" | sed 's/,"jobs":\[.*//')"
+    create_state="$(printf '%s' "$command_json" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')"
+    if [ "$create_state" = "completed" ] || [ "$create_state" = "failed" ]; then
+        break
+    fi
+    sleep 2
+done
+
+if [ "$create_state" != "completed" ]; then
+    echo "smoke failed: create-from-preflight command did not complete (state=${create_state})" >&2
+    echo "$create_show" >&2
+    exit 1
+fi
+
+case "$create_show" in
+    *'"stash_id"'*) ;;
+    *)
+        echo "smoke failed: create-from-preflight missing stash_id in result" >&2
+        exit 1
+        ;;
+esac
+
+stash_id="$(printf '%s' "$create_show" | sed -n 's/.*"stash_id":"\([^"]*\)".*/\1/p')"
+media_item_id="$($CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite \
+    "SELECT mediaItemId FROM stash_items WHERE stashId = '${stash_id}' ORDER BY position ASC LIMIT 1;")"
+
+if [ -z "$media_item_id" ]; then
+    echo "smoke failed: could not resolve media item for stash ${stash_id}" >&2
+    exit 1
+fi
+
+echo "Running fake item.download → temp staging → Vault check..."
+download_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/commands" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer ${token}" \
+    -d "{\"type\":\"item.download\",\"options\":{\"media_item_id\":\"${media_item_id}\",\"stash_id\":\"${stash_id}\"}}")"
+echo "$download_body"
+
+download_command_id="$(printf '%s' "$download_body" | sed -n 's/.*"command_id":"\([^"]*\)".*/\1/p')"
+deadline=$(( $(date +%s) + 60 ))
+download_state=""
+while [ "$(date +%s)" -lt "$deadline" ]; do
+    download_show="$(curl -fsS "http://127.0.0.1:18474/api/v1/commands/${download_command_id}" \
+        -H "Authorization: Bearer ${token}")"
+    command_json="$(printf '%s' "$download_show" | sed 's/,"jobs":\[.*//')"
+    download_state="$(printf '%s' "$command_json" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')"
+    if [ "$download_state" = "completed" ] || [ "$download_state" = "failed" ]; then
+        break
+    fi
+    sleep 2
+done
+
+if [ "$download_state" != "completed" ]; then
+    echo "smoke failed: item.download did not complete (state=${download_state})" >&2
+    echo "$download_show" >&2
+    exit 1
+fi
+
+provider_item_id="$($CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite \
+    "SELECT providerItemId FROM media_items WHERE id = '${media_item_id}';")"
+vault_file="$TMP/media/vault/fake/items/${provider_item_id}/original.fake"
+
+if [ ! -f "$vault_file" ]; then
+    echo "smoke failed: expected Vault file missing: ${vault_file}" >&2
+    exit 1
+fi
+
+asset_state="$($CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite \
+    "SELECT state FROM assets WHERE mediaItemId = '${media_item_id}' AND role = 'vault_original' LIMIT 1;")"
+
+if [ "$asset_state" != "ready" ]; then
+    echo "smoke failed: vault_original asset not ready (state=${asset_state})" >&2
+    exit 1
+fi
+
+echo "Restarting container again to verify Vault file persistence..."
+$CONTAINER restart "$NAME" >/dev/null
+wait_for_health
+
+if [ ! -f "$vault_file" ]; then
+    echo "smoke failed: Vault file missing after restart" >&2
+    exit 1
+fi
+
+echo "Creating filesystem broadcast and running broadcast.rebuild..."
+broadcast_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/stashes/${stash_id}/broadcasts" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer ${token}" \
+    -d '{"type":"filesystem_series","name":"Smoke Broadcast","slug":"smoke-broadcast"}')"
+echo "$broadcast_body"
+
+broadcast_id="$(printf '%s' "$broadcast_body" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
+if [ -z "$broadcast_id" ]; then
+    echo "smoke failed: could not parse broadcast id" >&2
+    exit 1
+fi
+
+rebuild_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/commands" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer ${token}" \
+    -d "{\"type\":\"broadcast.rebuild\",\"options\":{\"broadcast_id\":\"${broadcast_id}\"}}")"
+echo "$rebuild_body"
+
+rebuild_command_id="$(printf '%s' "$rebuild_body" | sed -n 's/.*"command_id":"\([^"]*\)".*/\1/p')"
+deadline=$(( $(date +%s) + 60 ))
+rebuild_state=""
+while [ "$(date +%s)" -lt "$deadline" ]; do
+    rebuild_show="$(curl -fsS "http://127.0.0.1:18474/api/v1/commands/${rebuild_command_id}" \
+        -H "Authorization: Bearer ${token}")"
+    command_json="$(printf '%s' "$rebuild_show" | sed 's/,"jobs":\[.*//')"
+    rebuild_state="$(printf '%s' "$command_json" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')"
+    if [ "$rebuild_state" = "completed" ] || [ "$rebuild_state" = "failed" ]; then
+        break
+    fi
+    sleep 2
+done
+
+if [ "$rebuild_state" != "completed" ]; then
+    echo "smoke failed: broadcast.rebuild did not complete (state=${rebuild_state})" >&2
+    echo "$rebuild_show" >&2
+    exit 1
+fi
+
+published_path="$($CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite \
+    "SELECT publishedPath FROM broadcast_items WHERE broadcastId = '${broadcast_id}' LIMIT 1;")"
+
+if [ -z "$published_path" ] || [ ! -f "$published_path" ]; then
+    echo "smoke failed: broadcast published file missing: ${published_path}" >&2
+    exit 1
+fi
+
+if command -v stat >/dev/null 2>&1; then
+    vault_inode="$(stat -c '%i' "$vault_file" 2>/dev/null || true)"
+    published_inode="$(stat -c '%i' "$published_path" 2>/dev/null || true)"
+    if [ -n "$vault_inode" ] && [ -n "$published_inode" ] && [ "$vault_inode" = "$published_inode" ]; then
+        echo "Broadcast file shares inode with Vault original (hardlink confirmed)."
+    else
+        echo "Inode check skipped or inconclusive; verifying Vault file unchanged and broadcast file exists."
+    fi
+fi
+
+if [ ! -f "$vault_file" ]; then
+    echo "smoke failed: Vault original was removed during broadcast rebuild" >&2
+    exit 1
+fi
+
+echo "Running broadcast.verify after container restart..."
+$CONTAINER restart "$NAME" >/dev/null
+wait_for_health
+
+verify_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/commands" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer ${token}" \
+    -d "{\"type\":\"broadcast.verify\",\"options\":{\"broadcast_id\":\"${broadcast_id}\"}}")"
+echo "$verify_body"
+
+verify_command_id="$(printf '%s' "$verify_body" | sed -n 's/.*"command_id":"\([^"]*\)".*/\1/p')"
+deadline=$(( $(date +%s) + 60 ))
+verify_state=""
+while [ "$(date +%s)" -lt "$deadline" ]; do
+    verify_show="$(curl -fsS "http://127.0.0.1:18474/api/v1/commands/${verify_command_id}" \
+        -H "Authorization: Bearer ${token}")"
+    command_json="$(printf '%s' "$verify_show" | sed 's/,"jobs":\[.*//')"
+    verify_state="$(printf '%s' "$command_json" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')"
+    if [ "$verify_state" = "completed" ] || [ "$verify_state" = "failed" ]; then
+        break
+    fi
+    sleep 2
+done
+
+if [ "$verify_state" != "completed" ]; then
+    echo "smoke failed: broadcast.verify did not complete (state=${verify_state})" >&2
+    echo "$verify_show" >&2
+    exit 1
+fi
+
+case "$verify_show" in
+    *'"ok":true'*) ;;
+    *)
+        echo "smoke failed: broadcast.verify did not report ok=true" >&2
+        echo "$verify_show" >&2
+        exit 1
+        ;;
+esac
+
+echo "Creating jellyfin_series broadcast and running broadcast.rebuild..."
+jellyfin_broadcast_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/stashes/${stash_id}/broadcasts" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer ${token}" \
+    -d '{"type":"jellyfin_series","name":"Smoke Jellyfin Series","slug":"smoke-jellyfin-series"}')"
+echo "$jellyfin_broadcast_body"
+
+jellyfin_broadcast_id="$(printf '%s' "$jellyfin_broadcast_body" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
+if [ -z "$jellyfin_broadcast_id" ]; then
+    echo "smoke failed: could not parse jellyfin broadcast id" >&2
+    exit 1
+fi
+
+jellyfin_rebuild_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/commands" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer ${token}" \
+    -d "{\"type\":\"broadcast.rebuild\",\"options\":{\"broadcast_id\":\"${jellyfin_broadcast_id}\"}}")"
+echo "$jellyfin_rebuild_body"
+
+jellyfin_rebuild_command_id="$(printf '%s' "$jellyfin_rebuild_body" | sed -n 's/.*"command_id":"\([^"]*\)".*/\1/p')"
+deadline=$(( $(date +%s) + 60 ))
+jellyfin_rebuild_state=""
+while [ "$(date +%s)" -lt "$deadline" ]; do
+    jellyfin_rebuild_show="$(curl -fsS "http://127.0.0.1:18474/api/v1/commands/${jellyfin_rebuild_command_id}" \
+        -H "Authorization: Bearer ${token}")"
+    command_json="$(printf '%s' "$jellyfin_rebuild_show" | sed 's/,"jobs":\[.*//')"
+    jellyfin_rebuild_state="$(printf '%s' "$command_json" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')"
+    if [ "$jellyfin_rebuild_state" = "completed" ] || [ "$jellyfin_rebuild_state" = "failed" ]; then
+        break
+    fi
+    sleep 2
+done
+
+if [ "$jellyfin_rebuild_state" != "completed" ]; then
+    echo "smoke failed: jellyfin_series broadcast.rebuild did not complete (state=${jellyfin_rebuild_state})" >&2
+    echo "$jellyfin_rebuild_show" >&2
+    exit 1
+fi
+
+jellyfin_published_path="$($CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite \
+    "SELECT publishedPath FROM broadcast_items WHERE broadcastId = '${jellyfin_broadcast_id}' LIMIT 1;")"
+
+if [ -z "$jellyfin_published_path" ] || [ ! -f "$jellyfin_published_path" ]; then
+    echo "smoke failed: jellyfin_series published file missing: ${jellyfin_published_path}" >&2
+    exit 1
+fi
+
+case "$jellyfin_published_path" in
+    *S??E???\ -\ *) ;;
+    *)
+        echo "smoke failed: jellyfin_series published path missing SxxExxx episode naming: ${jellyfin_published_path}" >&2
+        exit 1
+        ;;
+esac
+
+jellyfin_root="$(dirname "$(dirname "$jellyfin_published_path")")"
+if [ ! -f "${jellyfin_root}/tvshow.nfo" ]; then
+    echo "smoke failed: jellyfin_series tvshow.nfo sidecar missing under ${jellyfin_root}" >&2
+    exit 1
+fi
+
+echo "docker smoke test passed (boot, health, storage layout, migrations, worker/scheduler, system health, restart persistence, fake preflight e2e, fake download → vault, filesystem broadcast rebuild + verify, jellyfin_series rebuild + nfo)"

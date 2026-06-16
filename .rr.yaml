@@ -1,0 +1,18 @@
+version: "3"
+
+server:
+  command: "php bin/worker.php"
+  relay: pipes
+  env:
+    - APP_RUNTIME: RoadRunner
+
+http:
+  address: 0.0.0.0:${STASHD_HTTP_PORT:-8474}
+  pool:
+    num_workers: 2
+    supervisor:
+      max_worker_memory: 128
+
+logs:
+  mode: development
+  level: info

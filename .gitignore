@@ -1,0 +1,10 @@
+/vendor/
+/node_modules/
+/.tempest/
+/.env
+/data/
+/media/
+/rr
+/.idea/
+.phpunit.result.cache
+composer.phar

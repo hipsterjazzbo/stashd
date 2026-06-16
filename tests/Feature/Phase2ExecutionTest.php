@@ -1,0 +1,270 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature;
+
+use App\Domain\Activity\ActivityEventRecord;
+use App\Domain\Command\CommandType;
+use App\Domain\Event\EventNotificationRecord;
+use App\Domain\Job\JobIntent;
+use App\Domain\Job\JobRecord;
+use App\Domain\Job\JobState;
+use App\Infrastructure\Persistence\RecordTimestamps;
+use App\Services\Auth\AuthContext;
+use App\Services\Auth\AuthService;
+use App\Services\Event\EventPublisher;
+use App\Services\Job\JobWorkerService;
+use Tempest\Http\Status;
+
+test('commands api dispatches stash preflight command', function (): void {
+    $headers = $this->authHeaders();
+
+    $response = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.preflight',
+        'options' => [
+            'source_uri' => 'fake://channel/commands-demo',
+            'source_title' => 'Commands Demo',
+            'origin' => 'browser_extension',
+        ],
+    ], headers: $headers);
+
+    $response->assertStatus(Status::CREATED);
+    expect($response->body['command_type'])->toBe('stash.preflight')
+        ->and($response->body['command_state'])->toBe('accepted')
+        ->and($response->body['job_ids'])->toHaveCount(1);
+
+    $show = $this->http->get('/api/v1/commands/' . $response->body['command_id'], headers: $headers);
+    $show->assertOk();
+    expect($show->body['command']['type'])->toBe('stash.preflight')
+        ->and($show->body['command']['state'])->toBe('accepted');
+});
+
+test('commands api rejects invalid payload', function (): void {
+    $headers = $this->authHeaders();
+
+    $response = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.preflight',
+        'options' => [],
+    ], headers: $headers);
+
+    $response->assertStatus(Status::BAD_REQUEST);
+    expect($response->body['error']['code'])->toBe('validation_error');
+});
+
+test('commands api rejects unsupported type', function (): void {
+    $headers = $this->authHeaders();
+
+    $response = $this->http->post('/api/v1/commands', [
+        'type' => 'unknown.command',
+        'options' => [],
+    ], headers: $headers);
+
+    $response->assertStatus(Status::BAD_REQUEST);
+});
+
+test('system storage check command creates and completes storage job', function (): void {
+    $headers = $this->authHeaders();
+
+    $response = $this->http->post('/api/v1/commands', [
+        'type' => 'system.storage_check',
+        'options' => [],
+    ], headers: $headers);
+
+    $response->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $job = $this->http->get('/api/v1/jobs/' . $response->body['job_ids'][0], headers: $headers);
+    $job->assertOk();
+    expect($job->body['job']['intent'])->toBe('storage_check')
+        ->and($job->body['job']['state'])->toBe('ready');
+
+    $command = $this->http->get('/api/v1/commands/' . $response->body['command_id'], headers: $headers);
+    $command->assertOk();
+    expect($command->body['command']['state'])->toBe('completed')
+        ->and($command->body['command']['result']['status'])->not->toBeNull();
+});
+
+test('jobs api lists recent jobs', function (): void {
+    $headers = $this->authHeaders();
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'system.storage_check',
+        'options' => [],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    $jobs = $this->http->get('/api/v1/jobs', headers: $headers);
+    $jobs->assertOk();
+    expect($jobs->body['jobs'])->not->toBeEmpty();
+});
+
+test('job worker records failure with last error', function (): void {
+    $headers = $this->authHeaders();
+    $jobs = $this->container->get(\App\Infrastructure\Persistence\JobRepository::class);
+
+    $job = $jobs->create(
+        intent: JobIntent::Enrich,
+        entityType: 'test',
+    );
+
+    $worker = $this->container->get(JobWorkerService::class);
+    expect($worker->processNextJob())->toBeTrue();
+
+    $job = JobRecord::findById($job->id);
+    expect($job->state)->toBe(JobState::Failed)
+        ->and($job->lastError)->toContain('No handler registered');
+});
+
+test('stale processing jobs are recovered or failed based on attempts', function (): void {
+    $headers = $this->authHeaders();
+
+    $created = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.preflight',
+        'options' => ['source_uri' => 'fake://channel/stale-demo'],
+    ], headers: $headers);
+
+    $job = JobRecord::findById(new \Tempest\Database\PrimaryKey($created->body['job_ids'][0]));
+    $job->state = JobState::Processing;
+    $job->attempts = 1;
+    $job->maxAttempts = 3;
+    $job->heartbeatAt = gmdate('Y-m-d H:i:s', time() - 300);
+    $job->startedAt = RecordTimestamps::now();
+    $job->save();
+
+    $worker = $this->container->get(JobWorkerService::class);
+    expect($worker->recoverStaleJobs())->toBe(1);
+
+    $job = JobRecord::findById($job->id);
+    expect($job->state)->toBe(JobState::Pending)
+        ->and($job->lastError)->toContain('stalled');
+
+    $job->state = JobState::Processing;
+    $job->attempts = 3;
+    $job->heartbeatAt = gmdate('Y-m-d H:i:s', time() - 300);
+    $job->save();
+
+    expect($worker->recoverStaleJobs())->toBe(1);
+    $job = JobRecord::findById($job->id);
+    expect($job->state)->toBe(JobState::Failed);
+});
+
+test('command dispatch writes activity and notification events', function (): void {
+    $headers = $this->authHeaders();
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'system.storage_check',
+        'options' => [],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    $this->processAllJobs();
+
+    $activities = ActivityEventRecord::select()->all();
+    expect($activities)->not->toBeEmpty();
+
+    $types = array_map(static fn ($event): string => $event->type, $activities);
+    expect($types)->toContain('command.accepted')
+        ->and($types)->toContain('job.started')
+        ->and($types)->toContain('storage_check.completed')
+        ->and($types)->toContain('command.completed');
+
+    $notifications = EventNotificationRecord::select()->all();
+    expect($notifications)->not->toBeEmpty();
+});
+
+test('event publisher writes sse notification rows', function (): void {
+    $publisher = $this->container->get(EventPublisher::class);
+    $job = JobRecord::select()->first();
+
+    if ($job === null) {
+        $headers = $this->authHeaders();
+        $created = $this->http->post('/api/v1/commands', [
+            'type' => 'system.storage_check',
+            'options' => [],
+        ], headers: $headers);
+        $job = JobRecord::findById(new \Tempest\Database\PrimaryKey($created->body['job_ids'][0]));
+    }
+
+    $publisher->jobProgress($job);
+
+    $notification = EventNotificationRecord::select()
+        ->where('eventType = ?', 'job.progress')
+        ->orderBy('createdAt', \Tempest\Database\Direction::DESC)
+        ->first();
+
+    expect($notification)->not->toBeNull();
+});
+
+test('events endpoint requires authentication', function (): void {
+    $users = $this->container->get(\App\Infrastructure\Persistence\UserRepository::class);
+    $users->createOwner(
+        email: 'owner@stashd.test',
+        username: 'owner',
+        passwordHash: password_hash('secret-password', PASSWORD_DEFAULT),
+    );
+
+    $this->http->get('/api/v1/events')->assertStatus(Status::UNAUTHORIZED);
+});
+
+test('request auth context does not leak between http requests', function (): void {
+    $headers = $this->authHeaders();
+
+    $this->http->get('/api/v1/auth/me', headers: $headers)->assertOk();
+
+    $context = $this->container->get(AuthContext::class);
+    expect($context->user())->toBeNull();
+
+    $this->http->get('/api/v1/auth/me')->assertStatus(Status::UNAUTHORIZED);
+});
+
+test('bearer auth does not leak to subsequent unauthenticated requests', function (): void {
+    $headers = $this->authHeaders();
+
+    $this->http->get('/api/v1/jobs', headers: $headers)->assertOk();
+    $this->http->get('/api/v1/jobs')->assertStatus(Status::UNAUTHORIZED);
+});
+
+test('api token uses stashd_pat prefix and supports lookup and revoke', function (): void {
+    $users = $this->container->get(\App\Infrastructure\Persistence\UserRepository::class);
+    $auth = $this->container->get(AuthService::class);
+    $user = $users->createOwner(
+        email: 'owner@stashd.test',
+        username: 'owner',
+        passwordHash: password_hash('secret-password', PASSWORD_DEFAULT),
+    );
+
+    $created = $auth->createApiToken($user, 'phase2-token');
+    expect($created['token'])->toStartWith('stashd_pat_')
+        ->and($created['token_preview'])->toStartWith('stashd_pat_');
+
+    $headers = ['Authorization' => 'Bearer ' . $created['token']];
+    $this->http->get('/api/v1/auth/me', headers: $headers)->assertOk();
+
+    $auth->revokeApiToken($user, \App\Domain\Support\PrefixedUlid::parse($created['id']));
+    $this->http->get('/api/v1/auth/me', headers: $headers)->assertStatus(Status::UNAUTHORIZED);
+});
+
+test('scheduler creates preflight commands for due automatic stash inputs', function (): void {
+    $stashRepo = $this->container->get(\App\Infrastructure\Persistence\StashRepository::class);
+    $inputRepo = $this->container->get(\App\Infrastructure\Persistence\StashInputRepository::class);
+    $scheduler = $this->container->get(\App\Services\Scheduler\RoutineDiscoveryScheduler::class);
+
+    $stash = $stashRepo->create('Scheduler Stash', 'scheduler-stash');
+    $inputRepo->create(
+        stashId: \App\Domain\Support\PrefixedUlid::parse((string) $stash->id),
+        providerKey: 'fake',
+        inputType: \App\Domain\Stash\StashInputType::Channel,
+        sourceUri: 'fake://channel/scheduler-demo',
+        providerInputId: 'scheduler-demo',
+        title: 'Scheduler Channel',
+        syncMode: \App\Domain\Stash\SyncMode::Automatic,
+    );
+
+    expect($scheduler->runDueChecks())->toBe(1);
+
+    $command = \App\Domain\Command\CommandRecord::select()
+        ->where('type = ?', CommandType::StashPreflight)
+        ->orderBy('createdAt', \Tempest\Database\Direction::DESC)
+        ->first();
+
+    expect($command)->not->toBeNull();
+});

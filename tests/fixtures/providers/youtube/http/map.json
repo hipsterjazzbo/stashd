@@ -1,0 +1,11 @@
+{
+  "https://www.youtube.com/feeds/videos.xml?channel_id=UCStashdDemoCh0012345678": "channel_rss.xml",
+  "https://www.youtube.com/feeds/videos.xml?playlist_id=PLStashdDemoPlaylist01": "playlist_rss.xml",
+  "https://www.youtube.com/feeds/videos.xml?channel_id=UCStashdEmptyCh012345678": "empty_feed.xml",
+  "https://www.youtube.com/feeds/videos.xml?channel_id=UCStashdBadFeed0123456789": "malformed.xml",
+  "https://www.youtube.com/feeds/videos.xml?channel_id=UCStashdPrivateCh12345678": "unavailable.txt",
+  "https://www.youtube.com/@StashdDemo": "channel_handle_page.html",
+  "https://www.youtube.com/oembed?format=json&url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DdemoVideo01": "video_oembed.json",
+  "https://www.googleapis.com/youtube/v3/videos?id=demoVideo01": "data_api_video.json",
+  "https://www.youtube.com/feeds/videos.xml?channel_id=UCStashdPrivateCh12345678": "unavailable.txt"
+}

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+        bootstrap="vendor/autoload.php"
+        colors="true"
+        cacheDirectory=".tempest/cache/phpunit"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory suffix=".php">app</directory>
+        </include>
+    </source>
+    <php>
+        <env name="ENVIRONMENT" value="testing"/>
+        <env name="BASE_URI" value="http://localhost:8474"/>
+        <env name="STASHD_PUBLIC_URL" value="http://localhost:8474"/>
+        <env name="STASHD_DATA_PATH" value="/tmp/stashd-test/data"/>
+        <env name="STASHD_MEDIA_PATH" value="/tmp/stashd-test/media"/>
+        <env name="DB_DATABASE" value="/tmp/stashd-test/data/stashd.sqlite"/>
+    </php>
+</phpunit>
