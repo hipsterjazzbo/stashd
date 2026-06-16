@@ -1,7 +1,8 @@
 #!/usr/bin/env sh
 # Docker smoke test — release gate starter.
-# Run from repo root: composer test:docker-smoke
-# If composer fails to find docker, run: bash tests/docker/smoke.sh
+# First run: composer test:docker-smoke
+# Reuse image later: STASHD_SMOKE_SKIP_BUILD=1 composer test:docker-smoke
+# If composer cannot see docker/podman, run tests/docker/smoke.sh directly.
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)"
@@ -20,6 +21,24 @@ else
     exit 127
 fi
 
+reuse_hint() {
+    echo "Tip: reuse this image on later runs with:"
+    echo "  STASHD_SMOKE_SKIP_BUILD=1 tests/docker/smoke.sh"
+    echo "or:"
+    echo "  STASHD_SMOKE_SKIP_BUILD=1 composer test:docker-smoke"
+}
+
+media_host_path() {
+    case "$1" in
+        /media/*)
+            printf '%s\n' "$TMP/media/${1#/media/}"
+            ;;
+        *)
+            printf '%s\n' "$1"
+            ;;
+    esac
+}
+
 cleanup() {
     $CONTAINER rm -f "$NAME" >/dev/null 2>&1 || true
     rm -f "/tmp/stashd-smoke-cookies-$$"
@@ -31,7 +50,13 @@ mkdir -p "$TMP/data" "$TMP/media"
 
 if [ "$SKIP_BUILD" != "1" ]; then
     echo "Building ${IMAGE}..."
-    $CONTAINER build -t "$IMAGE" "$ROOT"
+    if ! $CONTAINER build -t "$IMAGE" "$ROOT"; then
+        echo "smoke failed: image build failed for ${IMAGE}" >&2
+        echo "After fixing the build, rerun: tests/docker/smoke.sh" >&2
+        exit 1
+    fi
+    echo "Build complete for ${IMAGE}."
+    reuse_hint
 else
     echo "Skipping image build (STASHD_SMOKE_SKIP_BUILD=1); using ${IMAGE}"
 fi
@@ -358,15 +383,16 @@ fi
 
 published_path="$($CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite \
     "SELECT publishedPath FROM broadcast_items WHERE broadcastId = '${broadcast_id}' LIMIT 1;")"
+published_host_path="$(media_host_path "$published_path")"
 
-if [ -z "$published_path" ] || [ ! -f "$published_path" ]; then
-    echo "smoke failed: broadcast published file missing: ${published_path}" >&2
+if [ -z "$published_path" ] || [ ! -f "$published_host_path" ]; then
+    echo "smoke failed: broadcast published file missing: ${published_path} (host: ${published_host_path})" >&2
     exit 1
 fi
 
 if command -v stat >/dev/null 2>&1; then
     vault_inode="$(stat -c '%i' "$vault_file" 2>/dev/null || true)"
-    published_inode="$(stat -c '%i' "$published_path" 2>/dev/null || true)"
+    published_inode="$(stat -c '%i' "$published_host_path" 2>/dev/null || true)"
     if [ -n "$vault_inode" ] && [ -n "$published_inode" ] && [ "$vault_inode" = "$published_inode" ]; then
         echo "Broadcast file shares inode with Vault original (hardlink confirmed)."
     else
@@ -459,9 +485,10 @@ fi
 
 jellyfin_published_path="$($CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite \
     "SELECT publishedPath FROM broadcast_items WHERE broadcastId = '${jellyfin_broadcast_id}' LIMIT 1;")"
+jellyfin_published_host_path="$(media_host_path "$jellyfin_published_path")"
 
-if [ -z "$jellyfin_published_path" ] || [ ! -f "$jellyfin_published_path" ]; then
-    echo "smoke failed: jellyfin_series published file missing: ${jellyfin_published_path}" >&2
+if [ -z "$jellyfin_published_path" ] || [ ! -f "$jellyfin_published_host_path" ]; then
+    echo "smoke failed: jellyfin_series published file missing: ${jellyfin_published_path} (host: ${jellyfin_published_host_path})" >&2
     exit 1
 fi
 
@@ -473,7 +500,7 @@ case "$jellyfin_published_path" in
         ;;
 esac
 
-jellyfin_root="$(dirname "$(dirname "$jellyfin_published_path")")"
+jellyfin_root="$(dirname "$(dirname "$jellyfin_published_host_path")")"
 if [ ! -f "${jellyfin_root}/tvshow.nfo" ]; then
     echo "smoke failed: jellyfin_series tvshow.nfo sidecar missing under ${jellyfin_root}" >&2
     exit 1

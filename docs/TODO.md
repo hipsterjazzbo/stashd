@@ -138,6 +138,7 @@
 - [x] Tests: `tests/Unit/Services/Download/YtdlpDownloaderTest.php`, `tests/Feature/YtdlpDownloadTest.php`
 - [x] Opt-in live probe test: `STASHD_LIVE_DOWNLOAD_TESTS=1` (`tests/Feature/LiveYtdlpDownloadTest.php`)
 - [x] Docker: yt-dlp + ffmpeg + PHP `uri` extension; smoke still uses fake provider
+- [x] Docker build: PHP 8.5 bundled `uri` extension verified without `docker-php-ext-install uri`
 - [x] Docs updated (`docs/providers/README.md`, `docs/storage/README.md`)
 
 ## Phase 5 — Broadcasts
@@ -193,5 +194,6 @@
 - [x] Docker smoke: fake-provider download → temp → Vault → asset ready (+ restart persistence)
 - [x] Docker smoke: filesystem broadcast create → rebuild → verify after restart
 - [x] Docker smoke: jellyfin_series broadcast rebuild + tvshow.nfo sidecar (fake provider, no live Jellyfin)
+- [x] Docker smoke docs: first-run and no-build reuse workflow (`docs/runtime/docker-smoke.md`)
 - [ ] Multi-arch image build
 - [ ] Static analysis + filesystem integration tests

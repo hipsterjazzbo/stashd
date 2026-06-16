@@ -16,9 +16,13 @@ RUN apt-get update \
         libicu-dev \
         ffmpeg \
         curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && docker-php-ext-install pdo_sqlite sockets intl uri \
-    && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN docker-php-ext-install pdo_sqlite sockets intl \
+    && php -m | grep -i '^uri$' >/dev/null \
+    && php -r 'exit(extension_loaded("uri") ? 0 : 1);'
+
+RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
     && chmod a+rx /usr/local/bin/yt-dlp
 
 COPY --from=composer /usr/bin/composer /usr/bin/composer
@@ -29,12 +33,14 @@ COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
 
 COPY . .
-RUN composer dump-autoload --optimize \
+RUN git config --global --add safe.directory /var/www/html \
+    && composer dump-autoload --optimize \
     && php vendor/bin/tempest discovery:generate --no-interaction \
     && vendor/bin/rr get --no-config \
-    && rm -rf .tempest \
-    && groupadd -g 1000 stashd \
-    && useradd -u 1000 -g stashd -d /var/www/html -s /usr/sbin/nologin stashd \
+    && rm -rf .tempest
+
+RUN groupadd -g "${PGID}" stashd \
+    && useradd -u "${PUID}" -g stashd -d /var/www/html -s /usr/sbin/nologin stashd \
     && chown -R stashd:stashd /var/www/html
 
 COPY docker/supervisord.conf /etc/supervisor/conf.d/stashd.conf
