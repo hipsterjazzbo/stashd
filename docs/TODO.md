@@ -172,9 +172,18 @@
 - [x] Docs: `docs/broadcasts/README.md`, `docs/media-servers/README.md`
 - [ ] Optional live media-server tests: `STASHD_LIVE_MEDIA_SERVER_TESTS=1`
 
-### Phase 5C+ (not started)
+### Phase 5C — Private podcast broadcasts (in progress)
 
-- [ ] Audio/video podcast feeds + tokenized URLs with encrypted storage
+- [x] Podcast feed and item token foundation with encrypted storage
+- [x] Authenticated podcast feed URL exposure
+- [x] `broadcast.rotate_token` for podcast broadcasts
+- [x] `audio_podcast` and `video_podcast` broadcast format registration
+- [x] Deterministic minimal RSS podcast feed generation to `/media/broadcasts/{broadcastId}/feed.xml`
+- [x] Tokenized enclosure URL shape (`/b/{broadcastToken}/items/{itemToken}/episode.{ext}`) in generated feeds
+- [x] Audio/video podcast asset selection from ready Vault assets with stable unavailable errors
+- [ ] Public `GET /b/{broadcastToken}/feed.xml` route
+- [ ] Public tokenized episode media route
+- [ ] Range request support for episode media
 - [ ] Transcode/remux broadcast policies
 
 ## Phase 6 — API + UI

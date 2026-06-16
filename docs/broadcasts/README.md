@@ -1,6 +1,6 @@
-# Broadcasts (Phase 5A + 5B)
+# Broadcasts (Phase 5A + 5B + 5C)
 
-Broadcasts are **disposable, regeneratable filesystem views** of a stash. They do not own canonical media — the Vault remains the source of truth.
+Broadcasts are **disposable, regeneratable views** of a stash. They do not own canonical media — the Vault remains the source of truth.
 
 ## Phase 5A (complete)
 
@@ -19,10 +19,33 @@ Broadcasts are **disposable, regeneratable filesystem views** of a stash. They d
 
 Not implemented:
 
-- Podcast feeds or tokenized URLs (Phase 5C+)
+- Public podcast feed/media routes (Phase 5C follow-up)
 - Transcode/remux
 - Silent copy when hardlinks fail
 - Broad Plex/Jellyfin PHP client libraries
+
+## Phase 5C (in progress)
+
+- `audio_podcast` and `video_podcast` broadcast types are registered.
+- Podcast broadcast/feed tokens and podcast item tokens are stored through `SecretsService`.
+- Authenticated API responses can show the full private feed URL for podcast broadcasts.
+- `broadcast.rotate_token` rotates the private feed token without rotating item tokens.
+- `broadcast.rebuild` for podcast formats writes a deterministic generated feed:
+
+```text
+/media/broadcasts/{broadcastId}/feed.xml
+```
+
+Podcast feeds are tokenized HTTP distribution surfaces, not Plex/Jellyfin filesystem views. Podcast formats do **not** use `AbstractSeriesBroadcastType`.
+
+Public feed and media serving routes are still pending:
+
+```text
+GET /b/{broadcastToken}/feed.xml
+GET /b/{broadcastToken}/items/{itemToken}/episode.{ext}
+```
+
+Generated enclosure URLs already use that path-token shape. The routes themselves will be wired in a later slice.
 
 ## Layout
 
@@ -46,6 +69,20 @@ Not implemented:
     S01E001 - Episode-title.nfo
     S01E002 - Another-title.ext
 ```
+
+### `audio_podcast` / `video_podcast`
+
+```text
+/media/broadcasts/{broadcastId}/
+  feed.xml
+```
+
+- Podcast rebuilds do not hardlink/copy media files into the broadcast directory.
+- Enclosure URLs point at future tokenized media routes.
+- Raw broadcast/item tokens are recoverable only through encrypted secrets, and appear only in intended feed/enclosure URLs.
+- Audio podcast feeds require ready audio Vault assets.
+- Video podcast feeds require ready video Vault assets with conservative podcast-friendly MIME/container support.
+- Full transcode/remux and media probing remain future work.
 
 - Path identity uses broadcast ID + stash item ordering (season/episode/position fallbacks)
 - Filenames use readable titles with broadcast-safe sanitization (spaces preserved in folder/episode names)
@@ -90,7 +127,7 @@ Not yet implemented: settings-change detection, artwork/subtitle drift beyond op
 
 ```text
 GET  /api/v1/stashes/{stashId}/broadcasts
-POST /api/v1/stashes/{stashId}/broadcasts   (type: filesystem_series | jellyfin_series | plex_series)
+POST /api/v1/stashes/{stashId}/broadcasts   (type: filesystem_series | jellyfin_series | plex_series | audio_podcast | video_podcast)
 GET  /api/v1/broadcasts/{broadcastId}
 GET  /api/v1/broadcasts/{broadcastId}/items
 POST /api/v1/commands  (broadcast.plan|rebuild|verify|prune|trigger)
