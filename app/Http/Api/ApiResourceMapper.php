@@ -88,6 +88,7 @@ final class ApiResourceMapper
             'stashItemId' => $item->stashItemId,
             'mediaItemId' => $item->mediaItemId,
             'state' => $item->state->value,
+            'tokenPreview' => $item->tokenPreview,
             'publishedPath' => $item->publishedPath,
             'publishedUri' => $item->publishedUri,
             'lastPublishedAt' => $item->lastPublishedAt,

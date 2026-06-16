@@ -57,7 +57,7 @@ final readonly class BroadcastJobHandler implements JobHandler
         $broadcast = $this->broadcasts->find($broadcastId);
 
         $job->progressTotal = match ($action) {
-            'plan', 'verify', 'prune', 'trigger' => 2,
+            'plan', 'verify', 'prune', 'trigger', 'rotate_token' => 2,
             'rebuild' => 4,
             default => 1,
         };
@@ -70,6 +70,7 @@ final readonly class BroadcastJobHandler implements JobHandler
                 'verify' => $this->handleVerify($command, $job, $context, $broadcastId),
                 'prune' => $this->handlePrune($command, $job, $context, $broadcastId),
                 'trigger' => $this->handleTrigger($command, $job, $context, $broadcastId),
+                'rotate_token' => $this->handleRotateToken($command, $job, $context, $broadcastId),
                 default => throw BroadcastException::withCode('broadcast_action_unsupported', 'Unsupported broadcast action.'),
             };
 
@@ -174,6 +175,21 @@ final readonly class BroadcastJobHandler implements JobHandler
         } elseif (($trigger['success_count'] ?? 0) > 0) {
             $this->activity->broadcastTriggerSucceeded($command, $job, $broadcastId, $trigger);
         }
+    }
+
+    /** @return array<string, mixed> */
+    private function handleRotateToken(
+        CommandRecord $command,
+        JobRecord $job,
+        JobHandlerContext $context,
+        PrefixedUlid $broadcastId,
+    ): array {
+        $context->progress($job, 1, 2, 'Rotating podcast token');
+        $result = $this->lifecycle->rotateToken($broadcastId);
+        $this->activity->broadcastTokenRotated($command, $job, $broadcastId, $result->toArray());
+        $context->progress($job, 2, 2, 'Podcast token rotated');
+
+        return ['token' => $result->toArray()];
     }
 
     /** @return array<string, mixed> */

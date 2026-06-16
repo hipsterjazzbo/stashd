@@ -380,6 +380,33 @@ final readonly class ActivityEventService
         return $record;
     }
 
+    /** @param array<string, mixed> $result */
+    public function broadcastTokenRotated(
+        CommandRecord $command,
+        JobRecord $job,
+        PrefixedUlid $broadcastId,
+        array $result,
+    ): ActivityEventRecord {
+        $record = $this->events->create(
+            level: ActivityLevel::Info,
+            type: 'broadcast.token_rotated',
+            message: 'Podcast broadcast token rotated.',
+            entityType: 'broadcast',
+            entityId: $broadcastId->toString(),
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+            metadata: [
+                'token_preview' => (string) ($result['token_preview'] ?? ''),
+                'revoked_old_secret' => (bool) ($result['revoked_old_secret'] ?? false),
+            ],
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
     /** @param array<string, mixed> $prune */
     public function broadcastPruned(
         CommandRecord $command,

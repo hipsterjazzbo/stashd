@@ -42,6 +42,7 @@ final class CommandHandlerRegistryInitializer implements Initializer
             new BroadcastCommandHandler($commands, $jobs, $broadcasts, CommandType::BroadcastVerify),
             new BroadcastCommandHandler($commands, $jobs, $broadcasts, CommandType::BroadcastPrune),
             new BroadcastCommandHandler($commands, $jobs, $broadcasts, CommandType::BroadcastTrigger),
+            new BroadcastCommandHandler($commands, $jobs, $broadcasts, CommandType::BroadcastRotateToken),
             new MediaServerCommandHandler($commands, $jobs, $connections, CommandType::MediaServerTestConnection),
             new MediaServerCommandHandler($commands, $jobs, $connections, CommandType::MediaServerListLibraries),
         ]);

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
+use App\Broadcasts\Podcasts\PodcastTokenRotationResult;
+use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Support\PrefixedUlid;
 use App\Support\RecordTimestamps;
 use App\System\State\StateTransitionService;
@@ -40,6 +42,7 @@ final readonly class BroadcastLifecycleService
         private BroadcastContextFactory $contextFactory,
         private BroadcastTypeRegistry $types,
         private BroadcastTriggerService $triggers,
+        private PodcastTokenService $podcastTokens,
         private StateTransitionService $transitions,
     ) {
     }
@@ -117,6 +120,21 @@ final readonly class BroadcastLifecycleService
     public function trigger(PrefixedUlid $broadcastId): BroadcastTriggerResult
     {
         return $this->triggers->execute($broadcastId, 'manual');
+    }
+
+    public function rotateToken(PrefixedUlid $broadcastId): PodcastTokenRotationResult
+    {
+        $broadcast = $this->broadcasts->find($broadcastId)
+            ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
+
+        if (! $this->podcastTokens->supports($broadcast)) {
+            throw BroadcastException::withCode(
+                'broadcast_token_rotation_unsupported',
+                'Token rotation is only supported for podcast broadcasts.',
+            );
+        }
+
+        return $this->podcastTokens->rotateBroadcastToken($broadcast);
     }
 
     private function planOnly(PrefixedUlid $broadcastId): BroadcastPlan

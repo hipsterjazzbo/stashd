@@ -25,6 +25,11 @@ final class SecretRepository
             ->first();
     }
 
+    public function find(\App\Support\PrefixedUlid $id): ?SecretRecord
+    {
+        return SecretRecord::findById(new PrimaryKey($id->toString()));
+    }
+
     public function create(
         string $key,
         SecretType $type,

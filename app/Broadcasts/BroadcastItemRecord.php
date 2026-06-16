@@ -20,6 +20,8 @@ final class BroadcastItemRecord
         public string $stashItemId,
         public string $mediaItemId,
         public BroadcastItemState $state,
+        public ?string $tokenSecretId = null,
+        public ?string $tokenPreview = null,
         public ?string $publishedPath = null,
         public ?string $publishedUri = null,
         public ?string $lastPublishedAt = null,

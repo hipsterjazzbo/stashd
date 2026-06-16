@@ -31,9 +31,17 @@ final readonly class BroadcastCommandHandler implements CommandHandler
     public function validate(array $options): void
     {
         $broadcastId = $this->broadcastIdFromOptions($options);
+        $broadcast = $this->broadcasts->find(PrefixedUlid::parse($broadcastId));
 
-        if ($this->broadcasts->find(PrefixedUlid::parse($broadcastId)) === null) {
+        if ($broadcast === null) {
             throw InvalidCommandPayload::withErrors(['Broadcast not found.']);
+        }
+
+        if (
+            $this->commandType === CommandType::BroadcastRotateToken
+            && ! in_array($broadcast->type, [BroadcastType::AudioPodcast, BroadcastType::VideoPodcast], true)
+        ) {
+            throw InvalidCommandPayload::withErrors(['Token rotation is only supported for podcast broadcasts.']);
         }
     }
 
@@ -91,6 +99,7 @@ final readonly class BroadcastCommandHandler implements CommandHandler
             CommandType::BroadcastVerify => 'verify',
             CommandType::BroadcastPrune => 'prune',
             CommandType::BroadcastTrigger => 'trigger',
+            CommandType::BroadcastRotateToken => 'rotate_token',
             default => throw InvalidCommandPayload::withErrors(['Unsupported broadcast command type.']),
         };
     }

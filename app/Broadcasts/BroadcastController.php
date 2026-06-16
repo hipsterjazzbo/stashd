@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
+use App\Broadcasts\Podcasts\PodcastEpisodeUrlBuilder;
+use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Http\Api\ApiJson;
 use App\Http\Api\ApiResourceMapper;
 use App\Http\Middleware\RequireAuthMiddleware;
@@ -28,6 +30,8 @@ final readonly class BroadcastController
         private StashRepository $stashes,
         private BroadcastRepository $broadcasts,
         private BroadcastItemRepository $broadcastItems,
+        private PodcastTokenService $podcastTokens,
+        private PodcastEpisodeUrlBuilder $podcastUrls,
     ) {
     }
 
@@ -42,7 +46,7 @@ final readonly class BroadcastController
 
         return new Json([
             'broadcasts' => array_map(
-                static fn ($broadcast): array => ApiResourceMapper::broadcast($broadcast),
+                fn ($broadcast): array => $this->mapBroadcast($broadcast),
                 $this->broadcasts->listForStash(PrefixedUlid::parse($stashId)),
             ),
         ]);
@@ -116,8 +120,12 @@ final readonly class BroadcastController
             settings: $settings,
         );
 
+        if ($this->podcastTokens->supports($broadcast)) {
+            $this->podcastTokens->ensureBroadcastToken($broadcast);
+        }
+
         return new Json([
-            'broadcast' => ApiResourceMapper::broadcast($broadcast),
+            'broadcast' => $this->mapBroadcast($broadcast),
         ], Status::CREATED);
     }
 
@@ -131,7 +139,7 @@ final readonly class BroadcastController
         }
 
         return new Json([
-            'broadcast' => ApiResourceMapper::broadcast($broadcast),
+            'broadcast' => $this->mapBroadcast($broadcast),
         ]);
     }
 
@@ -160,5 +168,21 @@ final readonly class BroadcastController
                 'message' => $message,
             ],
         ], Status::NOT_FOUND);
+    }
+
+    /** @return array<string, mixed> */
+    private function mapBroadcast(BroadcastRecord $broadcast): array
+    {
+        $mapped = ApiResourceMapper::broadcast($broadcast);
+
+        if (! $this->podcastTokens->supports($broadcast)) {
+            return $mapped;
+        }
+
+        $token = $this->podcastTokens->ensureBroadcastToken($broadcast);
+        $mapped['feed_url'] = $this->podcastUrls->feedUrl($token);
+        $mapped['token_preview'] = $broadcast->tokenPreview;
+
+        return $mapped;
     }
 }
