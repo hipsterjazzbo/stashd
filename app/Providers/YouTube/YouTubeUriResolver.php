@@ -44,6 +44,26 @@ final class YouTubeUriResolver
             return self::channelInput($uri, $channelId, "YouTube Channel {$channelId}");
         }
 
+        if ($uri->pathStartsWith('/c/')) {
+            $customName = str($uri->path())->afterFirst('/c/')->before('/')->trim('/')->toString();
+
+            if ($customName === '') {
+                throw ProviderException::withUnsupportedUrl($uri->toString(), 'YouTube custom channel URL is missing a name.');
+            }
+
+            return self::channelInput($uri, 'c:' . $customName, "YouTube {$customName}");
+        }
+
+        if ($uri->pathStartsWith('/user/')) {
+            $username = str($uri->path())->afterFirst('/user/')->before('/')->trim('/')->toString();
+
+            if ($username === '') {
+                throw ProviderException::withUnsupportedUrl($uri->toString(), 'YouTube legacy user URL is missing a username.');
+            }
+
+            return self::channelInput($uri, 'user:' . $username, "YouTube {$username}");
+        }
+
         if ($uri->path() === '/watch' || $uri->pathStartsWith('/watch/')) {
             $videoId = str((string) ($uri->queryParam('v') ?? ''))->trim()->toString();
 
@@ -52,6 +72,12 @@ final class YouTubeUriResolver
             }
 
             throw ProviderException::withUnsupportedUrl($uri->toString(), 'YouTube watch URL is missing a video ID.');
+        }
+
+        if ($uri->pathStartsWith('/shorts/')) {
+            $videoId = str($uri->path())->afterFirst('/shorts/')->before('/')->trim('/')->toString();
+
+            return self::videoInput($uri, $videoId);
         }
 
         if ($uri->path() === '/playlist' || $uri->pathStartsWith('/playlist/')) {
@@ -70,7 +96,7 @@ final class YouTubeUriResolver
     private static function channelInput(StashdUri $uri, string $providerInputId, ?string $title): ResolvedInput
     {
         return new ResolvedInput(
-            providerKey: 'youtube',
+            providerKey: YouTubeProvider::KEY,
             inputType: YouTubeInputType::Channel->value,
             sourceUri: $uri,
             providerInputId: $providerInputId,
@@ -81,7 +107,7 @@ final class YouTubeUriResolver
     private static function playlistInput(StashdUri $uri, string $playlistId): ResolvedInput
     {
         return new ResolvedInput(
-            providerKey: 'youtube',
+            providerKey: YouTubeProvider::KEY,
             inputType: YouTubeInputType::Playlist->value,
             sourceUri: $uri,
             providerInputId: $playlistId,
@@ -96,7 +122,7 @@ final class YouTubeUriResolver
         }
 
         return new ResolvedInput(
-            providerKey: 'youtube',
+            providerKey: YouTubeProvider::KEY,
             inputType: YouTubeInputType::Video->value,
             sourceUri: $uri,
             providerInputId: $videoId,

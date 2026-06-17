@@ -38,6 +38,16 @@ final class YouTubeUris
         return Uri::from(self::ORIGIN)->withPath('/@' . str($handle)->ltrim('@')->toString());
     }
 
+    public static function customPage(string $name): Uri
+    {
+        return Uri::from(self::ORIGIN)->withPath('/c/' . str($name)->ltrim('/')->toString());
+    }
+
+    public static function userPage(string $name): Uri
+    {
+        return Uri::from(self::ORIGIN)->withPath('/user/' . str($name)->ltrim('/')->toString());
+    }
+
     public static function oembed(StashdUri $watchUri): Uri
     {
         return Uri::from(self::ORIGIN)->withPath('/oembed')->withQuery(

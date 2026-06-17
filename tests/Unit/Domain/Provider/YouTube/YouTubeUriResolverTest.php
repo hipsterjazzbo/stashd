@@ -39,6 +39,35 @@ test('youtube uri resolver accepts watch and youtu.be video urls', function (): 
         ->and($short->providerInputId)->toBe('demoVideo01');
 });
 
+test('youtube uri resolver accepts shorts urls', function (): void {
+    $input = YouTubeUriResolver::resolve(StashdUri::parse('https://www.youtube.com/shorts/demoVideo01'));
+
+    expect($input->inputType)->toBe('video')
+        ->and($input->providerInputId)->toBe('demoVideo01');
+});
+
+test('youtube uri resolver accepts custom channel urls', function (): void {
+    $input = YouTubeUriResolver::resolve(StashdUri::parse('https://www.youtube.com/c/StashdDemo'));
+
+    expect($input->inputType)->toBe('channel')
+        ->and($input->providerInputId)->toBe('c:StashdDemo');
+});
+
+test('youtube uri resolver accepts legacy user urls', function (): void {
+    $input = YouTubeUriResolver::resolve(StashdUri::parse('https://www.youtube.com/user/StashdDemo'));
+
+    expect($input->inputType)->toBe('channel')
+        ->and($input->providerInputId)->toBe('user:StashdDemo');
+});
+
+test('youtube uri resolver rejects custom channel urls without a name', function (): void {
+    YouTubeUriResolver::resolve(StashdUri::parse('https://www.youtube.com/c/'));
+})->throws(ProviderException::class);
+
+test('youtube uri resolver rejects legacy user urls without a username', function (): void {
+    YouTubeUriResolver::resolve(StashdUri::parse('https://www.youtube.com/user/'));
+})->throws(ProviderException::class);
+
 test('youtube uri resolver rejects unsupported youtube urls', function (): void {
     YouTubeUriResolver::resolve(StashdUri::parse('https://www.youtube.com/feed/trending'));
 })->throws(ProviderException::class);

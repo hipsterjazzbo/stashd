@@ -203,12 +203,15 @@
   - No resumable/`multipart/byteranges` streaming — out of scope for this slice
   - Covered by `tests/Feature/Phase5CPodcastEpisodeRouteTest.php`
 - [ ] Transcode/remux broadcast policies (deferred — separate future initiative, not blocking Phase 5C; requires explicit sign-off per `AGENTS.md`'s "ask before enabling copies/transcoding by default")
+  - `stashes.videoQualityProfileId`/`audioQualityProfileId` columns exist but are unused — only meaningful once this work exists
+  - `BroadcastPlan::estimatedCopyBytes` stays hardcoded at `0` until generated-media (podcast audio/video) work exists; `0` is already correct for hardlink-only broadcast types in the meantime
 
 ## Phase 6 — API + UI
 
 - [ ] OpenAPI-documented `/api/v1` resources
 - [ ] Glance-inspired dashboard UI consuming public API only
 - [ ] Job progress UI via SSE
+- [ ] "Explain Generated Files" asset metadata (`canRegenerate`/`safeToDelete`/generated-by info) — depends on this phase's UI work
 
 ## Phase 7 — Release hardening
 
@@ -225,3 +228,6 @@
 - [x] Docker smoke docs: first-run and no-build reuse workflow (`docs/runtime/docker-smoke.md`)
 - [ ] Multi-arch image build
 - [ ] Static analysis + filesystem integration tests
+- [ ] Tech debt: unused `JobIntent`/`CommandType` enum cases (`RoutineDiscovery`, `InitialBackfill`, `MetadataCapture`, `MetadataRefresh`, `Repair`, `Enrich` / `StashSync`, `StashBackfill`, `ItemRefreshMetadata`, `SystemPruneTemp`) — scaffolding from an earlier design pass; the underlying capabilities already work via other plumbing (scheduler + `Preflight` job, provider strategy pattern). Revisit: remove or wire up.
+- [ ] Tech debt: `RawMetadataSnapshotRecord` table/record exists but is never instantiated — scaffolding for a not-yet-scoped provenance feature.
+- [ ] Max concurrent downloads is not explicitly enforced in code — naturally satisfied today by the single serial `worker` process; revisit if workers are ever scaled beyond one.
