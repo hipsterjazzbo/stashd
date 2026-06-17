@@ -39,6 +39,18 @@ media_host_path() {
     esac
 }
 
+http_status() {
+    curl -s -o /dev/null -w '%{http_code}' "$@"
+}
+
+# Extracts a header's value (last match, CRLF-stripped) without relying on
+# any particular grep dialect's support for \r in a regex.
+header_value() {
+    name="$1"
+    file="$2"
+    tr -d '\r' < "$file" | awk -F': ' -v name="$name" 'tolower($1) == tolower(name) { value = substr($0, length($1) + 3) } END { print value }'
+}
+
 cleanup() {
     $CONTAINER rm -f "$NAME" >/dev/null 2>&1 || true
     rm -f "/tmp/stashd-smoke-cookies-$$"
@@ -506,4 +518,156 @@ if [ ! -f "${jellyfin_root}/tvshow.nfo" ]; then
     exit 1
 fi
 
-echo "docker smoke test passed (boot, health, storage layout, migrations, worker/scheduler, system health, restart persistence, fake preflight e2e, fake download → vault, filesystem broadcast rebuild + verify, jellyfin_series rebuild + nfo)"
+echo "Seeding a podcast-suitable Vault asset for the public feed/episode routes..."
+# The fake downloader writes a generic original.fake / video kind that the
+# podcast asset selector does not recognise (see PodcastMimeType), so a
+# small real audio fixture + matching asset row are inserted directly,
+# mirroring the Pest fixture pattern (tests/Feature/Phase5CPodcastFeedTest.php).
+podcast_fixture_content="stashd-smoke-podcast-episode-bytes"
+podcast_fixture_size="$(printf '%s' "$podcast_fixture_content" | wc -c | tr -d ' ')"
+podcast_fixture_container_path="/media/vault/podcast-smoke/${provider_item_id}/original.mp3"
+podcast_fixture_host_path="$(media_host_path "$podcast_fixture_container_path")"
+mkdir -p "$(dirname "$podcast_fixture_host_path")"
+printf '%s' "$podcast_fixture_content" > "$podcast_fixture_host_path"
+
+podcast_asset_id="asset_smoke_podcast_$$"
+$CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite \
+    "INSERT INTO assets (id, mediaItemId, role, kind, path, relativePath, mimeType, container, sizeBytes, state, createdAt, updatedAt) VALUES ('${podcast_asset_id}', '${media_item_id}', 'vault_original', 'audio', '${podcast_fixture_container_path}', 'podcast-smoke/${provider_item_id}/original.mp3', 'audio/mpeg', 'mp3', ${podcast_fixture_size}, 'ready', datetime('now'), datetime('now'));"
+
+echo "Creating audio_podcast broadcast and running broadcast.rebuild..."
+podcast_broadcast_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/stashes/${stash_id}/broadcasts" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer ${token}" \
+    -d '{"type":"audio_podcast","name":"Smoke Podcast","slug":"smoke-podcast"}')"
+echo "$podcast_broadcast_body"
+
+podcast_broadcast_id="$(printf '%s' "$podcast_broadcast_body" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
+if [ -z "$podcast_broadcast_id" ]; then
+    echo "smoke failed: could not parse audio_podcast broadcast id" >&2
+    exit 1
+fi
+
+podcast_rebuild_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/commands" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer ${token}" \
+    -d "{\"type\":\"broadcast.rebuild\",\"options\":{\"broadcast_id\":\"${podcast_broadcast_id}\"}}")"
+echo "$podcast_rebuild_body"
+
+podcast_rebuild_command_id="$(printf '%s' "$podcast_rebuild_body" | sed -n 's/.*"command_id":"\([^"]*\)".*/\1/p')"
+deadline=$(( $(date +%s) + 60 ))
+podcast_rebuild_state=""
+while [ "$(date +%s)" -lt "$deadline" ]; do
+    podcast_rebuild_show="$(curl -fsS "http://127.0.0.1:18474/api/v1/commands/${podcast_rebuild_command_id}" \
+        -H "Authorization: Bearer ${token}")"
+    command_json="$(printf '%s' "$podcast_rebuild_show" | sed 's/,"jobs":\[.*//')"
+    podcast_rebuild_state="$(printf '%s' "$command_json" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')"
+    if [ "$podcast_rebuild_state" = "completed" ] || [ "$podcast_rebuild_state" = "failed" ]; then
+        break
+    fi
+    sleep 2
+done
+
+if [ "$podcast_rebuild_state" != "completed" ]; then
+    echo "smoke failed: audio_podcast broadcast.rebuild did not complete (state=${podcast_rebuild_state})" >&2
+    echo "$podcast_rebuild_show" >&2
+    exit 1
+fi
+
+podcast_feed_container_path="/media/broadcasts/${podcast_broadcast_id}/feed.xml"
+podcast_feed_host_path="$(media_host_path "$podcast_feed_container_path")"
+
+if [ ! -f "$podcast_feed_host_path" ]; then
+    echo "smoke failed: podcast feed.xml missing: ${podcast_feed_host_path}" >&2
+    exit 1
+fi
+
+enclosure_line="$(grep '<enclosure' "$podcast_feed_host_path" || true)"
+if [ -z "$enclosure_line" ]; then
+    echo "smoke failed: podcast feed.xml has no enclosure (synthetic asset not selected?)" >&2
+    cat "$podcast_feed_host_path" >&2
+    exit 1
+fi
+
+enclosure_url="$(printf '%s' "$enclosure_line" | sed -n 's/.*url="\([^"]*\)".*/\1/p')"
+enclosure_path="$(printf '%s' "$enclosure_url" | sed 's#^[a-zA-Z][a-zA-Z]*://[^/]*##')"
+smoke_broadcast_token="$(printf '%s' "$enclosure_path" | sed -n 's#^/b/\([^/]*\)/items/.*#\1#p')"
+smoke_item_token="$(printf '%s' "$enclosure_path" | sed -n 's#^/b/[^/]*/items/\([^/]*\)/episode\..*#\1#p')"
+smoke_ext="$(printf '%s' "$enclosure_path" | sed -n 's#^/b/[^/]*/items/[^/]*/episode\.\(.*\)#\1#p')"
+
+if [ -z "$smoke_broadcast_token" ] || [ -z "$smoke_item_token" ] || [ -z "$smoke_ext" ]; then
+    echo "smoke failed: could not parse broadcast/item token from enclosure url: ${enclosure_url}" >&2
+    exit 1
+fi
+
+echo "Fetching public podcast feed route (unauthenticated)..."
+podcast_feed_response="$(curl -fsS "http://127.0.0.1:18474/b/${smoke_broadcast_token}/feed.xml")"
+
+case "$podcast_feed_response" in
+    *'<rss'*'<enclosure'*) ;;
+    *)
+        echo "smoke failed: public feed route did not return expected rss/enclosure content" >&2
+        exit 1
+        ;;
+esac
+
+echo "Fetching public podcast episode route (unauthenticated)..."
+curl -fsS -D "$TMP/episode_headers.txt" -o "$TMP/episode_body.bin" \
+    "http://127.0.0.1:18474/b/${smoke_broadcast_token}/items/${smoke_item_token}/episode.${smoke_ext}"
+
+episode_body_size="$(wc -c < "$TMP/episode_body.bin" | tr -d ' ')"
+if [ "$episode_body_size" != "$podcast_fixture_size" ]; then
+    echo "smoke failed: episode route body size mismatch (got ${episode_body_size}, expected ${podcast_fixture_size})" >&2
+    exit 1
+fi
+
+if ! cmp -s "$TMP/episode_body.bin" "$podcast_fixture_host_path"; then
+    echo "smoke failed: episode route body bytes do not match the Vault fixture" >&2
+    exit 1
+fi
+
+episode_content_length="$(header_value 'Content-Length' "$TMP/episode_headers.txt")"
+if [ "$episode_content_length" != "$podcast_fixture_size" ]; then
+    echo "smoke failed: episode route Content-Length header mismatch (got '${episode_content_length}', expected '${podcast_fixture_size}')" >&2
+    cat "$TMP/episode_headers.txt" >&2
+    exit 1
+fi
+
+episode_accept_ranges="$(header_value 'Accept-Ranges' "$TMP/episode_headers.txt")"
+if [ "$episode_accept_ranges" != "bytes" ]; then
+    echo "smoke failed: episode route Accept-Ranges header mismatch (got '${episode_accept_ranges}')" >&2
+    cat "$TMP/episode_headers.txt" >&2
+    exit 1
+fi
+
+echo "Fetching public podcast episode route with a Range header..."
+range_status="$(curl -s -o "$TMP/episode_range_body.bin" -D "$TMP/episode_range_headers.txt" -w '%{http_code}' \
+    -H 'Range: bytes=0-3' \
+    "http://127.0.0.1:18474/b/${smoke_broadcast_token}/items/${smoke_item_token}/episode.${smoke_ext}")"
+
+if [ "$range_status" != "206" ]; then
+    echo "smoke failed: ranged episode request did not return 206 (got ${range_status})" >&2
+    cat "$TMP/episode_range_headers.txt" >&2
+    exit 1
+fi
+
+range_body_size="$(wc -c < "$TMP/episode_range_body.bin" | tr -d ' ')"
+if [ "$range_body_size" != "4" ]; then
+    echo "smoke failed: ranged episode request returned ${range_body_size} bytes, expected 4" >&2
+    exit 1
+fi
+
+episode_content_range="$(header_value 'Content-Range' "$TMP/episode_range_headers.txt")"
+if [ "$episode_content_range" != "bytes 0-3/${podcast_fixture_size}" ]; then
+    echo "smoke failed: ranged episode request Content-Range header mismatch (got '${episode_content_range}', expected 'bytes 0-3/${podcast_fixture_size}')" >&2
+    cat "$TMP/episode_range_headers.txt" >&2
+    exit 1
+fi
+
+echo "Confirming an unknown item token returns a non-revealing 404 on the episode route..."
+wrong_token_status="$(http_status "http://127.0.0.1:18474/b/${smoke_broadcast_token}/items/this-is-not-a-real-item-token/episode.${smoke_ext}")"
+if [ "$wrong_token_status" != "404" ]; then
+    echo "smoke failed: episode route with unknown item token returned ${wrong_token_status}, expected 404" >&2
+    exit 1
+fi
+
+echo "docker smoke test passed (boot, health, storage layout, migrations, worker/scheduler, system health, restart persistence, fake preflight e2e, fake download → vault, filesystem broadcast rebuild + verify, jellyfin_series rebuild + nfo, audio_podcast feed + episode route + Range request + unknown-token 404)"

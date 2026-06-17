@@ -110,13 +110,10 @@ Completed major work:
 * Phase 5A/5B foundations: commands/jobs/SSE, provider layer, fake/real downloads, Vault, Jellyfin/Plex filesystem broadcasts, media-server triggers.
 * Phase 5C Slice 1: podcast token foundation and authenticated feed URL exposure.
 * Phase 5C Slice 2: podcast feed builder plus `audio_podcast` and `video_podcast` broadcast formats.
+* Phase 5C Slice 3: public tokenized podcast feed route (`GET /b/{broadcastToken}/feed.xml`).
+* Phase 5C Slice 4: public episode media route (`GET /b/{broadcastToken}/items/{itemToken}/episode.{ext}`), including single-range `Range` request support.
+* Phase 5C is otherwise complete; Docker smoke now covers the podcast feed/episode/Range routes. Transcode/remux broadcast policies are deferred as a separate future initiative (requires explicit sign-off — see "Ask first").
 * Docker smoke/build cleanup.
-
-Likely upcoming Phase 5C slices:
-
-1. Public tokenized podcast feed route: `GET /b/{broadcastToken}/feed.xml`.
-2. Public episode media route: `GET /b/{broadcastToken}/items/{itemToken}/episode.{ext}`.
-3. Docker smoke covering podcast feed + episode fetch.
 
 Do not assume this snapshot is fresher than `docs/TODO.md` or recent commits.
 

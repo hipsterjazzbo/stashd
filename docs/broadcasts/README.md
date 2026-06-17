@@ -24,7 +24,7 @@ Not implemented:
 - Silent copy when hardlinks fail
 - Broad Plex/Jellyfin PHP client libraries
 
-## Phase 5C (in progress)
+## Phase 5C (complete — transcode/remux deferred)
 
 - `audio_podcast` and `video_podcast` broadcast types are registered.
 - Podcast broadcast/feed tokens and podcast item tokens are stored through `SecretsService`.

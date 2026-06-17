@@ -172,7 +172,7 @@
 - [x] Docs: `docs/broadcasts/README.md`, `docs/media-servers/README.md`
 - [ ] Optional live media-server tests: `STASHD_LIVE_MEDIA_SERVER_TESTS=1`
 
-### Phase 5C — Private podcast broadcasts (in progress)
+### Phase 5C — Private podcast broadcasts (complete — transcode/remux deferred)
 
 - [x] Podcast feed and item token foundation with encrypted storage
 - [x] Authenticated podcast feed URL exposure
@@ -221,6 +221,7 @@
 - [x] Docker smoke: fake-provider download → temp → Vault → asset ready (+ restart persistence)
 - [x] Docker smoke: filesystem broadcast create → rebuild → verify after restart
 - [x] Docker smoke: jellyfin_series broadcast rebuild + tvshow.nfo sidecar (fake provider, no live Jellyfin)
+- [x] Docker smoke: audio_podcast rebuild + public feed.xml + public episode route (full fetch, `Range` request → 206, unknown item token → 404)
 - [x] Docker smoke docs: first-run and no-build reuse workflow (`docs/runtime/docker-smoke.md`)
 - [ ] Multi-arch image build
 - [ ] Static analysis + filesystem integration tests
