@@ -51,13 +51,27 @@ GET /b/{broadcastToken}/feed.xml      (public, unauthenticated)
 - Every failure mode returns the same non-revealing 404: unknown token, revoked or rotated-old token, a token bound to a non-podcast broadcast, or a valid token whose feed has not been generated yet. No broadcast identity, token, or filesystem path is exposed.
 - **Token rotation invalidates old feed URLs.** `broadcast.rotate_token` revokes the previous feed secret, so the old URL immediately 404s; the new URL resolves to the same broadcast.
 
-The episode media route remains pending:
+The public episode media route is implemented:
 
 ```text
-GET /b/{broadcastToken}/items/{itemToken}/episode.{ext}     (not implemented)
+GET /b/{broadcastToken}/items/{itemToken}/episode.{ext}      (public, unauthenticated)
 ```
 
-Generated enclosure URLs already use that path-token shape. Episode media serving, Range requests, and transcode/remux remain future work.
+- **Unauthenticated by design**, same convention as the feed route: the broadcast token and item token in the path are the only credentials. Anyone holding a feed or episode URL can access it — treat both as secrets.
+- The broadcast token resolves via `PodcastTokenService::findPodcastBroadcastByFeedToken`, exactly as the feed route does. The item token then resolves via `PodcastTokenService::findBroadcastItemByEpisodeToken`, which decrypts candidate item tokens scoped to that broadcast's items and compares with `hash_equals` — an item token never matches outside the broadcast it belongs to.
+- The route serves the Vault asset already selected by `PodcastAssetSelector` for that broadcast item (audio for `audio_podcast`, video for `video_podcast`). It never resolves a filesystem path from request input, never transcodes, remuxes, or extracts media, and never mutates Vault assets.
+- `{ext}` is a presentation/Content-Type hint only, never authorization. The router binds the whole trailing path segment (`episode.mp3`) to one parameter, so the controller splits the `episode.` prefix itself rather than relying on a separate route parameter for the extension. If `{ext}` doesn't match the selected asset's own extension, the response is the same non-revealing 404.
+- Every failure mode returns the same non-revealing 404: unknown broadcast or item token, an item token that belongs to a different broadcast, a token bound to a non-podcast broadcast, an unavailable or unreadable Vault asset, or a mismatched extension. No broadcast identity, item identity, token, or filesystem path is exposed.
+- **Broadcast token rotation invalidates old episode URLs too** — rotation revokes only the feed/broadcast token, not item tokens, so the new broadcast token paired with an unchanged item token continues to resolve.
+- **Single-range `Range` requests are supported** for seeking/resuming in podcast clients, via `PodcastEpisodeByteRange` (a pure header parser/validator) plus chunked `fseek`/`fread` reads in the controller — never a full `file_get_contents()` for a ranged request:
+  - No `Range` header → unchanged 200 with the full body, now also advertising `Accept-Ranges: bytes`.
+  - A satisfiable single range (`bytes=N-M`, `bytes=N-`, or `bytes=-N` suffix form) → `206 Partial Content` with `Content-Range: bytes {start}-{end}/{total}` and a `Content-Length` matching the partial byte count.
+  - A range starting beyond the end of the file → `416 Range Not Satisfiable` with `Content-Range: bytes */{total}`. This discloses nothing new: `{total}` is already disclosed via `Content-Length` on every successful response and the feed's enclosure `length` attribute.
+  - A `Range` header naming more than one range (e.g. `bytes=0-1,3-4`), or one that's syntactically invalid per RFC 7233 (e.g. a reversed `start-end`), is treated the same as no header at all — the full file is served with 200. Stashd does not implement `multipart/byteranges`; real podcast clients only ever request a single range for seeking.
+  - A read failure after the file was already validated as readable (e.g. the file changed mid-request) falls back to the same non-revealing 404 as a missing asset.
+- Covered by `tests/Feature/Phase5CPodcastEpisodeRouteTest.php`.
+
+Transcode/remux/audio-extraction remain future work, deferred as a separate initiative — this route only serves the already-selected asset's bytes, never generated or converted media.
 
 ## Layout
 

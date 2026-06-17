@@ -188,9 +188,21 @@
   - Non-revealing 404 for unknown/revoked/rotated-old tokens, non-podcast broadcasts, and missing feeds
   - Token rotation (`broadcast.rotate_token`) invalidates old feed URLs
   - Covered by `tests/Feature/Phase5CPodcastFeedRouteTest.php`
-- [ ] Public tokenized episode media route
-- [ ] Range request support for episode media
-- [ ] Transcode/remux broadcast policies
+- [x] Public tokenized episode media route
+  - `GET /b/{broadcastToken}/items/{itemToken}/episode.{ext}` (unauthenticated by design, same convention as the feed route)
+  - Resolves the broadcast token via `PodcastTokenService::findPodcastBroadcastByFeedToken`, then the item token via the new `PodcastTokenService::findBroadcastItemByEpisodeToken` (decrypt candidates scoped to that broadcast's items, `hash_equals`)
+  - Serves the Vault asset already selected by `PodcastAssetSelector` (audio for `audio_podcast`, video for `video_podcast`) — never an arbitrary filesystem path, never transcoded/remuxed
+  - `{ext}` is a presentation hint only; a mismatch against the selected asset's own extension is a non-revealing 404
+  - Non-revealing 404 for unknown/cross-broadcast/revoked tokens, non-podcast broadcasts, unavailable/unreadable assets, and extension mismatches
+  - Covered by `tests/Feature/Phase5CPodcastEpisodeRouteTest.php`
+- [x] Range request support for episode media
+  - Single-range `Range: bytes=...` requests only (`N-M`, `N-`, `-N` suffix forms); multi-range and syntactically invalid ranges are treated as absent (full file, 200)
+  - Parsed/validated by `PodcastEpisodeByteRange` (pure value object, no I/O); satisfiable ranges are read via chunked `fopen`/`fseek`/`fread`, never a full `file_get_contents()`
+  - Satisfiable range → `206 Partial Content` with `Content-Range`/`Content-Length`; unsatisfiable (start beyond EOF) → `416 Range Not Satisfiable` with `Content-Range: bytes */{total}`
+  - No-`Range` requests now also advertise `Accept-Ranges: bytes`
+  - No resumable/`multipart/byteranges` streaming — out of scope for this slice
+  - Covered by `tests/Feature/Phase5CPodcastEpisodeRouteTest.php`
+- [ ] Transcode/remux broadcast policies (deferred — separate future initiative, not blocking Phase 5C; requires explicit sign-off per `AGENTS.md`'s "ask before enabling copies/transcoding by default")
 
 ## Phase 6 — API + UI
 

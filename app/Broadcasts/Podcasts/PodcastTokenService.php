@@ -92,6 +92,34 @@ final readonly class PodcastTokenService
         );
     }
 
+    /**
+     * Resolve a raw episode token back to one of the matched broadcast's
+     * items.
+     *
+     * Item tokens are encrypted at rest, so candidate tokens for the already
+     * resolved broadcast are decrypted and compared with `hash_equals`. The
+     * lookup never crosses broadcasts: a token valid for another broadcast's
+     * item will not match here even if it decrypts successfully.
+     */
+    public function findBroadcastItemByEpisodeToken(
+        BroadcastRecord $broadcast,
+        #[\SensitiveParameter] string $itemToken,
+    ): ?BroadcastItemRecord {
+        if ($itemToken === '') {
+            return null;
+        }
+
+        foreach ($this->broadcastItems->listForBroadcast(PrefixedUlid::parse((string) $broadcast->id)) as $item) {
+            $candidate = $this->itemToken($item);
+
+            if ($candidate !== null && hash_equals($candidate, $itemToken)) {
+                return $item;
+            }
+        }
+
+        return null;
+    }
+
     public function ensureItemToken(BroadcastItemRecord $item): string
     {
         $existing = $this->itemToken($item);
