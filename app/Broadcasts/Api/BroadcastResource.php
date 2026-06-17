@@ -10,12 +10,10 @@ use App\Support\Arrayable;
 
 final readonly class BroadcastResource implements Arrayable
 {
-
     public function __construct(
         private BroadcastRecord $broadcast,
         private ?string $feedUrl = null,
-    )
-    {
+    ) {
     }
 
     public static function fromRecord(BroadcastRecord $broadcast, ?string $feedUrl = null): BroadcastResource
