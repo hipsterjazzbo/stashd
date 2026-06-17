@@ -9,3 +9,4 @@
 .phpunit.result.cache
 composer.phar
 .aider*
+CLAUDE.local.md
