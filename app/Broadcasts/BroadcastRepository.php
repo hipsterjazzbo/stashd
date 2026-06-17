@@ -73,4 +73,22 @@ final class BroadcastRepository
             ->where('stashId = ? AND slug = ?', $stashId->toString(), $slug)
             ->first();
     }
+
+    /**
+     * Podcast broadcasts that carry a feed token, used to resolve a raw feed
+     * token back to its broadcast for the public feed route.
+     *
+     * @return list<BroadcastRecord>
+     */
+    public function listPodcastBroadcastsWithFeedToken(): array
+    {
+        return BroadcastRecord::select()
+            ->where(
+                'tokenSecretId IS NOT NULL AND (type = ? OR type = ?)',
+                BroadcastType::AudioPodcast->value,
+                BroadcastType::VideoPodcast->value,
+            )
+            ->orderBy('createdAt', \Tempest\Database\Direction::ASC)
+            ->all();
+    }
 }

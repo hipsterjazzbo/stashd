@@ -181,7 +181,13 @@
 - [x] Deterministic minimal RSS podcast feed generation to `/media/broadcasts/{broadcastId}/feed.xml`
 - [x] Tokenized enclosure URL shape (`/b/{broadcastToken}/items/{itemToken}/episode.{ext}`) in generated feeds
 - [x] Audio/video podcast asset selection from ready Vault assets with stable unavailable errors
-- [ ] Public `GET /b/{broadcastToken}/feed.xml` route
+- [x] Public `GET /b/{broadcastToken}/feed.xml` route
+  - Unauthenticated by design (route opts out of `RequireAuthMiddleware`); anyone with the feed URL can read the feed
+  - Resolves the raw feed token to its podcast broadcast via `PodcastTokenService::findPodcastBroadcastByFeedToken` (decrypt candidates, `hash_equals`)
+  - Serves the generated `feed.xml`; never rebuilds synchronously
+  - Non-revealing 404 for unknown/revoked/rotated-old tokens, non-podcast broadcasts, and missing feeds
+  - Token rotation (`broadcast.rotate_token`) invalidates old feed URLs
+  - Covered by `tests/Feature/Phase5CPodcastFeedRouteTest.php`
 - [ ] Public tokenized episode media route
 - [ ] Range request support for episode media
 - [ ] Transcode/remux broadcast policies

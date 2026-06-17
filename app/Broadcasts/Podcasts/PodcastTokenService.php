@@ -41,6 +41,30 @@ final readonly class PodcastTokenService
         return $this->storeBroadcastToken($broadcast, $this->generateToken());
     }
 
+    /**
+     * Resolve a raw feed token back to its podcast broadcast.
+     *
+     * Feed tokens are encrypted at rest, so there is no reverse index: candidate
+     * tokens are decrypted and compared with `hash_equals`. Revoked (rotated-old)
+     * tokens never match because {@see broadcastToken()} returns null for them.
+     */
+    public function findPodcastBroadcastByFeedToken(#[\SensitiveParameter] string $token): ?BroadcastRecord
+    {
+        if ($token === '') {
+            return null;
+        }
+
+        foreach ($this->broadcasts->listPodcastBroadcastsWithFeedToken() as $broadcast) {
+            $candidate = $this->broadcastToken($broadcast);
+
+            if ($candidate !== null && hash_equals($candidate, $token)) {
+                return $broadcast;
+            }
+        }
+
+        return null;
+    }
+
     public function broadcastToken(BroadcastRecord $broadcast): ?string
     {
         $secret = $this->secretForId($broadcast->tokenSecretId);
