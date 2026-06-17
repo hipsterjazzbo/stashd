@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Vault;
 
-use App\Http\Api\ApiResourceMapper;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
 use App\Support\PrefixedUlid;
+use App\Vault\Api\AssetResource;
+use App\Vault\Api\MediaItemResource;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
 use Tempest\Router\Get;
@@ -38,7 +39,7 @@ final readonly class MediaItemController
         }
 
         return new Json([
-            'item' => ApiResourceMapper::mediaItem($item),
+            'item' => MediaItemResource::fromRecord($item)->toArray(),
         ]);
     }
 
@@ -58,7 +59,7 @@ final readonly class MediaItemController
 
         return new Json([
             'assets' => array_map(
-                static fn ($asset): array => ApiResourceMapper::asset($asset),
+                static fn ($asset): array => AssetResource::fromRecord($asset)->toArray(),
                 $this->assets->listForMediaItem(PrefixedUlid::parse($id)),
             ),
         ]);

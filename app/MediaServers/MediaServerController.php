@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\MediaServers;
 
 use App\Http\Api\ApiJson;
-use App\Http\Api\ApiResourceMapper;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
+use App\MediaServers\Api\MediaServerResource;
 use App\Support\PrefixedUlid;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
@@ -33,7 +33,7 @@ final readonly class MediaServerController
     {
         return new Json([
             'media_servers' => array_map(
-                static fn ($connection): array => ApiResourceMapper::mediaServerConnection($connection),
+                static fn ($connection): array => MediaServerResource::fromRecord($connection)->toArray(),
                 $this->connections->listAll(),
             ),
         ]);
@@ -69,7 +69,7 @@ final readonly class MediaServerController
         );
 
         return new Json([
-            'media_server' => ApiResourceMapper::mediaServerConnection($connection),
+            'media_server' => MediaServerResource::fromRecord($connection)->toArray(),
         ], Status::CREATED);
     }
 
@@ -83,7 +83,7 @@ final readonly class MediaServerController
         }
 
         return new Json([
-            'media_server' => ApiResourceMapper::mediaServerConnection($connection),
+            'media_server' => MediaServerResource::fromRecord($connection)->toArray(),
         ]);
     }
 
@@ -111,7 +111,7 @@ final readonly class MediaServerController
         }
 
         return new Json([
-            'media_server' => ApiResourceMapper::mediaServerConnection($connection),
+            'media_server' => MediaServerResource::fromRecord($connection)->toArray(),
         ]);
     }
 

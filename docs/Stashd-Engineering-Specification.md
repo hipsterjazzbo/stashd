@@ -2882,3 +2882,6 @@ optional segment marking in broadcasts
 optional segment removal in derived broadcast assets
 ```
 
+## Misc Notes
+
+Smoke tests store app paths as container paths; host assertions must translate /media and /data through mounted temp dirs.

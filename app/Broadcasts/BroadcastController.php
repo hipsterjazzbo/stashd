@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
+use App\Broadcasts\Api\BroadcastItemResource;
+use App\Broadcasts\Api\BroadcastResource;
 use App\Broadcasts\Podcasts\PodcastEpisodeUrlBuilder;
 use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Http\Api\ApiJson;
-use App\Http\Api\ApiResourceMapper;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
 use App\Stashes\StashRepository;
@@ -154,7 +155,7 @@ final readonly class BroadcastController
 
         return new Json([
             'items' => array_map(
-                static fn ($item): array => ApiResourceMapper::broadcastItem($item),
+                static fn ($item): array => BroadcastItemResource::fromRecord($item)->toArray(),
                 $this->broadcastItems->listForBroadcast(PrefixedUlid::parse($id)),
             ),
         ]);
@@ -173,16 +174,12 @@ final readonly class BroadcastController
     /** @return array<string, mixed> */
     private function mapBroadcast(BroadcastRecord $broadcast): array
     {
-        $mapped = ApiResourceMapper::broadcast($broadcast);
-
         if (! $this->podcastTokens->supports($broadcast)) {
-            return $mapped;
+            return BroadcastResource::fromRecord($broadcast)->toArray();
         }
 
         $token = $this->podcastTokens->ensureBroadcastToken($broadcast);
-        $mapped['feed_url'] = $this->podcastUrls->feedUrl($token);
-        $mapped['token_preview'] = $broadcast->tokenPreview;
 
-        return $mapped;
+        return BroadcastResource::fromRecord($broadcast, $this->podcastUrls->feedUrl($token))->toArray();
     }
 }

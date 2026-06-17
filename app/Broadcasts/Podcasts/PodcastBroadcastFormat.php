@@ -15,7 +15,7 @@ use App\Broadcasts\BroadcastPlan;
 use App\Broadcasts\BroadcastPlannedSidecar;
 use App\Broadcasts\BroadcastPruneResult;
 use App\Broadcasts\BroadcastPublishResult;
-use App\Broadcasts\BroadcastSidecarKind;
+use App\Broadcasts\BroadcastSidecarType;
 use App\Broadcasts\BroadcastVerifyResult;
 use App\Broadcasts\Formats\BroadcastFormat;
 use App\Stashes\StashItemRecord;
@@ -54,7 +54,7 @@ abstract readonly class PodcastBroadcastFormat implements BroadcastFormat
             files: [],
             sidecars: [
                 new BroadcastPlannedSidecar(
-                    kind: BroadcastSidecarKind::FeedXml,
+                    kind: BroadcastSidecarType::FeedXml,
                     relativePath: $this->paths->relativeFile('feed.xml'),
                     absolutePath: $this->feedPath($context),
                     content: '',

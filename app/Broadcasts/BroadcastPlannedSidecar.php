@@ -8,12 +8,12 @@ namespace App\Broadcasts;
 final readonly class BroadcastPlannedSidecar
 {
     public function __construct(
-        public BroadcastSidecarKind $kind,
-        public string $relativePath,
-        public string $absolutePath,
-        public string $content,
-        public ?string $stashItemId = null,
-        public ?string $mediaItemId = null,
+        public BroadcastSidecarType $kind,
+        public string               $relativePath,
+        public string               $absolutePath,
+        public string               $content,
+        public ?string              $stashItemId = null,
+        public ?string              $mediaItemId = null,
     ) {
     }
 

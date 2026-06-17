@@ -16,7 +16,7 @@ use App\Broadcasts\BroadcastPlannedFile;
 use App\Broadcasts\BroadcastPlannedSidecar;
 use App\Broadcasts\BroadcastPruneResult;
 use App\Broadcasts\BroadcastPublishResult;
-use App\Broadcasts\BroadcastSidecarKind;
+use App\Broadcasts\BroadcastSidecarType;
 use App\Broadcasts\BroadcastSidecarWriter;
 use App\Broadcasts\BroadcastVerifyResult;
 use App\Broadcasts\HardlinkPublisher;
@@ -91,7 +91,7 @@ abstract readonly class AbstractSeriesBroadcastType implements BroadcastFormat
                 if (! $tvShowNfoAdded) {
                     $tvShowRelative = $this->paths->relativeFile('tvshow.nfo');
                     $sidecars[] = new BroadcastPlannedSidecar(
-                        kind: BroadcastSidecarKind::TvShowNfo,
+                        kind: BroadcastSidecarType::TvShowNfo,
                         relativePath: $tvShowRelative,
                         absolutePath: $this->paths->broadcastFile($broadcastId, 'tvshow.nfo'),
                         content: $this->nfos->tvShowNfo($context->broadcast->name),
@@ -103,7 +103,7 @@ abstract readonly class AbstractSeriesBroadcastType implements BroadcastFormat
                 $episodeNumber = max(1, $stashItem->episodeNumber ?? $position);
                 $episodeNfoName = $this->nfos->episodeNfoFilename($filename);
                 $sidecars[] = new BroadcastPlannedSidecar(
-                    kind: BroadcastSidecarKind::EpisodeNfo,
+                    kind: BroadcastSidecarType::EpisodeNfo,
                     relativePath: $this->paths->relativeFile($season, $episodeNfoName),
                     absolutePath: $this->paths->broadcastFile($broadcastId, $season, $episodeNfoName),
                     content: $this->nfos->episodeNfo($stashItem, $mediaItem, $seasonNumber, $episodeNumber),
@@ -188,7 +188,7 @@ abstract readonly class AbstractSeriesBroadcastType implements BroadcastFormat
         }
 
         foreach ($plan->sidecars as $sidecar) {
-            if ($sidecar->kind === BroadcastSidecarKind::Poster) {
+            if ($sidecar->kind === BroadcastSidecarType::Poster) {
                 $this->publishPosterSidecar($sidecar);
 
                 continue;
@@ -263,7 +263,7 @@ abstract readonly class AbstractSeriesBroadcastType implements BroadcastFormat
         }
 
         foreach ($plan->sidecars as $sidecar) {
-            if ($sidecar->kind === BroadcastSidecarKind::Poster) {
+            if ($sidecar->kind === BroadcastSidecarType::Poster) {
                 continue;
             }
 
@@ -352,7 +352,7 @@ abstract readonly class AbstractSeriesBroadcastType implements BroadcastFormat
             $filename = 'poster.' . $extension;
 
             return new BroadcastPlannedSidecar(
-                kind: BroadcastSidecarKind::Poster,
+                kind: BroadcastSidecarType::Poster,
                 relativePath: $this->paths->relativeFile($filename),
                 absolutePath: $this->paths->broadcastFile($broadcastId, $filename),
                 content: '',

@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Commands;
 
 use App\Auth\AuthContext;
+use App\Commands\Api\CommandResource;
 use App\Http\Api\ApiJson;
-use App\Http\Api\ApiResourceMapper;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
+use App\Jobs\Api\JobResource;
 use App\Jobs\JobRepository;
 use App\Support\PrefixedUlid;
 use Tempest\Http\Request;
@@ -87,9 +88,9 @@ final readonly class CommandController
         }
 
         return new Json([
-            'command' => ApiResourceMapper::command($command),
+            'command' => CommandResource::fromRecord($command)->toArray(),
             'jobs' => array_map(
-                static fn ($job): array => ApiResourceMapper::job($job),
+                static fn ($job): array => JobResource::fromRecord($job)->toArray(),
                 $this->jobs->listForCommand((string) $command->id),
             ),
         ]);

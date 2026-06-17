@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
-use App\Http\Api\ApiResourceMapper;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
+use App\Jobs\Api\JobResource;
 use App\Support\PrefixedUlid;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
@@ -27,7 +27,7 @@ final readonly class JobController
     {
         return new Json([
             'jobs' => array_map(
-                static fn ($job): array => ApiResourceMapper::job($job),
+                static fn ($job): array => JobResource::fromRecord($job)->toArray(),
                 $this->jobs->listRecent(),
             ),
         ]);
@@ -47,6 +47,6 @@ final readonly class JobController
             ], Status::NOT_FOUND);
         }
 
-        return new Json(['job' => ApiResourceMapper::job($job)]);
+        return new Json(['job' => JobResource::fromRecord($job)->toArray()]);
     }
 }
