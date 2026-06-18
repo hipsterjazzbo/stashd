@@ -121,3 +121,29 @@ test('fake provider strategy selection remains unchanged', function (): void {
 
     expect($selector->select($provider, StrategyPurpose::Discovery)->key)->toBe('fake.feed');
 });
+
+test('youtube data api metadata strategy captures snippet description', function (): void {
+    $fixturesDirectory = __DIR__ . '/../../../../fixtures/providers/youtube/http';
+    $map = json_decode((string) file_get_contents($fixturesDirectory . '/map.json'), true, flags: JSON_THROW_ON_ERROR);
+    $http = new FixtureProviderHttpClient($fixturesDirectory, $map);
+    $strategy = new YouTubeDataApiMetadataStrategy(
+        config: new YouTubeConfig(dataApiKey: 'test-api-key'),
+        http: $http,
+    );
+
+    $input = new \App\Providers\ResolvedInput(
+        providerKey: 'youtube',
+        inputType: 'video',
+        sourceUri: \App\Providers\StashdUri::parse('https://www.youtube.com/watch?v=demoVideo01'),
+        providerInputId: 'demoVideo01',
+    );
+    $item = new \App\Providers\Core\DiscoveredItem(
+        providerItemId: 'demoVideo01',
+        canonicalUri: \App\Providers\StashdUri::parse('https://www.youtube.com/watch?v=demoVideo01'),
+        title: 'Demo Episode One',
+    );
+
+    $enriched = $strategy->enrich($input, $item);
+
+    expect($enriched->description)->toBe('Fixture video description.');
+});

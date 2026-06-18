@@ -15,7 +15,8 @@ test('fake provider discovers three channel items initially', function (): void 
     $items = $provider->discover($input, $strategy);
 
     expect($items)->toHaveCount(3)
-        ->and($items[0]->providerItemId)->toBe('demo-episode-1');
+        ->and($items[0]->providerItemId)->toBe('demo-episode-1')
+        ->and($items[0]->description)->toBe('Fake episode 1 description.');
 });
 
 test('fake provider adds a fourth item on subsequent sync', function (): void {
@@ -34,5 +35,8 @@ test('fake provider discovers twenty playlist items', function (): void {
     $input = $provider->resolveInput(StashdUri::parse('fake://playlist/long'));
     $strategy = $provider->discoveryStrategies()[0];
 
-    expect($provider->discover($input, $strategy))->toHaveCount(20);
+    $items = $provider->discover($input, $strategy);
+
+    expect($items)->toHaveCount(20)
+        ->and($items[0]->description)->toBe('Fake track 1 description.');
 });

@@ -74,10 +74,16 @@ final class YouTubeRssParser
                 ? StashdUri::parse(str((string) $thumbnailNodes[0]['url'])->trim()->toString())
                 : null;
 
+            $descriptionNodes = $entry->xpath('media:group/media:description');
+            $description = isset($descriptionNodes[0]) && str((string) $descriptionNodes[0])->trim()->isNotEmpty()
+                ? str((string) $descriptionNodes[0])->trim()->toString()
+                : null;
+
             $items[] = new DiscoveredItem(
                 providerItemId: $videoId,
                 canonicalUri: $canonicalUri,
                 title: $title,
+                description: $description,
                 publishedAt: $publishedAt,
                 thumbnailUri: $thumbnailUri,
                 rawMetadata: [

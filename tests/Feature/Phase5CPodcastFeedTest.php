@@ -75,7 +75,7 @@ test('broadcast.rebuild writes deterministic audio podcast feed with tokenized e
         ->and((string) $xml->channel->title)->toBe('Audio & Feed')
         ->and((string) $xml->channel->description)->toBe('Private <audio> feed')
         ->and((string) $xml->channel->item->title)->toBe('Fake Episode 1')
-        ->and((string) $xml->channel->item->description)->toBe('Fake Episode 1')
+        ->and((string) $xml->channel->item->description)->toBe('Fake episode 1 description.')
         ->and((string) $xml->channel->item->guid)->toBe('stashd:broadcast:' . $broadcast->body['broadcast']['id'] . ':item:' . (string) $item->id)
         ->and((string) $xml->channel->item->enclosure['url'])->toContain('/b/' . rawurlencode($feedToken) . '/items/')
         ->and((string) $xml->channel->item->enclosure['url'])->toContain('/episode.mp3')
@@ -242,7 +242,6 @@ function podcastFeedReadyStash(\Tests\IntegrationTestCase $test, string $channel
 
     $media = MediaItemRecord::findById(new PrimaryKey($mediaItemId));
     $media->state = \App\Vault\MediaItemState::Ready;
-    $media->description = $media->title;
     $media->save();
 
     return [$headers, $stashId, $mediaItemId];

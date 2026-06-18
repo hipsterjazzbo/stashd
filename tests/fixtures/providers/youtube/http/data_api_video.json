@@ -4,6 +4,7 @@
       "id": "demoVideo01",
       "snippet": {
         "title": "Fixture Video Title",
+        "description": "Fixture video description.",
         "publishedAt": "2026-03-01T10:00:00Z",
         "thumbnails": {
           "high": {

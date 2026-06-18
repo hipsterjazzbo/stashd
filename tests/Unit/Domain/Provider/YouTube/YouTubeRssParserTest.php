@@ -15,9 +15,12 @@ test('youtube rss parser maps atom entries to discovered items', function (): vo
     expect($items)->toHaveCount(3)
         ->and($items[0]->providerItemId)->toBe('demoVideo01')
         ->and($items[0]->title)->toBe('Demo Episode One')
+        ->and($items[0]->description)->toBe('Demo Episode One description.')
         ->and($items[0]->canonicalUri->toString())->toBe('https://www.youtube.com/watch?v=demoVideo01')
         ->and($items[0]->thumbnailUri?->toString())->toContain('demoVideo01')
-        ->and($items[0]->rawMetadata['feed_kind'])->toBe('channel');
+        ->and($items[0]->rawMetadata['feed_kind'])->toBe('channel')
+        ->and($items[1]->description)->toBeNull()
+        ->and($items[2]->description)->toBeNull();
 });
 
 test('youtube rss parser returns empty list for empty feed', function (): void {

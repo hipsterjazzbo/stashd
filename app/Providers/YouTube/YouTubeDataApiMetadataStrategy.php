@@ -63,6 +63,9 @@ final readonly class YouTubeDataApiMetadataStrategy implements MetadataStrategyH
         $title = is_string($snippet['title'] ?? null) && str($snippet['title'])->trim()->isNotEmpty()
             ? str($snippet['title'])->trim()->toString()
             : $item->title;
+        $description = is_string($snippet['description'] ?? null) && str($snippet['description'])->trim()->isNotEmpty()
+            ? str($snippet['description'])->trim()->toString()
+            : $item->description;
         $publishedAt = is_string($snippet['publishedAt'] ?? null)
             ? ProviderDates::tryParse($snippet['publishedAt'])
             : $item->publishedAt;
@@ -86,6 +89,7 @@ final readonly class YouTubeDataApiMetadataStrategy implements MetadataStrategyH
             providerItemId: $item->providerItemId,
             canonicalUri: $item->canonicalUri,
             title: $title,
+            description: $description,
             durationSeconds: $durationSeconds,
             publishedAt: $publishedAt,
             thumbnailUri: $thumbnailUri,

@@ -136,6 +136,7 @@ final class FakeProvider implements Provider
                 providerItemId: "{$slug}-episode-{$i}",
                 canonicalUri: StashdUri::fake("item/{$slug}-episode-{$i}"),
                 title: "Fake Episode {$i}",
+                description: "Fake episode {$i} description.",
                 durationSeconds: 600 + ($i * 30),
                 publishedAt: ProviderDates::utc(sprintf('2026-01-%02dT12:00:00Z', min($i, 28))),
             );
@@ -155,6 +156,7 @@ final class FakeProvider implements Provider
                 providerItemId: "{$slug}-track-{$i}",
                 canonicalUri: StashdUri::fake("item/{$slug}-track-{$i}"),
                 title: "Fake Track {$i}",
+                description: "Fake track {$i} description.",
                 durationSeconds: 180 + $i,
                 publishedAt: ProviderDates::utc(sprintf('2025-12-%02dT08:00:00Z', min($i, 28))),
             );
@@ -176,6 +178,7 @@ final class FakeProvider implements Provider
                     providerItemId: $kind,
                     canonicalUri: StashdUri::fake("item/{$kind}"),
                     title: "Fake Item {$kind}",
+                    description: "Fake item {$kind} description.",
                     durationSeconds: 420,
                     publishedAt: ProviderDates::utc('2026-06-01T10:00:00Z'),
                 ),

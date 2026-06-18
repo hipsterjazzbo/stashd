@@ -92,6 +92,9 @@ final readonly class CreateStashFromDiscovery
             $providerItemId = str((string) ($item['provider_item_id'] ?? ''))->trim()->toString();
             $canonicalUriRaw = str((string) ($item['canonical_uri'] ?? ''))->trim()->toString();
             $title = str((string) ($item['title'] ?? 'Untitled'))->trim()->toString();
+            $description = is_string($item['description'] ?? null) && str($item['description'])->trim()->isNotEmpty()
+                ? str($item['description'])->trim()->toString()
+                : null;
 
             if ($providerItemId === '' || $canonicalUriRaw === '') {
                 continue;
@@ -110,6 +113,7 @@ final readonly class CreateStashFromDiscovery
                     providerItemId: $providerItemId,
                     canonicalUri: $canonicalUri,
                     title: $title,
+                    description: $description,
                     durationSeconds: isset($item['duration_seconds']) ? (int) $item['duration_seconds'] : null,
                     publishedAt: ProviderDates::tryParse(is_string($item['published_at'] ?? null) ? $item['published_at'] : null),
                     thumbnailUri: is_string($item['thumbnail_uri'] ?? null) && str($item['thumbnail_uri'])->trim()->isNotEmpty()

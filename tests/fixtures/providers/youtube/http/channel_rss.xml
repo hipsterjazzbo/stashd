@@ -10,6 +10,7 @@
         <link rel="alternate" href="https://www.youtube.com/watch?v=demoVideo01"/>
         <media:group>
             <media:thumbnail url="https://i.ytimg.com/vi/demoVideo01/hqdefault.jpg"/>
+            <media:description>Demo Episode One description.</media:description>
         </media:group>
     </entry>
     <entry>
@@ -19,6 +20,7 @@
         <link rel="alternate" href="https://www.youtube.com/watch?v=demoVideo02"/>
         <media:group>
             <media:thumbnail url="https://i.ytimg.com/vi/demoVideo02/hqdefault.jpg"/>
+            <media:description>   </media:description>
         </media:group>
     </entry>
     <entry>

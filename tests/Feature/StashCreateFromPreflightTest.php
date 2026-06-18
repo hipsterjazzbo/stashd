@@ -106,6 +106,66 @@ test('create from preflight rejects incomplete preflight commands', function ():
     expect($response->body['error']['code'])->toBe('validation_error');
 });
 
+test('create from preflight persists discovered descriptions onto new media items', function (): void {
+    $headers = $this->authHeaders();
+
+    $preflight = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.preflight',
+        'options' => ['source_uri' => 'fake://channel/with-descriptions'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $create = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.create_from_preflight',
+        'options' => [
+            'preflight_command_id' => $preflight->body['command_id'],
+            'slug' => 'with-descriptions',
+        ],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $media = MediaItemRecord::select()
+        ->where('providerKey = ? AND providerItemId = ?', 'fake', 'with-descriptions-episode-1')
+        ->first();
+
+    expect($media)->not->toBeNull()
+        ->and($media->description)->toBe('Fake episode 1 description.');
+});
+
+test('create from preflight leaves existing media item description unchanged when reused', function (): void {
+    $headers = $this->authHeaders();
+    $mediaItems = $this->container->get(\App\Vault\MediaItemRepository::class);
+
+    $mediaItems->create(
+        providerKey: 'fake',
+        providerItemId: 'dedupe-desc-episode-1',
+        canonicalUri: 'fake://item/dedupe-desc-episode-1',
+        title: 'Existing Episode',
+        description: 'Manually curated description.',
+    );
+
+    $preflight = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.preflight',
+        'options' => ['source_uri' => 'fake://channel/dedupe-desc'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $create = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.create_from_preflight',
+        'options' => [
+            'preflight_command_id' => $preflight->body['command_id'],
+            'slug' => 'dedupe-desc',
+        ],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $media = MediaItemRecord::select()
+        ->where('providerKey = ? AND providerItemId = ?', 'fake', 'dedupe-desc-episode-1')
+        ->first();
+
+    expect($media->description)->toBe('Manually curated description.');
+});
+
 test('preflight review exposes discovered items for commit flow', function (): void {
     $headers = $this->authHeaders();
 
