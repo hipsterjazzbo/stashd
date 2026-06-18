@@ -1,25 +1,26 @@
 services:
   stashd:
-    image: ghcr.io/stashd/stashd:latest
-    container_name: stashd
+    build:
+      context: .
+      target: dev
+    image: stashd:dev
+    container_name: stashd-dev
     ports:
       - "8474:8474"
+      - "9003:9003"
     environment:
       STASHD_PUBLIC_URL: http://localhost:8474
       STASHD_HTTP_PORT: "8474"
       STASHD_DATA_PATH: /data
       STASHD_MEDIA_PATH: /media
+      STASHD_REAL_DOWNLOADS_ENABLED: "0"
+      XDEBUG_MODE: ${XDEBUG_MODE:-off}
       SIGNING_KEY: ${SIGNING_KEY:-}
       PUID: ${PUID:-1000}
       PGID: ${PGID:-1000}
       UMASK: ${UMASK:-0022}
     volumes:
+      - .:/var/www/html
       - ./data:/data
       - ./media:/media
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8474/health || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 60s
