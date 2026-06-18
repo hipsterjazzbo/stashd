@@ -115,3 +115,14 @@ services:
     - sqlite
 workers:
     - schedule
+custom_workers:
+    schedule:
+        label: Task Scheduler
+        command: php tempest schedule:run
+        schedule: minutely
+container:
+    containerfile: Dockerfile
+    target: dev
+    port: 8474
+    port_env_key: STASHD_HTTP_PORT
+    command: ./rr serve -c .rr.yaml
