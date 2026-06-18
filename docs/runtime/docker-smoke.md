@@ -12,6 +12,7 @@ The Docker smoke test builds the Stashd image, starts a disposable container, an
 - filesystem broadcast rebuild/verify
 - `jellyfin_series` rebuild with `tvshow.nfo`
 - `audio_podcast` rebuild, public `GET /b/{broadcastToken}/feed.xml`, public episode media route (full fetch + a `Range` request → `206`), and a non-revealing `404` for an unknown item token
+- auto-generated `SIGNING_KEY` persisted under `/data/.env` (verified unchanged across both restart and full container recreation), and the operator-supplied `SIGNING_KEY` override path
 
 Run the full build-and-smoke path from the repo root:
 

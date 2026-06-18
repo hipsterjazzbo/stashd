@@ -44,9 +44,38 @@ ensure_writable() {
     done
 }
 
+ensure_signing_key() {
+    if [ -n "${SIGNING_KEY:-}" ]; then
+        log "using operator-supplied SIGNING_KEY"
+        return 0
+    fi
+
+    # A symlink into the bind-mounted $DATA_DIR is deliberately avoided here:
+    # some container security profiles (confirmed via AppArmor's docker-default
+    # on this host) deny non-root traversal of a symlink that crosses from the
+    # image's own filesystem into a bind-mounted volume, even though root can
+    # follow it fine. Copying the file instead never crosses that boundary.
+    persisted_env="$DATA_DIR/.env"
+
+    if [ -f "$persisted_env" ]; then
+        cp "$persisted_env" "$APP_DIR/.env" || true
+        if [ "$(id -u)" -eq 0 ]; then
+            chown "${PUID}:${PGID}" "$APP_DIR/.env" || true
+        fi
+    fi
+
+    run_app php tempest key:generate --no-override
+
+    cp "$APP_DIR/.env" "$persisted_env"
+    if [ "$(id -u)" -eq 0 ]; then
+        chown "${PUID}:${PGID}" "$persisted_env" || true
+    fi
+}
+
 prepare_runtime() {
     cd "$APP_DIR"
     ensure_writable
+    ensure_signing_key
     export STASHD_DATA_PATH="$DATA_DIR"
     export STASHD_MEDIA_PATH="$MEDIA_DIR"
     export TEMPEST_INTERNAL_STORAGE="${DATA_DIR}/.tempest"

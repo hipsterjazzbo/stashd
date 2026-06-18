@@ -10,6 +10,7 @@ services:
       STASHD_HTTP_PORT: "8474"
       STASHD_DATA_PATH: /data
       STASHD_MEDIA_PATH: /media
+      SIGNING_KEY: ${SIGNING_KEY:-}
       PUID: ${PUID:-1000}
       PGID: ${PGID:-1000}
       UMASK: ${UMASK:-0022}

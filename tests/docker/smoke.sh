@@ -131,6 +131,12 @@ if [ ! -f "$TMP/data/stashd.sqlite" ]; then
     exit 1
 fi
 
+if [ ! -f "$TMP/data/.env" ] || ! grep -q '^SIGNING_KEY=' "$TMP/data/.env"; then
+    echo "smoke failed: SIGNING_KEY was not generated/persisted to /data/.env" >&2
+    exit 1
+fi
+signing_key_initial="$(grep '^SIGNING_KEY=' "$TMP/data/.env")"
+
 for dir in vault broadcasts temp cache; do
     if [ ! -d "$TMP/media/$dir" ]; then
         echo "smoke failed: /media/$dir not created" >&2
@@ -211,6 +217,42 @@ esac
 
 if [ ! -f "$TMP/data/stashd.sqlite" ]; then
     echo "smoke failed: sqlite missing after restart" >&2
+    exit 1
+fi
+
+if [ "$(grep '^SIGNING_KEY=' "$TMP/data/.env")" != "$signing_key_initial" ]; then
+    echo "smoke failed: SIGNING_KEY changed after container restart" >&2
+    exit 1
+fi
+
+echo "Recreating container (not just restarting) to verify SIGNING_KEY survives a fresh container..."
+$CONTAINER rm -f "$NAME" >/dev/null
+$CONTAINER run -d --name "$NAME" \
+    -e STASHD_DATA_PATH=/data \
+    -e STASHD_MEDIA_PATH=/media \
+    -v "$TMP/data:/data" \
+    -v "$TMP/media:/media" \
+    -p 18474:8474 \
+    "$IMAGE" >/dev/null
+wait_for_health
+
+if [ "$(grep '^SIGNING_KEY=' "$TMP/data/.env")" != "$signing_key_initial" ]; then
+    echo "smoke failed: SIGNING_KEY changed after container recreate" >&2
+    exit 1
+fi
+
+recreate_health="$(curl -fsS "http://127.0.0.1:18474/health")"
+case "$recreate_health" in
+    *'"status":"ok"'*) ;;
+    *)
+        echo "smoke failed: health not ok after container recreate" >&2
+        $CONTAINER logs "$NAME" 2>&1 || true
+        exit 1
+        ;;
+esac
+
+if [ ! -f "$TMP/data/stashd.sqlite" ]; then
+    echo "smoke failed: sqlite missing after container recreate" >&2
     exit 1
 fi
 
@@ -670,4 +712,44 @@ if [ "$wrong_token_status" != "404" ]; then
     exit 1
 fi
 
-echo "docker smoke test passed (boot, health, storage layout, migrations, worker/scheduler, system health, restart persistence, fake preflight e2e, fake download → vault, filesystem broadcast rebuild + verify, jellyfin_series rebuild + nfo, audio_podcast feed + episode route + Range request + unknown-token 404)"
+echo "Verifying operator-supplied SIGNING_KEY is honored and auto-generation is skipped..."
+override_tmp="$(mktemp -d)"
+mkdir -p "$override_tmp/data" "$override_tmp/media"
+override_name="stashd-smoke-override-$$"
+operator_key="$(head -c32 /dev/urandom | base64)"
+
+$CONTAINER run -d --name "$override_name" \
+    -e STASHD_DATA_PATH=/data \
+    -e STASHD_MEDIA_PATH=/media \
+    -e SIGNING_KEY="$operator_key" \
+    -v "$override_tmp/data:/data" \
+    -v "$override_tmp/media:/media" \
+    -p 18475:8474 \
+    "$IMAGE" >/dev/null
+
+override_deadline=$(( $(date +%s) + TIMEOUT ))
+while [ "$(date +%s)" -lt "$override_deadline" ]; do
+    curl -fsS "http://127.0.0.1:18475/health" >/dev/null 2>&1 && break
+    sleep 3
+done
+
+if ! curl -fsS "http://127.0.0.1:18475/health" >/dev/null 2>&1; then
+    echo "smoke failed: health endpoint not ready with operator-supplied SIGNING_KEY" >&2
+    $CONTAINER logs "$override_name" 2>&1 || true
+    $CONTAINER rm -f "$override_name" >/dev/null 2>&1 || true
+    rm -rf "$override_tmp"
+    exit 1
+fi
+
+if [ -f "$override_tmp/data/.env" ]; then
+    echo "smoke failed: auto-generated .env was created even though an operator SIGNING_KEY was supplied" >&2
+    $CONTAINER rm -f "$override_name" >/dev/null 2>&1 || true
+    rm -rf "$override_tmp"
+    exit 1
+fi
+
+$CONTAINER rm -f "$override_name" >/dev/null 2>&1 || true
+rm -rf "$override_tmp"
+echo "Operator-supplied SIGNING_KEY honored correctly."
+
+echo "docker smoke test passed (boot, health, storage layout, migrations, worker/scheduler, system health, restart persistence, SIGNING_KEY persisted across restart and container recreate, operator-supplied SIGNING_KEY override honored, fake preflight e2e, fake download → vault, filesystem broadcast rebuild + verify, jellyfin_series rebuild + nfo, audio_podcast feed + episode route + Range request + unknown-token 404)"

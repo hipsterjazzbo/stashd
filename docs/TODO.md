@@ -232,6 +232,7 @@
 - [x] Docker smoke: jellyfin_series broadcast rebuild + tvshow.nfo sidecar (fake provider, no live Jellyfin)
 - [x] Docker smoke: audio_podcast rebuild + public feed.xml + public episode route (full fetch, `Range` request → 206, unknown item token → 404)
 - [x] Docker smoke docs: first-run and no-build reuse workflow (`docs/runtime/docker-smoke.md`)
+- [x] Docker entrypoint: auto-generate and persist `SIGNING_KEY` under `/data/.env` on first boot, symlinked into the app root (`docker/entrypoint.sh` `ensure_signing_key`); operator-supplied `SIGNING_KEY` env var takes precedence and skips generation; verified unchanged across restart, full container recreation, and the override path (`tests/docker/smoke.sh`)
 - [ ] Multi-arch image build
 - [ ] Static analysis + filesystem integration tests
 - [ ] Tech debt: unused `JobIntent`/`CommandType` enum cases (`RoutineDiscovery`, `InitialBackfill`, `MetadataCapture`, `MetadataRefresh`, `Repair`, `Enrich` / `StashSync`, `StashBackfill`, `ItemRefreshMetadata`, `SystemPruneTemp`) — scaffolding from an earlier design pass; the underlying capabilities already work via other plumbing (scheduler + `Preflight` job, provider strategy pattern). Revisit: remove or wire up.
