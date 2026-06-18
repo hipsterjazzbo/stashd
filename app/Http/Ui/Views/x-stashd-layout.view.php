@@ -20,7 +20,7 @@
 	<x-vite-tags entrypoint="src/main.entrypoint.ts"/>
 	<x-slot name="head"/>
 </head>
-<body class="min-h-full bg-espresso text-cream font-mono antialiased text-sm">
+<body data-requires-auth class="min-h-full bg-espresso text-cream font-mono antialiased text-sm">
 	<header class="border-b border-line bg-panel/60">
 		<div class="mx-auto flex max-w-7xl items-center gap-8 px-5 py-3">
 			<a href="/" class="text-lg font-semibold tracking-tight text-cream">stashd<span class="brand-underscore">_</span></a>

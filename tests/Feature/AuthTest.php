@@ -5,7 +5,26 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Auth\AuthService;
+use Tempest\Framework\Testing\Http\TestResponseHelper;
+use Tempest\Http\Cookie\Cookie;
 use Tempest\Http\Status;
+
+function useSessionCookieFrom(TestResponseHelper $response): void
+{
+    $values = $response->response->getHeader('set-cookie')?->values ?? [];
+
+    foreach ($values as $value) {
+        $cookie = Cookie::createFromString($value);
+
+        if ($cookie->key === AuthService::SESSION_COOKIE) {
+            $_COOKIE[AuthService::SESSION_COOKIE] = $cookie->value;
+
+            return;
+        }
+    }
+
+    throw new RuntimeException('Response did not set a ' . AuthService::SESSION_COOKIE . ' cookie.');
+}
 
 test('owner setup creates the first user', function (): void {
     $response = $this->http->post('/api/v1/auth/setup', [
@@ -44,14 +63,79 @@ test('login and session me endpoint work', function (): void {
         'password' => 'secret-password',
     ])->assertStatus(Status::CREATED);
 
-    $this->http->post('/api/v1/auth/login', [
+    $login = $this->http->post('/api/v1/auth/login', [
         'email' => 'owner@stashd.test',
         'password' => 'secret-password',
     ])->assertOk();
 
+    useSessionCookieFrom($login);
+
     $me = $this->http->get('/api/v1/auth/me');
     $me->assertOk();
     expect($me->body['user']['username'])->toBe('owner');
+});
+
+test('login sets an httponly session cookie carrying a revocable token', function (): void {
+    $this->http->post('/api/v1/auth/setup', [
+        'email' => 'owner@stashd.test',
+        'username' => 'owner',
+        'password' => 'secret-password',
+    ])->assertStatus(Status::CREATED);
+
+    $response = $this->http->post('/api/v1/auth/login', [
+        'email' => 'owner@stashd.test',
+        'password' => 'secret-password',
+    ])->assertOk();
+
+    $response->assertHasCookie(AuthService::SESSION_COOKIE, function (string $value): void {
+        expect($value)->not->toBeEmpty();
+    });
+});
+
+test('the session cookie issued at login authenticates protected routes', function (): void {
+    $this->http->post('/api/v1/auth/setup', [
+        'email' => 'owner@stashd.test',
+        'username' => 'owner',
+        'password' => 'secret-password',
+    ])->assertStatus(Status::CREATED);
+
+    $login = $this->http->post('/api/v1/auth/login', [
+        'email' => 'owner@stashd.test',
+        'password' => 'secret-password',
+    ])->assertOk();
+
+    $this->http->get('/api/v1/auth/me')->assertStatus(Status::UNAUTHORIZED);
+
+    useSessionCookieFrom($login);
+
+    $me = $this->http->get('/api/v1/auth/me');
+    $me->assertOk();
+    expect($me->body['user']['email'])->toBe('owner@stashd.test');
+});
+
+test('logout revokes the session token and clears the cookie', function (): void {
+    $this->http->post('/api/v1/auth/setup', [
+        'email' => 'owner@stashd.test',
+        'username' => 'owner',
+        'password' => 'secret-password',
+    ])->assertStatus(Status::CREATED);
+
+    $login = $this->http->post('/api/v1/auth/login', [
+        'email' => 'owner@stashd.test',
+        'password' => 'secret-password',
+    ])->assertOk();
+
+    useSessionCookieFrom($login);
+
+    $loggedInCookie = $_COOKIE[AuthService::SESSION_COOKIE];
+
+    $logout = $this->http->post('/api/v1/auth/logout');
+    $logout->assertOk();
+    $logout->assertHasCookie(AuthService::SESSION_COOKIE, '');
+
+    // The revoked cookie must not work even if a client kept holding onto it.
+    $_COOKIE[AuthService::SESSION_COOKIE] = $loggedInCookie;
+    $this->http->get('/api/v1/auth/me')->assertStatus(Status::UNAUTHORIZED);
 });
 
 test('api token authenticates protected routes', function (): void {
@@ -78,11 +162,13 @@ test('protected routes require setup before owner exists', function (): void {
 });
 
 test('protected routes require authentication after setup', function (): void {
-    $this->http->post('/api/v1/auth/setup', [
+    $setup = $this->http->post('/api/v1/auth/setup', [
         'email' => 'owner@stashd.test',
         'username' => 'owner',
         'password' => 'secret-password',
     ])->assertStatus(Status::CREATED);
+
+    useSessionCookieFrom($setup);
 
     $this->http->post('/api/v1/auth/logout')->assertOk();
 
@@ -121,11 +207,13 @@ test('invalid login credentials are rejected', function (): void {
 });
 
 test('api tokens can be revoked', function (): void {
-    $this->http->post('/api/v1/auth/setup', [
+    $setup = $this->http->post('/api/v1/auth/setup', [
         'email' => 'owner@stashd.test',
         'username' => 'owner',
         'password' => 'secret-password',
     ])->assertStatus(Status::CREATED);
+
+    useSessionCookieFrom($setup);
 
     $created = $this->http->post('/api/v1/auth/tokens', ['name' => 'revoke-me'])->assertStatus(Status::CREATED);
     $headers = ['Authorization' => 'Bearer ' . $created->body['token']];

@@ -52,10 +52,30 @@ function wireLogout(): void {
 	})
 }
 
+/**
+ * Client auth gate for the dashboard shell. The HTML pages are public, so when
+ * the session cookie is missing or invalid every /api/v1 call returns 401 — we
+ * detect that up front and bounce to /login. Pages opt in via the layout's
+ * `data-requires-auth` body attribute; the login page does not.
+ */
+async function enforceAuth(): Promise<void> {
+	if (!document.body.hasAttribute('data-requires-auth')) return
+
+	try {
+		const res = await fetch('/api/v1/auth/me', { credentials: 'same-origin' })
+		if (res.status === 401 || res.status === 403) {
+			window.location.assign('/login')
+		}
+	} catch {
+		// Network error — leave the shell in place rather than trapping a loop.
+	}
+}
+
 window.Alpine = Alpine
 Alpine.start()
 
 document.addEventListener('DOMContentLoaded', () => {
 	markActiveNav()
 	wireLogout()
+	void enforceAuth()
 })

@@ -49,6 +49,12 @@ pest()->extend(IntegrationTestCase::class)
         $_ENV['STASHD_MEDIA_PATH'] = $media;
         $_ENV['DB_DATABASE'] = $data . '/stashd.sqlite';
 
+        // Tests that exercise the cookie-authenticated session (AuthTest,
+        // Phase2HardeningTest) write directly to this superglobal since
+        // Tempest's request mapper reads cookies from it. Pest runs every
+        // test in the same process, so it must not leak between tests.
+        $_COOKIE = [];
+
         $this->useTestingDatabase();
         $this->database->reset();
 

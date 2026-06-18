@@ -8,15 +8,24 @@ use App\Support\PrefixedUlid;
 use App\Support\RecordTimestamps;
 use RuntimeException;
 use SensitiveParameter;
-use Tempest\Auth\Authentication\Authenticator;
 use Tempest\Http\Request;
 
 final readonly class AuthService
 {
+    /**
+     * Reserved token + cookie names for the browser session. The web UI never
+     * sees a raw API token: login mints this single rotating token and ships it
+     * in an HttpOnly cookie. It is hidden from the user-facing token list.
+     */
+    public const string WEB_SESSION_TOKEN_NAME = '__web_session__';
+
+    public const string SESSION_COOKIE = 'stashd_session';
+
+    public const int WEB_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+
     public function __construct(
         private UserRepository $users,
         private ApiTokenRepository $tokens,
-        private Authenticator $authenticator,
         private AuthContext $context,
     ) {
     }
@@ -38,7 +47,6 @@ final readonly class AuthService
             passwordHash: $this->hashPassword($password),
         );
 
-        $this->authenticator->authenticate($user);
         $this->context->set($user);
 
         return $user;
@@ -56,7 +64,6 @@ final readonly class AuthService
             throw new InvalidCredentials('Invalid email or password.');
         }
 
-        $this->authenticator->authenticate($user);
         $this->context->set($user);
 
         return $user;
@@ -64,65 +71,78 @@ final readonly class AuthService
 
     public function logout(): void
     {
-        $this->authenticator->deauthenticate();
         $this->context->set(null);
-    }
-
-    public function currentUser(): ?UserRecord
-    {
-        $contextUser = $this->context->user();
-
-        if ($contextUser !== null) {
-            return $contextUser;
-        }
-
-        $authenticatable = $this->authenticator->current();
-
-        if ($authenticatable instanceof UserRecord) {
-            $this->context->set($authenticatable);
-
-            return $authenticatable;
-        }
-
-        return null;
     }
 
     public function resolveFromRequest(Request $request): ?UserRecord
     {
         $authorization = $this->headerValue($request, 'Authorization');
 
+        // Bearer header keeps precedence: an explicit (even if invalid) token
+        // must not silently fall back to a cookie or session.
         if ($authorization !== null && preg_match('/^Bearer\s+(\S+)\s*$/i', $authorization, $matches)) {
-            $tokenHash = hash('sha256', $matches[1]);
-            $token = $this->tokens->findByHash($tokenHash);
-
-            if ($token === null) {
-                return null;
-            }
-
-            if ($token->expiresAt !== null && strtotime($token->expiresAt) < time()) {
-                return null;
-            }
-
-            $user = $this->users->findById($token->userId);
-
-            if ($user === null) {
-                return null;
-            }
-
-            $token->lastUsedAt = RecordTimestamps::now();
-            $token->save();
-            $this->context->set($user);
-
-            return $user;
+            return $this->resolveFromToken($matches[1]);
         }
 
-        $sessionUser = $this->currentUser();
+        $cookie = $request->cookies[self::SESSION_COOKIE] ?? null;
 
-        if ($sessionUser !== null) {
-            return $sessionUser;
+        if ($cookie !== null && is_string($cookie->value) && $cookie->value !== '') {
+            return $this->resolveFromToken($cookie->value);
         }
 
+        // No fallback to Tempest's native Authenticator/Session here: those
+        // are singletons that live for the lifetime of a RoadRunner worker,
+        // so one user's native session would leak into every other request
+        // that worker happens to serve afterward. Bearer header and the
+        // stashd_session cookie are the only supported auth paths.
         return null;
+    }
+
+    private function resolveFromToken(#[SensitiveParameter] string $plainToken): ?UserRecord
+    {
+        $token = $this->tokens->findByHash(hash('sha256', $plainToken));
+
+        if ($token === null) {
+            return null;
+        }
+
+        if ($token->expiresAt !== null && strtotime($token->expiresAt) < time()) {
+            return null;
+        }
+
+        $user = $this->users->findById($token->userId);
+
+        if ($user === null) {
+            return null;
+        }
+
+        $token->lastUsedAt = RecordTimestamps::now();
+        $token->save();
+        $this->context->set($user);
+
+        return $user;
+    }
+
+    /**
+     * Mints the single rotating web-session token, replacing any prior one, and
+     * returns the raw value for the caller to place in the session cookie.
+     */
+    public function issueWebSessionToken(UserRecord $user): string
+    {
+        $this->revokeWebSessionTokens($user);
+
+        $expiresAt = gmdate(DATE_ATOM, time() + self::WEB_SESSION_TTL_SECONDS);
+
+        return $this->createApiToken($user, self::WEB_SESSION_TOKEN_NAME, expiresAt: $expiresAt)['token'];
+    }
+
+    public function revokeWebSessionTokens(UserRecord $user): void
+    {
+        foreach ($this->tokens->listForUser(PrefixedUlid::parse((string) $user->id)) as $token) {
+            if ($token->name === self::WEB_SESSION_TOKEN_NAME) {
+                $this->tokens->revoke(PrefixedUlid::parse((string) $token->id));
+            }
+        }
     }
 
     /** @return array{id: string, token: string, token_preview: string, name: string} */
@@ -149,7 +169,12 @@ final readonly class AuthService
     /** @return list<array<string, mixed>> */
     public function listApiTokens(UserRecord $user): array
     {
-        return array_map(
+        $tokens = array_filter(
+            $this->tokens->listForUser(PrefixedUlid::parse((string) $user->id)),
+            static fn ($token): bool => $token->name !== self::WEB_SESSION_TOKEN_NAME,
+        );
+
+        return array_values(array_map(
             static fn ($token): array => [
                 'id' => (string) $token->id,
                 'name' => $token->name,
@@ -161,8 +186,8 @@ final readonly class AuthService
                 'expires_at' => $token->expiresAt,
                 'created_at' => $token->createdAt,
             ],
-            $this->tokens->listForUser(PrefixedUlid::parse((string) $user->id)),
-        );
+            $tokens,
+        ));
     }
 
     public function revokeApiToken(UserRecord $user, PrefixedUlid $tokenId): void

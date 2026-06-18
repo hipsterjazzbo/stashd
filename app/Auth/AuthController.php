@@ -7,6 +7,7 @@ namespace App\Auth;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
 use App\Support\PrefixedUlid;
+use Tempest\Http\Cookie\CookieManager;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
@@ -22,6 +23,7 @@ final readonly class AuthController
     public function __construct(
         private AuthService $auth,
         private AuthContext $context,
+        private CookieManager $cookies,
     ) {
     }
 
@@ -61,6 +63,8 @@ final readonly class AuthController
                 ],
             ], Status::CONFLICT);
         }
+
+        $this->issueSessionCookie($user);
 
         return new Json([
             'user' => $this->userPayload($user),
@@ -102,12 +106,16 @@ final readonly class AuthController
             ], Status::UNAUTHORIZED);
         }
 
+        $this->issueSessionCookie($user);
+
         return new Json(['user' => $this->userPayload($user)]);
     }
 
     #[Post('/api/v1/auth/logout')]
     public function logout(): Json
     {
+        $this->auth->revokeWebSessionTokens($this->context->requireUser());
+        $this->cookies->remove(AuthService::SESSION_COOKIE);
         $this->auth->logout();
 
         return new Json(['ok' => true]);
@@ -160,6 +168,21 @@ final readonly class AuthController
         $this->auth->revokeApiToken($user, PrefixedUlid::parse($tokenId));
 
         return new Json(['ok' => true]);
+    }
+
+    /**
+     * Mints the rotating web-session token and stores it in an HttpOnly,
+     * Secure, SameSite=Lax cookie (CookieManager applies those defaults and
+     * encrypts the value). The browser UI authenticates with this cookie; the
+     * raw token is never exposed to JavaScript or the response body.
+     */
+    private function issueSessionCookie(UserRecord $user): void
+    {
+        $this->cookies->set(
+            AuthService::SESSION_COOKIE,
+            $this->auth->issueWebSessionToken($user),
+            time() + AuthService::WEB_SESSION_TTL_SECONDS,
+        );
     }
 
     /** @return array<string, mixed> */

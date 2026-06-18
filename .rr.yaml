@@ -11,6 +11,9 @@ http:
   # Serve built front-end assets (public/build/) and the favicon straight from
   # disk, before the request reaches a PHP worker. Everything else falls through
   # to the Tempest router. Forbid serving source/secret files defensively.
+  # The "static" middleware must be listed explicitly — declaring `static:`
+  # alone only configures the plugin, it doesn't wire it into the chain.
+  middleware: ["static"]
   static:
     dir: "public"
     forbid: [".php", ".htaccess", ".env"]

@@ -153,10 +153,12 @@ test('bearer auth takes precedence over session for the same request', function 
         passwordHash: password_hash('secret-password', PASSWORD_DEFAULT),
     );
 
-    $this->http->post('/api/v1/auth/login', [
+    $login = $this->http->post('/api/v1/auth/login', [
         'email' => 'owner@stashd.test',
         'password' => 'secret-password',
     ])->assertOk();
+
+    useSessionCookieFrom($login);
 
     $token = $auth->createApiToken($owner, 'bearer-precedence');
     $headers = ['Authorization' => 'Bearer ' . $token['token']];

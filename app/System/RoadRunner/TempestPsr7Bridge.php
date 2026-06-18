@@ -12,6 +12,8 @@ use Tempest\Http\HttpRequestFailed;
 use Tempest\Http\Response;
 use Tempest\Http\Status;
 use Tempest\Router\Router;
+use Tempest\View\View;
+use Tempest\View\ViewRenderer;
 
 /**
  * Bridges RoadRunner's PSR-7 worker loop to Tempest's HTTP router.
@@ -31,6 +33,7 @@ final class TempestPsr7Bridge
     public function __construct(
         private Router $router,
         private AuthContext $authContext,
+        private ViewRenderer $viewRenderer,
     ) {
     }
 
@@ -54,6 +57,13 @@ final class TempestPsr7Bridge
                 break;
             }
 
+            // RoadRunner does not populate PHP's $_COOKIE superglobal, but
+            // Tempest's request mapper reads cookies from it (and decrypts
+            // them). Seed it per request from the PSR-7 cookie params so the
+            // session cookie is readable; reset in finally to avoid leaking
+            // cookies between requests in this long-lived worker.
+            $_COOKIE = $request->getCookieParams();
+
             try {
                 $response = $this->router->dispatch($request);
                 $psr7->respond($this->toPsr7($factory, $response));
@@ -75,6 +85,7 @@ final class TempestPsr7Bridge
                 ));
             } finally {
                 $this->authContext->set(null);
+                $_COOKIE = [];
             }
         }
 
@@ -102,6 +113,15 @@ final class TempestPsr7Bridge
             $psr = $psr->withBody($factory->createStream(json_encode($body, JSON_THROW_ON_ERROR)));
         } elseif (is_string($body)) {
             $psr = $psr->withBody($factory->createStream($body));
+        } elseif ($body instanceof View) {
+            // Tempest::GenericResponseSender renders View bodies the same way
+            // but never sets a Content-Type (it relies on the SAPI default);
+            // RoadRunner's PSR-7 response has no such default, so set it here.
+            if (! $psr->hasHeader('Content-Type')) {
+                $psr = $psr->withHeader('Content-Type', 'text/html; charset=utf-8');
+            }
+
+            $psr = $psr->withBody($factory->createStream($this->viewRenderer->render($body)));
         } elseif ($body instanceof \JsonSerializable) {
             $psr = $psr->withBody($factory->createStream(json_encode($body, JSON_THROW_ON_ERROR)));
         }
