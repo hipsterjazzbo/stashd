@@ -10,3 +10,4 @@
 composer.phar
 .aider*
 CLAUDE.local.md
+.env.before_lerd

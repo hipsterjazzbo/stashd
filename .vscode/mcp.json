@@ -1,0 +1,14 @@
+{
+    "servers": {
+        "lerd": {
+            "args": [
+                "mcp"
+            ],
+            "command": "lerd",
+            "env": {
+                "LERD_SITE_PATH": "/home/hazel/Projects/stashd"
+            },
+            "type": "stdio"
+        }
+    }
+}
