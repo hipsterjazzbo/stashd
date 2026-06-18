@@ -1,6 +1,8 @@
 /vendor/
 /node_modules/
 /.tempest/
+/public/build/
+/public/vite-tempest
 /.env
 /data/
 /media/

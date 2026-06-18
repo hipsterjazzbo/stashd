@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/*
+ * Stashd brand tokens — calm, warm, dark dashboard.
+ * See docs/Stashd-Branding-Plan.md (§7 Visual Direction, §10 Color Direction).
+ * Espresso-charcoal background, graphite-brown panels, warm cream text,
+ * muted amber accent (the underscore), muted success/warn/error.
+ */
+@theme {
+	--color-espresso: #1c1714;
+	--color-panel: #262019;
+	--color-panel-raised: #2e271f;
+	--color-line: #3a3027;
+	--color-cream: #ece3d4;
+	--color-muted: #a8997f;
+	--color-amber: #d99a4e;
+	--color-amber-dim: #a8743a;
+	--color-success: #7c9a6b;
+	--color-warn: #c8822f;
+	--color-error: #a8503e;
+
+	--font-mono: ui-monospace, "JetBrains Mono", "Fira Code", "SFMono-Regular",
+		"Menlo", "Consolas", monospace;
+	--font-sans: var(--font-mono);
+}
+
+html {
+	background-color: var(--color-espresso);
+	color-scheme: dark;
+}
+
+body {
+	background-color: var(--color-espresso);
+	color: var(--color-cream);
+}
+
+/* The brand underscore: integral to the wordmark and recurring accent. */
+.brand-underscore {
+	color: var(--color-amber);
+}
+
+/* Active nav indicator — amber underscore under the current section. */
+[data-nav].is-active {
+	color: var(--color-cream);
+	border-bottom-color: var(--color-amber);
+}

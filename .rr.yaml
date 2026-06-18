@@ -8,8 +8,16 @@ server:
 
 http:
   address: 0.0.0.0:${STASHD_HTTP_PORT:-8474}
+  # Serve built front-end assets (public/build/) and the favicon straight from
+  # disk, before the request reaches a PHP worker. Everything else falls through
+  # to the Tempest router. Forbid serving source/secret files defensively.
+  static:
+    dir: "public"
+    forbid: [".php", ".htaccess", ".env"]
   pool:
-    num_workers: 2
+    # Two workers starved the pool while an SSE stream held one for ~30s
+    # (EventsController). Four gives live activity headroom alongside API calls.
+    num_workers: 4
     supervisor:
       max_worker_memory: 128
 

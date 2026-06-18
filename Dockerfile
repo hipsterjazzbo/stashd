@@ -1,5 +1,18 @@
 FROM docker.io/composer:2 AS composer
 
+# Build the front-end assets (Vite + Tailwind + Alpine) into public/build/.
+# The vite-plugin-tempest plugin normally shells out to `php tempest vite:config`
+# for its settings; we feed it inline via TEMPEST_PLUGIN_CONFIGURATION_OVERRIDE
+# so this stage stays pure Node (no PHP needed).
+FROM docker.io/node:22-bookworm-slim AS assets
+WORKDIR /app
+ENV TEMPEST_PLUGIN_CONFIGURATION_OVERRIDE='{"build_directory":"build","bridge_file_name":"vite-tempest","manifest":"manifest.json","entrypoints":["src/main.entrypoint.ts"]}'
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY vite.config.ts ./
+COPY src ./src
+RUN npm run build
+
 FROM php:8.5-cli-bookworm
 
 ARG PUID=1000
@@ -33,6 +46,7 @@ COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
 
 COPY . .
+COPY --from=assets /app/public/build ./public/build
 RUN git config --global --add safe.directory /var/www/html \
     && composer dump-autoload --optimize \
     && php vendor/bin/tempest discovery:generate --no-interaction \
