@@ -37,6 +37,7 @@ abstract readonly class PodcastBroadcastFormat implements BroadcastFormat
         private PodcastGuid $guids,
         private PodcastFeedBuilder $feedBuilder,
         private StateTransitionService $transitions,
+        private PodcastFundingLinkDetector $fundingDetector,
     ) {
     }
 
@@ -68,6 +69,7 @@ abstract readonly class PodcastBroadcastFormat implements BroadcastFormat
     {
         $broadcastToken = $this->tokens->ensureBroadcastToken($context->broadcast);
         $episodes = [];
+        $includedDescriptions = [];
         $failed = [];
         $included = 0;
 
@@ -98,11 +100,12 @@ abstract readonly class PodcastBroadcastFormat implements BroadcastFormat
             $itemToken = $this->tokens->ensureItemToken($item);
             $this->markItemReady($item);
             $episodes[] = $this->episode($context, $stashItem, $mediaItem, $item, $selection, $broadcastToken, $itemToken);
+            $includedDescriptions[] = $mediaItem->description;
             $included++;
         }
 
         $feedPath = $this->feedPath($context);
-        $this->writeFeed($feedPath, $this->feedBuilder->build($this->metadata($context, $broadcastToken), $episodes));
+        $this->writeFeed($feedPath, $this->feedBuilder->build($this->metadata($context, $broadcastToken, $includedDescriptions), $episodes));
 
         return new BroadcastPublishResult(
             publishedCount: 1,
@@ -271,7 +274,8 @@ abstract readonly class PodcastBroadcastFormat implements BroadcastFormat
         );
     }
 
-    private function metadata(BroadcastContext $context, string $broadcastToken): PodcastFeedMetadata
+    /** @param list<string|null> $includedDescriptions */
+    private function metadata(BroadcastContext $context, string $broadcastToken, array $includedDescriptions): PodcastFeedMetadata
     {
         $settings = $this->settings($context);
         $title = $this->nonEmptyString($settings['title'] ?? null)
@@ -280,6 +284,8 @@ abstract readonly class PodcastBroadcastFormat implements BroadcastFormat
         $description = $this->nonEmptyString($settings['description'] ?? null)
             ?? $context->stash->description
             ?? 'Private Stashd podcast feed.';
+        $fundingUrl = $this->nonEmptyString($settings['funding_url'] ?? null)
+            ?? $this->fundingDetector->detect($includedDescriptions);
 
         return new PodcastFeedMetadata(
             title: $title,
@@ -288,7 +294,7 @@ abstract readonly class PodcastBroadcastFormat implements BroadcastFormat
             linkUrl: $this->nonEmptyString($settings['link_url'] ?? null),
             author: $this->nonEmptyString($settings['author'] ?? null),
             imageUrl: $this->nonEmptyString($settings['image_url'] ?? null),
-            fundingUrl: $this->nonEmptyString($settings['funding_url'] ?? null),
+            fundingUrl: $fundingUrl,
         );
     }
 

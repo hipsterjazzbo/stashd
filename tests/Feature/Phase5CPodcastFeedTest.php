@@ -227,6 +227,157 @@ test('podcast rebuild activity does not include raw enclosure tokens', function 
         ->and($activity)->not->toContain($itemToken);
 });
 
+test('manual funding url setting wins over a detected link in episode descriptions', function (): void {
+    [$headers, $stashId, $mediaItemId] = podcastFeedReadyStash($this, 'podcast-funding-manual-wins');
+    $config = $this->container->get(StashdConfig::class);
+    podcastFeedCreateAsset(
+        $config,
+        $this->container->get(AssetRepository::class),
+        $mediaItemId,
+        AssetKind::Audio,
+        'original.mp3',
+        'audio/mpeg',
+        'audio-bytes',
+    );
+
+    $media = MediaItemRecord::findById(new PrimaryKey($mediaItemId));
+    $media->description = 'Support the show: https://www.patreon.com/example';
+    $media->save();
+
+    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'audio_podcast',
+        'name' => 'Manual Funding Feed',
+        'slug' => 'manual-funding-' . bin2hex(random_bytes(3)),
+        'settings' => ['funding_url' => 'https://example.test/manual-support'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild',
+        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $feedXml = (string) file_get_contents(podcastFeedPath($config, $broadcast->body['broadcast']['id']));
+    $xml = simplexml_load_string($feedXml);
+
+    expect((string) $xml->channel->funding['url'])->toBe('https://example.test/manual-support')
+        ->and((string) $xml->channel->description)->not->toContain('patreon.com');
+});
+
+test('detected funding link is used in the feed when no manual setting exists', function (): void {
+    [$headers, $stashId, $mediaItemId] = podcastFeedReadyStash($this, 'podcast-funding-detected');
+    $config = $this->container->get(StashdConfig::class);
+    podcastFeedCreateAsset(
+        $config,
+        $this->container->get(AssetRepository::class),
+        $mediaItemId,
+        AssetKind::Audio,
+        'original.mp3',
+        'audio/mpeg',
+        'audio-bytes',
+    );
+
+    $media = MediaItemRecord::findById(new PrimaryKey($mediaItemId));
+    $media->description = 'Buy me a coffee at https://ko-fi.com/example';
+    $media->save();
+
+    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'audio_podcast',
+        'name' => 'Detected Funding Feed',
+        'slug' => 'detected-funding-' . bin2hex(random_bytes(3)),
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild',
+        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $feedXml = (string) file_get_contents(podcastFeedPath($config, $broadcast->body['broadcast']['id']));
+    $xml = simplexml_load_string($feedXml);
+
+    expect((string) $xml->channel->funding['url'])->toBe('https://ko-fi.com/example');
+});
+
+test('podcast feed omits funding tag when no manual or detected funding link exists', function (): void {
+    [$headers, $stashId, $mediaItemId] = podcastFeedReadyStash($this, 'podcast-funding-none');
+    $config = $this->container->get(StashdConfig::class);
+    podcastFeedCreateAsset(
+        $config,
+        $this->container->get(AssetRepository::class),
+        $mediaItemId,
+        AssetKind::Audio,
+        'original.mp3',
+        'audio/mpeg',
+        'audio-bytes',
+    );
+
+    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'audio_podcast',
+        'name' => 'No Funding Feed',
+        'slug' => 'no-funding-' . bin2hex(random_bytes(3)),
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild',
+        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $feedXml = (string) file_get_contents(podcastFeedPath($config, $broadcast->body['broadcast']['id']));
+
+    expect($feedXml)->not->toContain('<funding');
+});
+
+test('funding link detection only scans descriptions of items included in the feed', function (): void {
+    [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('podcast-funding-excluded');
+    $config = $this->container->get(StashdConfig::class);
+
+    foreach (StashItemRecord::select()->where('stashId = ?', $stashId)->all() as $stashItem) {
+        if ($stashItem->mediaItemId === $mediaItemId) {
+            continue;
+        }
+
+        $stashItem->state = StashItemState::Hidden;
+        $stashItem->save();
+
+        $hiddenMedia = MediaItemRecord::findById(new PrimaryKey($stashItem->mediaItemId));
+        $hiddenMedia->description = 'Hidden episode funding: https://www.patreon.com/hidden';
+        $hiddenMedia->save();
+    }
+
+    $media = MediaItemRecord::findById(new PrimaryKey($mediaItemId));
+    $media->state = \App\Vault\MediaItemState::Ready;
+    $media->save();
+
+    podcastFeedCreateAsset(
+        $config,
+        $this->container->get(AssetRepository::class),
+        $mediaItemId,
+        AssetKind::Audio,
+        'original.mp3',
+        'audio/mpeg',
+        'audio-bytes',
+    );
+
+    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'audio_podcast',
+        'name' => 'Funding Excluded Feed',
+        'slug' => 'funding-excluded-' . bin2hex(random_bytes(3)),
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild',
+        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $feedXml = (string) file_get_contents(podcastFeedPath($config, $broadcast->body['broadcast']['id']));
+
+    expect($feedXml)->not->toContain('<funding')
+        ->and($feedXml)->not->toContain('patreon.com/hidden');
+});
+
 /** @return array{0: array{Authorization: string}, 1: string, 2: string} */
 function podcastFeedReadyStash(\Tests\IntegrationTestCase $test, string $channel): array
 {

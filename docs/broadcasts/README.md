@@ -73,6 +73,36 @@ GET /b/{broadcastToken}/items/{itemToken}/episode.{ext}      (public, unauthenti
 
 Transcode/remux/audio-extraction remain future work, deferred as a separate initiative — this route only serves the already-selected asset's bytes, never generated or converted media.
 
+### Funding link detection
+
+Podcast feed metadata supports a `<funding url="...">` tag (already part of `PodcastFeedMetadata`/`PodcastFeedBuilder`). The funding URL is resolved in `PodcastBroadcastFormat::metadata()`:
+
+1. Manual `settings['funding_url']` on the broadcast, if non-blank — always wins.
+2. Otherwise, `PodcastFundingLinkDetector` scans the descriptions of media items actually included in that rebuild (active stash items with a successfully selected Vault asset) for a recognizable funding link.
+
+The v1 detector is intentionally conservative. It only recognizes:
+
+```text
+patreon.com
+ko-fi.com
+github.com/sponsors/...
+buymeacoffee.com
+```
+
+in that priority order, matched against real hostnames only (e.g. `evilpatreon.com` and `patreon.com.evil.example` are rejected). It accepts only `http://`/`https://` URLs (normalizing `http://` to `https://` for these domains), strips common trailing punctuation/Markdown syntax, and returns the first-encountered link within the highest-priority class found. If no manual or detected link exists, no `<funding>` tag is emitted.
+
+Hidden, failed, or otherwise excluded stash items are never scanned — only descriptions belonging to items that made it into the published feed.
+
+Deferred (per the engineering spec's full funding-link section, not yet implemented):
+
+- channel/about-page scraping
+- YouTube membership, Nebula, and other creator-owned subscription platforms
+- creator-website and merch-store detection
+- Substack / Open Collective
+- the "first plausible support link" fallback
+
+Covered by `tests/Unit/Broadcasts/Podcasts/PodcastFundingLinkDetectorTest.php` and `tests/Feature/Phase5CPodcastFeedTest.php`.
+
 ## Layout
 
 ### `filesystem_series`

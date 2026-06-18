@@ -202,6 +202,12 @@
   - No-`Range` requests now also advertise `Accept-Ranges: bytes`
   - No resumable/`multipart/byteranges` streaming — out of scope for this slice
   - Covered by `tests/Feature/Phase5CPodcastEpisodeRouteTest.php`
+- [x] Conservative description-based podcast funding-link detection
+  - `PodcastFundingLinkDetector` scans included episode/media item descriptions for Patreon, Ko-fi, GitHub Sponsors, and Buy Me a Coffee links only
+  - Manual `settings['funding_url']` always wins; detection only runs when it is absent/blank
+  - Only descriptions of items actually included in the rebuilt feed are scanned (hidden/failed/excluded items are not)
+  - Covered by `tests/Unit/Broadcasts/Podcasts/PodcastFundingLinkDetectorTest.php` and `tests/Feature/Phase5CPodcastFeedTest.php`
+  - Deferred: channel/about-page scraping, YouTube membership, Nebula, creator-website, merch-store, and Substack/Open Collective detection, and the "first plausible link" fallback from the engineering spec's full priority list
 - [ ] Transcode/remux broadcast policies (deferred — separate future initiative, not blocking Phase 5C; requires explicit sign-off per `AGENTS.md`'s "ask before enabling copies/transcoding by default")
   - `stashes.videoQualityProfileId`/`audioQualityProfileId` columns exist but are unused — only meaningful once this work exists
   - `BroadcastPlan::estimatedCopyBytes` stays hardcoded at `0` until generated-media (podcast audio/video) work exists; `0` is already correct for hardlink-only broadcast types in the meantime
