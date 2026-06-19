@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\System\RoadRunner;
 
 use App\Auth\AuthContext;
+use App\System\Boot\SqliteConfigurator;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Spiral\RoadRunner\Http\PSR7Worker;
 use Spiral\RoadRunner\Worker;
+use Tempest\Database\Config\SQLiteConfig;
 use Tempest\Http\HttpRequestFailed;
 use Tempest\Http\Response;
 use Tempest\Http\Status;
@@ -34,6 +36,8 @@ final class TempestPsr7Bridge
         private Router $router,
         private AuthContext $authContext,
         private ViewRenderer $viewRenderer,
+        private SqliteConfigurator $sqlite,
+        private SQLiteConfig $sqliteConfig,
     ) {
     }
 
@@ -46,6 +50,16 @@ final class TempestPsr7Bridge
 
     public function run(): never
     {
+        // stashd:boot (docker/entrypoint.sh) sets busy_timeout on its own
+        // throwaway CLI connection, which doesn't carry over: each of these
+        // long-lived RoadRunner worker processes opens its own PDO connection
+        // (.rr.yaml pool.num_workers) that otherwise defaults to a 0ms SQLite
+        // busy_timeout. PDO's default ERRMODE_SILENT means a SQLITE_BUSY hit
+        // under concurrent requests doesn't throw — it just makes the query
+        // look like "not found" (e.g. a valid session token appearing to not
+        // exist), so this must be set per-worker, not just at container boot.
+        $this->sqlite->configure($this->sqliteConfig);
+
         $factory = new Psr17Factory();
         $worker = Worker::create();
         $psr7 = new PSR7Worker($worker, $factory, $factory, $factory);
