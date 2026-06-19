@@ -11,6 +11,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY vite.config.ts ./
 COPY src ./src
+COPY app ./app
 RUN npm run build
 
 FROM php:8.5-cli-bookworm AS base
