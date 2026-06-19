@@ -48,6 +48,12 @@ final readonly class UiController
         return view(__DIR__ . '/Views/stashes.view.php');
     }
 
+    #[Get('/stashes/new', without: [RequireAuthMiddleware::class])]
+    public function stashNew(): View
+    {
+        return view(__DIR__ . '/Views/stash-new.view.php');
+    }
+
     #[Get('/stashes/{id}', without: [RequireAuthMiddleware::class])]
     public function stashDetail(string $id): View
     {

@@ -2,7 +2,13 @@
 	<div x-data="stashes">
 		<div class="mb-6 flex items-center justify-between">
 			<h1 class="text-base font-semibold text-cream">Stashes</h1>
-			<p class="text-[13px] text-error" x-show="error" x-text="error"></p>
+			<div class="flex items-center gap-4">
+				<p class="text-[13px] text-error" x-show="error" x-text="error"></p>
+				<a href="/stashes/new"
+					class="rounded bg-amber px-3 py-1.5 text-[13px] font-semibold text-espresso transition-colors hover:bg-amber-dim">
+					+ New stash
+				</a>
+			</div>
 		</div>
 
 		<template x-if="loading">
