@@ -214,7 +214,9 @@ Never claim tests passed unless they were actually run and passed.
 
 ## Commands
 
-Use Composer scripts where available.
+This project's PHP, Composer, and vendor binaries only exist correctly inside lerd's containers (correct PHP version/extensions, `.env` service hostnames like `lerd-mysql`, the actual mounted SQLite file). Never invoke `php`, `composer`, or `vendor/bin/*` directly on the host — always go through the lerd MCP `exec` tool (`action: "composer"` for Composer scripts, `action: "console"` for Tempest console commands, `action: "vendor_run"` for pint/pest/phpstan/rector after `vendor_bins`). See the Lerd section below for the full tool surface.
+
+Use Composer scripts where available (run via `exec` `action: "composer"`, e.g. `args: ["test"]`):
 
 ```bash
 composer test
