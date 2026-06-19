@@ -214,12 +214,47 @@
 
 ## Phase 6 — API + UI
 
-- [ ] OpenAPI-documented `/api/v1` resources
-- [ ] Glance-inspired dashboard UI consuming public API only
-- [x] Job progress UI via SSE (Dashboard `GET /` + Activity `GET /activity`, Alpine + native `EventSource`)
+**Status:** in progress. Slices 1-4 shipped (toolchain/shell, auth, Dashboard/Activity,
+Stashes/Vault). Slice 5 (Create Stash flow + Settings) not started — that, plus the
+cross-cutting items below, is everything left in this phase.
+
+### Slice 1 — Front-end toolchain + dashboard shell (complete — `50158bb`)
+
+- [x] Vite + Tailwind v4 + Alpine.js toolchain (`package.json`, `vite.config.ts`, `src/main.entrypoint.{ts,css}`)
+- [x] `.rr.yaml` `http.static` serving `public/`; `num_workers` 2 → 4 for SSE headroom (since raised again, see below)
+- [x] Dockerfile Node build stage producing `public/build/`
+- [x] `app/Http/Ui/Views/x-stashd-layout.view.php` — wordmark, top nav, inline favicon tile
+
+### Slice 2 — Auth: login page + session cookie + logout (complete — `24105cb`)
+
+- [x] `__web_session__` rotating token + `stashd_session` HttpOnly cookie (`app/Auth/AuthService.php`, `AuthController.php`)
+- [x] Dropped the fallback to Tempest's native Authenticator/Session — it's a container singleton living for the life of a RoadRunner worker, so one user's session was leaking into every other request that worker served afterward
+- [x] `app/Http/Ui/UiController.php` + view shells for every nav destination, all opting out of `RequireAuthMiddleware` via `without:`
+
+### Slice 3 — Dashboard + Activity (read-only, live) (complete — `2dcebbd`)
+
+- [x] Dashboard (`GET /`): status cards from `GET /api/v1/system/health`, jobs, stash/vault counts
+- [x] Activity (`GET /activity`): live feed from `GET /api/v1/events` (SSE) via Alpine + native `EventSource`
+- [x] Shared `apiFetch()` / status-badge / formatter helpers in `src/main.entrypoint.ts`
+
+### Slice 4 — Stashes + Vault (read + drill-down) (complete — `03b6265`)
+
+- [x] `GET /api/v1/stashes`, `/{id}`, `/{id}/items`, `/{id}/inputs`, `GET /api/v1/items` (closed a documented spec §27 gap — these endpoints didn't exist before this slice)
+- [x] Stash detail: inputs/items/broadcasts, rebuild/verify/prune/rotate_token actions, copyable podcast feed URL
+- [x] Vault detail: assets list; `Asset.derivedFromAssetId` exposed as an honest partial "Explain Generated Files" (see below — `canRegenerate`/`safeToDelete` still not modelled)
+
+### Slice 5 — Create Stash flow + Settings (not started)
+
+- [ ] Create Stash: paste-URL → `POST /api/v1/stashes/preflight` → `GET .../preflight/{commandId}/review` → choose download policy + broadcasts → `stash.create_from_preflight`, with impact/disk warnings and live job progress. No route, view, or nav/page entry point exists yet — `app/Http/Ui/Views/stashes.view.php` has no "new stash" link, `UiController` has no `/stashes/new`-equivalent route. Backend is fully ready (preflight + create-from-preflight commands already work, used by tests via `bootstrapFakeDownloadStash()`).
+- [ ] Settings (`GET /settings`): route and nav link exist but the view (`app/Http/Ui/Views/settings.view.php`) is a 3-line placeholder. Needs API tokens (create-once display/list/revoke via existing `/api/v1/auth/tokens`), media-server connections (full CRUD + `/test` + `/libraries` already exist at `/api/v1/media-servers`), and read-only system/storage info (`/api/v1/system/health`, already used on the Dashboard).
+
+### Cross-cutting / deferred
+
+- [ ] OpenAPI-documented `/api/v1` resources — not started; no spec file exists anywhere in the repo (engineering spec §31 calls for documenting from early development, but this never got picked up)
 - [ ] True low-latency SSE streaming over RoadRunner — `TempestPsr7Bridge::toPsr7()` (`app/System/RoadRunner/TempestPsr7Bridge.php`) now drains `EventStream`'s generator and sends it as one burst once the poll loop (`EventsController::MAX_ITERATIONS`) completes, fixing the prior bug where it silently dropped the `Generator` body and sent `Content-Length: 0`. The burst-delivery fix is enough for the Dashboard/Activity/Stash-detail UI (auto-reconnect every ~MAX_ITERATIONS seconds). Real incremental push needs RoadRunner's `chunkSize`-based stream mode (`PSR7Worker::respond()`) plus a custom `StreamInterface` adapter pulling from the generator — bigger change, touches shared runtime behavior, deferred.
-  - **Known sharp edge, hit twice now:** because the worker is held for the whole loop regardless of client disconnects (confirmed via a logged `broken pipe` at `elapsed: 30148ms`), every page that subscribes to `/api/v1/events` ties up one RoadRunner worker for ~`MAX_ITERATIONS` seconds out of every `MAX_ITERATIONS + ~3`s reconnect cycle, for as long as that page stays open. `.rr.yaml`'s `pool.num_workers` already got bumped once (2 → 4) for this; Slice 4 adding a third SSE-subscribing page (Stash detail) used up that headroom, and with all workers busy, new page navigations (including the auth check) had no worker free to run on — intermittently bouncing users to `/login` in a way that looked like a recurrence of the SQLite `busy_timeout` bug (`b841ea7`) but was actually worker-pool exhaustion, a different mechanism with the same symptom. Mitigated 2026-06-20 by dropping `MAX_ITERATIONS` 30 → 10 and raising `num_workers` 4 → 8 (~91% occupancy/open-tab down to ~77%, raises the simultaneous-open-tabs threshold from ~3-4 to ~7-8) — this is headroom, not a fix. **Next page that wants live SSE updates should trigger the real fix above (or a server-side cap on concurrent `/api/v1/events` connections) instead of bumping `num_workers` a third time.**
-- [ ] "Explain Generated Files" asset metadata (`canRegenerate`/`safeToDelete`/generated-by info) — depends on this phase's UI work
+  - **Known sharp edge, hit twice now:** because the worker is held for the whole loop regardless of client disconnects (confirmed via a logged `broken pipe` at `elapsed: 30148ms`), every page that subscribes to `/api/v1/events` ties up one RoadRunner worker for ~`MAX_ITERATIONS` seconds out of every `MAX_ITERATIONS + ~3`s reconnect cycle, for as long as that page stays open. `.rr.yaml`'s `pool.num_workers` already got bumped once (2 → 4) for this; Slice 4 adding a third SSE-subscribing page (Stash detail) used up that headroom, and with all workers busy, new page navigations (including the auth check) had no worker free to run on — intermittently bouncing users to `/login` in a way that looked like a recurrence of the SQLite `busy_timeout` bug (`b841ea7`) but was actually worker-pool exhaustion, a different mechanism with the same symptom. Mitigated 2026-06-20 by dropping `MAX_ITERATIONS` 30 → 10 and raising `num_workers` 4 → 8 (~91% occupancy/open-tab down to ~77%, raises the simultaneous-open-tabs threshold from ~3-4 to ~7-8) — this is headroom, not a fix. **Next page that wants live SSE updates should trigger the real fix above (or a server-side cap on concurrent `/api/v1/events` connections) instead of bumping `num_workers` a third time.** Slice 5's Create Stash flow wants live job progress too — decide then whether to do the real fix, or add a server-side cap and bump workers a third time.
+- [ ] "Explain Generated Files" asset metadata — partial since Slice 4: `role`/`kind`/`derived_from_asset_id` are exposed and shown in the Vault item detail UI; `canRegenerate`/`safeToDelete`/generated-by info are still not modelled (no schema for it yet) and the UI says so explicitly rather than guessing.
+- [x] Stale branding doc pointer — fixed 2026-06-20: `AGENTS.md` and `x-stashd-layout.view.php`'s doc comment both already named the right canonical path (`docs/Stashd-Branding-Plan.md`); the staleness was in that file's *content*, which still described pre-rebrand terminology (Mirror/Collection/Destination — explicitly disavowed by the current direction). Promoted the current content from `docs/stashd-design-assets-phase6/docs/Stashd-Branding-Plan-2026-06-16.md` into the canonical path; the dated copy and its asset bundle are left untouched as the historical design-handoff record (per `ASSET-MANIFEST.md`). Carried over from the Slice 1 plan's sign-off list.
 
 ## Phase 7 — Release hardening
 
