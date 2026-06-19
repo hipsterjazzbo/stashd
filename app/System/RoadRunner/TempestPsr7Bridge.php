@@ -6,12 +6,16 @@ namespace App\System\RoadRunner;
 
 use App\Auth\AuthContext;
 use App\System\Boot\SqliteConfigurator;
+use Generator;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Spiral\RoadRunner\Http\PSR7Worker;
 use Spiral\RoadRunner\Worker;
 use Tempest\Database\Config\SQLiteConfig;
+use Tempest\DateTime\Duration;
 use Tempest\Http\HttpRequestFailed;
 use Tempest\Http\Response;
+use Tempest\Http\ServerSentEvent;
+use Tempest\Http\ServerSentMessage;
 use Tempest\Http\Status;
 use Tempest\Router\Router;
 use Tempest\View\View;
@@ -138,6 +142,13 @@ final class TempestPsr7Bridge
             $psr = $psr->withBody($factory->createStream($this->viewRenderer->render($body)));
         } elseif ($body instanceof \JsonSerializable) {
             $psr = $psr->withBody($factory->createStream(json_encode($body, JSON_THROW_ON_ERROR)));
+        } elseif ($body instanceof Generator) {
+            // EventStream (app/System/Event/EventsController.php) yields ServerSentMessage
+            // instances from a sleep-and-poll loop. RoadRunner's PSR7Worker reads the whole
+            // body string up front (no true chunked flushing without enabling its streaming
+            // mode), so the generator is drained here and the formatted SSE text is sent as
+            // one response once it naturally completes (~MAX_ITERATIONS * POLL_INTERVAL_MS).
+            $psr = $psr->withBody($factory->createStream($this->renderEventStream($body)));
         }
 
         if ($psr->getBody()->getSize() === 0 && $response->status !== Status::NO_CONTENT) {
@@ -145,5 +156,40 @@ final class TempestPsr7Bridge
         }
 
         return $psr;
+    }
+
+    private function renderEventStream(Generator $messages): string
+    {
+        $output = '';
+
+        foreach ($messages as $message) {
+            if (! $message instanceof ServerSentEvent) {
+                $message = new ServerSentMessage(data: $message);
+            }
+
+            if ($message->id !== null) {
+                $output .= "id: {$message->id}\n";
+            }
+
+            if ($message->retryAfter !== null) {
+                $retry = $message->retryAfter instanceof Duration
+                    ? $message->retryAfter->getTotalMilliseconds()
+                    : $message->retryAfter;
+
+                $output .= "retry: {$retry}\n";
+            }
+
+            if ($message->event !== '') {
+                $output .= "event: {$message->event}\n";
+            }
+
+            foreach (explode("\n", (string) $message->data) as $line) {
+                $output .= "data: {$line}\n";
+            }
+
+            $output .= "\n";
+        }
+
+        return $output;
     }
 }

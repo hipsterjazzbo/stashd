@@ -216,7 +216,8 @@
 
 - [ ] OpenAPI-documented `/api/v1` resources
 - [ ] Glance-inspired dashboard UI consuming public API only
-- [ ] Job progress UI via SSE
+- [x] Job progress UI via SSE (Dashboard `GET /` + Activity `GET /activity`, Alpine + native `EventSource`)
+- [ ] True low-latency SSE streaming over RoadRunner — `TempestPsr7Bridge::toPsr7()` (`app/System/RoadRunner/TempestPsr7Bridge.php`) now drains `EventStream`'s generator and sends it as one burst once the ~30s poll loop (`EventsController::MAX_ITERATIONS`) completes, fixing the prior bug where it silently dropped the `Generator` body and sent `Content-Length: 0`. The burst-delivery fix is enough for the Dashboard/Activity UI (auto-reconnect every ~30s). Real incremental push needs RoadRunner's `chunkSize`-based stream mode (`PSR7Worker::respond()`) plus a custom `StreamInterface` adapter pulling from the generator — bigger change, touches shared runtime behavior, deferred.
 - [ ] "Explain Generated Files" asset metadata (`canRegenerate`/`safeToDelete`/generated-by info) — depends on this phase's UI work
 
 ## Phase 7 — Release hardening
