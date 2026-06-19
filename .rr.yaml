@@ -19,8 +19,12 @@ http:
     forbid: [".php", ".htaccess", ".env"]
   pool:
     # Two workers starved the pool while an SSE stream held one for ~30s
-    # (EventsController). Four gives live activity headroom alongside API calls.
-    num_workers: 4
+    # (EventsController). Four still wasn't enough once a third page started
+    # subscribing to /api/v1/events (each open page ties up one worker for
+    # the stream's whole iteration window, on repeat via EventSource
+    # auto-reconnect) — bumped to 8 alongside shortening that window. Revisit
+    # both together if another SSE-subscribing page gets added.
+    num_workers: 8
     supervisor:
       max_worker_memory: 128
 

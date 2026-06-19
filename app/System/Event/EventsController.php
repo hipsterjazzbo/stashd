@@ -18,7 +18,16 @@ final readonly class EventsController
 {
     private const int POLL_INTERVAL_MS = 1000;
 
-    private const int MAX_ITERATIONS = 30;
+    // RoadRunner drains this whole generator before writing a response, so a
+    // worker is held for the full duration regardless of client disconnects
+    // (confirmed via a "broken pipe" log entry with elapsed: 30148ms for the
+    // old 30-iteration loop). With only a handful of HTTP workers, every page
+    // that subscribes to this stream ties one up for that whole window, on
+    // a tight ~POLL_INTERVAL_MS-spaced reconnect cycle for as long as the
+    // page stays open — multiple such pages open at once can starve the pool
+    // and make unrelated requests (including auth checks) wait or fail. Keep
+    // this short; pair any increase with more `pool.num_workers` in .rr.yaml.
+    private const int MAX_ITERATIONS = 10;
 
     public function __construct(
         private EventNotificationRepository $notifications,
