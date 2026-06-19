@@ -152,6 +152,13 @@ const STATE_BADGES: Record<string, Badge> = {
 	disabled: { label: 'disabled', dot: 'bg-muted', text: 'text-muted' },
 	ignored: { label: 'ignored', dot: 'bg-muted', text: 'text-muted' },
 	cancelled: { label: 'cancelled', dot: 'bg-muted', text: 'text-muted' },
+	active: { label: 'active', dot: 'bg-success', text: 'text-success' },
+	removed: { label: 'removed', dot: 'bg-muted', text: 'text-muted' },
+	hidden: { label: 'hidden', dot: 'bg-muted', text: 'text-muted' },
+	discovered: { label: 'discovered', dot: 'bg-muted', text: 'text-muted' },
+	metadata_ready: { label: 'metadata ready', dot: 'bg-amber', text: 'text-amber' },
+	download_pending: { label: 'download pending', dot: 'bg-amber', text: 'text-amber' },
+	downloading: { label: 'downloading', dot: 'bg-amber', text: 'text-amber' },
 }
 
 function statusBadge(state: string | null | undefined): Badge {
@@ -258,6 +265,112 @@ interface JobSummary {
 	updated_at: string
 }
 
+interface StashSummary {
+	id: string
+	name: string
+	slug: string
+	description: string | null
+	sync_mode: string
+	download_policy: string
+	organization_mode: string
+	state: string
+	created_at: string
+	updated_at: string
+}
+
+interface StashItemSummary {
+	id: string
+	stash_id: string
+	media_item_id: string
+	stash_input_id: string | null
+	state: string
+	position: number | null
+	season_number: number | null
+	episode_number: number | null
+	season_title: string | null
+	display_title: string | null
+	display_description: string | null
+	first_seen_at: string | null
+	last_seen_at: string | null
+	removed_at: string | null
+	removed_reason: string | null
+	ignored_reason: string | null
+	created_at: string
+	updated_at: string
+}
+
+interface StashInputSummary {
+	id: string
+	stash_id: string
+	provider_key: string
+	input_type: string
+	source_uri: string
+	provider_input_id: string
+	state: string
+	consecutive_failures: number
+	title: string | null
+	sync_mode: string | null
+	last_checked_at: string | null
+	next_check_at: string | null
+	last_success_at: string | null
+	last_failure_at: string | null
+	created_at: string
+	updated_at: string
+}
+
+interface BroadcastSummary {
+	id: string
+	stash_id: string
+	type: string
+	name: string
+	slug: string
+	state: string
+	settings: Record<string, unknown> | null
+	last_planned_at: string | null
+	last_built_at: string | null
+	last_verified_at: string | null
+	last_error: string | null
+	created_at: string
+	updated_at: string
+	feed_url?: string
+	token_preview?: string
+}
+
+interface MediaItemSummary {
+	id: string
+	provider_key: string
+	provider_item_id: string
+	canonical_uri: string
+	title: string
+	state: string
+	duration_seconds: number | null
+	published_at: string | null
+	thumbnail_uri: string | null
+	created_at: string
+	updated_at: string
+}
+
+interface AssetSummary {
+	id: string
+	media_item_id: string
+	role: string
+	kind: string
+	state: string
+	derived_from_asset_id: string | null
+	path: string | null
+	relative_path: string | null
+	mime_type: string | null
+	container: string | null
+	size_bytes: number | null
+	checksum: string | null
+	duration_seconds: number | null
+	last_verified_at: string | null
+	missing_at: string | null
+	missing_reason: string | null
+	created_at: string
+	updated_at: string
+}
+
 function dashboardComponent() {
 	return {
 		loading: true,
@@ -333,8 +446,166 @@ function activityComponent() {
 	}
 }
 
+function stashesComponent() {
+	return {
+		loading: true,
+		error: null as string | null,
+		stashes: [] as StashSummary[],
+		statusBadge,
+
+		async init() {
+			await this.refresh()
+			this.loading = false
+		},
+
+		async refresh() {
+			try {
+				const response = await apiFetch('/api/v1/stashes')
+				this.stashes = (await response.json()).stashes
+				this.error = null
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not reach the server.'
+			}
+		},
+	}
+}
+
+function stashDetailComponent(stashId: string) {
+	return {
+		loading: true,
+		error: null as string | null,
+		stash: null as StashSummary | null,
+		items: [] as StashItemSummary[],
+		inputs: [] as StashInputSummary[],
+		broadcasts: [] as BroadcastSummary[],
+		actionPending: null as string | null,
+		statusBadge,
+		formatRelativeTime,
+
+		async init() {
+			await this.refresh()
+			this.loading = false
+
+			if ('EventSource' in window) {
+				const source = new EventSource('/api/v1/events')
+				for (const type of EVENT_TYPES) {
+					source.addEventListener(type, () => void this.refresh())
+				}
+			}
+		},
+
+		async refresh() {
+			try {
+				const [stashResponse, itemsResponse, inputsResponse, broadcastsResponse] = await Promise.all([
+					apiFetch(`/api/v1/stashes/${stashId}`),
+					apiFetch(`/api/v1/stashes/${stashId}/items`),
+					apiFetch(`/api/v1/stashes/${stashId}/inputs`),
+					apiFetch(`/api/v1/stashes/${stashId}/broadcasts`),
+				])
+				this.stash = (await stashResponse.json()).stash
+				this.items = (await itemsResponse.json()).items
+				this.inputs = (await inputsResponse.json()).inputs
+				this.broadcasts = (await broadcastsResponse.json()).broadcasts
+				this.error = null
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not reach the server.'
+			}
+		},
+
+		async runBroadcastAction(broadcastId: string, action: 'rebuild' | 'verify' | 'prune' | 'rotate_token') {
+			this.actionPending = `${broadcastId}:${action}`
+			try {
+				await apiFetch('/api/v1/commands', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						type: `broadcast.${action}`,
+						options: { broadcast_id: broadcastId },
+					}),
+				})
+				await this.refresh()
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not run that action.'
+			} finally {
+				this.actionPending = null
+			}
+		},
+
+		async copyFeedUrl(feedUrl: string) {
+			await navigator.clipboard.writeText(feedUrl)
+		},
+	}
+}
+
+function vaultComponent() {
+	return {
+		loading: true,
+		error: null as string | null,
+		items: [] as MediaItemSummary[],
+		statusBadge,
+		formatDuration,
+		formatRelativeTime,
+
+		async init() {
+			await this.refresh()
+			this.loading = false
+		},
+
+		async refresh() {
+			try {
+				const response = await apiFetch('/api/v1/items')
+				this.items = (await response.json()).items
+				this.error = null
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not reach the server.'
+			}
+		},
+	}
+}
+
+function vaultDetailComponent(itemId: string) {
+	return {
+		loading: true,
+		error: null as string | null,
+		item: null as MediaItemSummary | null,
+		assets: [] as AssetSummary[],
+		statusBadge,
+		formatBytes,
+		formatDuration,
+		formatRelativeTime,
+
+		async init() {
+			await this.refresh()
+			this.loading = false
+		},
+
+		async refresh() {
+			try {
+				const [itemResponse, assetsResponse] = await Promise.all([
+					apiFetch(`/api/v1/items/${itemId}`),
+					apiFetch(`/api/v1/items/${itemId}/assets`),
+				])
+				this.item = (await itemResponse.json()).item
+				this.assets = (await assetsResponse.json()).assets
+				this.error = null
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not reach the server.'
+			}
+		},
+	}
+}
+
 Alpine.data('dashboard', dashboardComponent)
 Alpine.data('activity', activityComponent)
+Alpine.data('stashes', stashesComponent)
+Alpine.data('stashDetail', stashDetailComponent)
+Alpine.data('vault', vaultComponent)
+Alpine.data('vaultDetail', vaultDetailComponent)
 
 window.Alpine = Alpine
 Alpine.start()

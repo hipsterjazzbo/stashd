@@ -125,6 +125,21 @@ test('command and job resources do not expose raw podcast tokens', function (): 
         ->and($show->body['jobs'][0]['payload'])->toHaveKey('broadcast_id');
 });
 
+test('stash and vault list resources do not expose secret-shaped fields', function (): void {
+    [$headers] = $this->bootstrapFakeDownloadStash('api-resource-stashes-list');
+
+    $stashes = $this->http->get('/api/v1/stashes', headers: $headers)->assertStatus(Status::OK);
+    $items = $this->http->get('/api/v1/items', headers: $headers)->assertStatus(Status::OK);
+    $json = json_encode([$stashes->body, $items->body], JSON_THROW_ON_ERROR);
+
+    expect($json)->not->toContain('tokenSecretId')
+        ->and($json)->not->toContain('token_secret_id')
+        ->and($json)->not->toContain('encryptedValue')
+        ->and($json)->not->toContain('encrypted_value')
+        ->and($json)->not->toContain('passwordHash')
+        ->and($json)->not->toContain('password_hash');
+});
+
 function apiResourcePodcastTokenFromFeedUrl(string $feedUrl): string
 {
     $path = parse_url($feedUrl, PHP_URL_PATH);

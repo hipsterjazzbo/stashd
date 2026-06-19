@@ -9,6 +9,7 @@ use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
 use App\Support\RecordTimestamps;
 use InvalidArgumentException;
+use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
@@ -73,5 +74,13 @@ final class MediaItemRepository
         $record->save();
 
         return $record;
+    }
+
+    /** @return list<MediaItemRecord> */
+    public function list(): array
+    {
+        return MediaItemRecord::select()
+            ->orderBy('createdAt', Direction::DESC)
+            ->all();
     }
 }

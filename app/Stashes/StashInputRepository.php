@@ -75,4 +75,13 @@ final class StashInputRepository
             ->orderBy('nextCheckAt', Direction::ASC)
             ->all();
     }
+
+    /** @return list<StashInputRecord> */
+    public function listForStash(PrefixedUlid $stashId): array
+    {
+        return StashInputRecord::select()
+            ->where('stashId = ?', $stashId->toString())
+            ->orderBy('createdAt', Direction::ASC)
+            ->all();
+    }
 }

@@ -28,6 +28,7 @@ final readonly class AssetResource implements Arrayable
             'role' => $this->asset->role->value,
             'kind' => $this->asset->kind->value,
             'state' => $this->asset->state->value,
+            'derivedFromAssetId' => $this->asset->derivedFromAssetId,
             'path' => $this->asset->path,
             'relativePath' => $this->asset->relativePath,
             'mimeType' => $this->asset->mimeType,

@@ -8,6 +8,7 @@ use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
 use App\Support\RecordTimestamps;
 use InvalidArgumentException;
+use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
@@ -54,5 +55,13 @@ final class StashRepository
     public function findBySlug(string $slug): ?StashRecord
     {
         return StashRecord::select()->where('slug = ?', $slug)->first();
+    }
+
+    /** @return list<StashRecord> */
+    public function list(): array
+    {
+        return StashRecord::select()
+            ->orderBy('createdAt', Direction::ASC)
+            ->all();
     }
 }

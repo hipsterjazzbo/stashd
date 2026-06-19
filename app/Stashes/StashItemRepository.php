@@ -8,6 +8,7 @@ use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
 use App\Support\RecordTimestamps;
 use InvalidArgumentException;
+use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
@@ -55,5 +56,14 @@ final class StashItemRepository
         return StashItemRecord::select()
             ->where('stashId = ? AND mediaItemId = ?', $stashId->toString(), $mediaItemId->toString())
             ->first();
+    }
+
+    /** @return list<StashItemRecord> */
+    public function listForStash(PrefixedUlid $stashId): array
+    {
+        return StashItemRecord::select()
+            ->where('stashId = ?', $stashId->toString())
+            ->orderBy('position', Direction::ASC)
+            ->all();
     }
 }

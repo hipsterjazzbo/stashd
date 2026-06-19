@@ -24,6 +24,17 @@ final readonly class MediaItemController
     ) {
     }
 
+    #[Get('/api/v1/items')]
+    public function index(): Json
+    {
+        return new Json([
+            'items' => array_map(
+                static fn ($item): array => MediaItemResource::fromRecord($item)->toArray(),
+                $this->mediaItems->list(),
+            ),
+        ]);
+    }
+
     #[Get('/api/v1/items/{id}')]
     public function show(string $id): Json
     {
