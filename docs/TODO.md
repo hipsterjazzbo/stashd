@@ -249,8 +249,28 @@ in this phase.
 - [x] Settings (`GET /settings`): API tokens (create-once display, list, revoke), media-server connections (create/list/test/delete), and read-only system/storage info, all against already-existing endpoints — no backend changes needed.
 - [x] Broadcast creation: Stash detail gained a minimal "new broadcast" form (type + name) — there was previously no UI anywhere to create one, only to act on existing ones. Found during this slice's planning, not in the original scope.
 
-### Cross-cutting / deferred
-
+### Slice 6 – Refinement & bug fixes
+- [ ] Stashes need an edit page
+- [ ] The item list on the detail page should be more detailed, show more data. Thumbnails, actual media titles, length, size on disk etc. It also need to show live processing status: fetching metadata, downloading (with live progress bar), etc.
+- [ ] Need to handle the case where a broadcast is created for a stash that is set to metadata-only. Prompt the user to enable some form of item download so the broadcast can work.
+- [ ] Youtube sources currently only grab 15 items. I suspect this is because it is only discovering via rss, rather than getting a full-channel discovery via the data api.
+  - Also need a settings section for the youtube api key
+- [ ] Activity page closes payload disclosure sections on every background refresh.
+- [ ] Stash name should default to channel/playlist name
+- [ ] Stash slug should gracefully fall back to adding an ordinal number suffix in the case of a duplicate
+- [ ] All UI that tells the user that something is happening right now in the background should have some sort of animated indicator. A small pulsing coloured circle or something like that.
+- [ ] Downloads do not currently happen when a stash is added with a download type specified. Literally the entire point of this app.
+- [ ] There's currently no way to delete a stash. This should prompt the user for confirmation before deleting.
+- [ ] Stashes should use channel avatar as an icon in lists and on the detail page
+- [ ] Dashboard needs refinement
+  - Remove recent jobs section, this is more like debugging data and is already present in the activity tab
+  - Add a summary of recent media activity. New episodes discovered and downloaded, new stashes added, and surface any issues (like a stash input becoming stale/disappearing)
+  - Storage locations section should show disk usage per location, and a total
+  - Stashes & Vault section is still empty despite its prerequisite being fulfilled
+- [ ] There's a fundamental part of Stashes that has been missed: you should be able to create an empty stash and add more than one input to it. I think we need to revise the stash workflow to acommodate this. Maybe just New Stash -> Name, go to detail page with empty sections showing what to do next. "No inputs configured. + Add input"
+- [ ] Vault item detail page (and by extension the media item detail page) is very sparse. I should be able to go there to see everything the system know about it cleanly presented. Stash(es) it is part of, broadcasts it's in, all metadata known about it, download/processing status etc.
+- [ ] HUGE ISSUE: I added https://www.youtube.com/@OculusImperia to a stash, and it "discovered" videos from a totally different channel??
+- [ ] The part of the flow of creating a stash is missing several things from teh engineering spec, for example, whether to include shorts/live vods.
 - [ ] OpenAPI-documented `/api/v1` resources — not started; no spec file exists anywhere in the repo (engineering spec §31 calls for documenting from early development, but this never got picked up)
 - [ ] True low-latency SSE streaming over RoadRunner — `TempestPsr7Bridge::toPsr7()` (`app/System/RoadRunner/TempestPsr7Bridge.php`) now drains `EventStream`'s generator and sends it as one burst once the poll loop (`EventsController::MAX_ITERATIONS`) completes, fixing the prior bug where it silently dropped the `Generator` body and sent `Content-Length: 0`. The burst-delivery fix is enough for the Dashboard/Activity/Stash-detail UI (auto-reconnect every ~MAX_ITERATIONS seconds). Real incremental push needs RoadRunner's `chunkSize`-based stream mode (`PSR7Worker::respond()`) plus a custom `StreamInterface` adapter pulling from the generator — bigger change, touches shared runtime behavior, deferred.
   - **Known sharp edge, hit twice now:** because the worker is held for the whole loop regardless of client disconnects (confirmed via a logged `broken pipe` at `elapsed: 30148ms`), every page that subscribes to `/api/v1/events` ties up one RoadRunner worker for ~`MAX_ITERATIONS` seconds out of every `MAX_ITERATIONS + ~3`s reconnect cycle, for as long as that page stays open. `.rr.yaml`'s `pool.num_workers` already got bumped once (2 → 4) for this; Slice 4 adding a third SSE-subscribing page (Stash detail) used up that headroom, and with all workers busy, new page navigations (including the auth check) had no worker free to run on — intermittently bouncing users to `/login` in a way that looked like a recurrence of the SQLite `busy_timeout` bug (`b841ea7`) but was actually worker-pool exhaustion, a different mechanism with the same symptom. Mitigated 2026-06-20 by dropping `MAX_ITERATIONS` 30 → 10 and raising `num_workers` 4 → 8 (~91% occupancy/open-tab down to ~77%, raises the simultaneous-open-tabs threshold from ~3-4 to ~7-8) — this is headroom, not a fix.
