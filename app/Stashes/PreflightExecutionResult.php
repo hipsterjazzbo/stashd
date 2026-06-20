@@ -41,6 +41,9 @@ final readonly class PreflightExecutionResult
                 'source_uri' => $this->resolvedInput->sourceUri->toString(),
                 'provider_input_id' => $this->resolvedInput->providerInputId,
                 'title' => $this->resolvedInput->title,
+                'source_title' => $this->resolvedInput->sourceTitle,
+                'source_avatar_uri' => $this->resolvedInput->sourceAvatarUri?->toString(),
+                'estimated_item_count' => $this->resolvedInput->estimatedItemCount,
             ],
             'discovery' => [
                 'strategy_key' => $this->strategyKey,

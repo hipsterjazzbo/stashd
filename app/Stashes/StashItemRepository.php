@@ -66,4 +66,20 @@ final class StashItemRepository
             ->orderBy('position', Direction::ASC)
             ->all();
     }
+
+    /**
+     * @param list<string> $mediaItemIds
+     * @return list<StashItemRecord>
+     */
+    public function listForMediaItemsExcludingStash(array $mediaItemIds, PrefixedUlid $excludingStashId): array
+    {
+        if ($mediaItemIds === []) {
+            return [];
+        }
+
+        return StashItemRecord::select()
+            ->whereIn('mediaItemId', $mediaItemIds)
+            ->where('stashId != ?', $excludingStashId->toString())
+            ->all();
+    }
 }

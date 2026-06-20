@@ -49,6 +49,7 @@ function youtubeProviderWithFixtures(?string $apiKey = null, bool $realDownloads
             config: $ytdlpConfig,
             gateway: new \App\Downloads\Ytdlp\StubYtdlpGateway(),
         ),
+        channelIds: new YouTubeChannelIdResolver($http),
     );
 }
 
@@ -70,6 +71,28 @@ test('youtube provider fixture channel discovery matches committed expectations'
     expect($items)->toHaveCount($fixture['discovery']['initial_item_count'])
         ->and($items[0]->providerItemId)->toBe($fixture['discovery']['first_item_id'])
         ->and($items[0]->title)->toBe($fixture['discovery']['first_item_title']);
+});
+
+test('youtube provider resolveInput enriches a channel handle with real identity', function (): void {
+    $provider = youtubeProviderWithFixtures();
+
+    $resolved = $provider->resolveInput(\App\Providers\StashdUri::parse('https://www.youtube.com/@StashdDemo'));
+
+    expect($resolved->providerInputId)->toBe('UCStashdDemoCh0012345678')
+        ->and($resolved->sourceTitle)->toBe('Stashd Demo')
+        ->and($resolved->sourceAvatarUri?->toString())->toBe('https://yt3.googleusercontent.com/stashd-demo-avatar.jpg')
+        ->and($resolved->estimatedItemCount)->toBe(217);
+});
+
+test('youtube provider resolveInput stays network-free for video inputs', function (): void {
+    $provider = youtubeProviderWithFixtures();
+
+    $resolved = $provider->resolveInput(\App\Providers\StashdUri::parse('https://www.youtube.com/watch?v=demoVideo01'));
+
+    expect($resolved->providerInputId)->toBe('demoVideo01')
+        ->and($resolved->sourceTitle)->toBeNull()
+        ->and($resolved->sourceAvatarUri)->toBeNull()
+        ->and($resolved->estimatedItemCount)->toBeNull();
 });
 
 test('youtube strategy selector prefers rss for discovery and skips ytdlp without allow last resort', function (): void {

@@ -44,3 +44,7 @@ body {
 	color: var(--color-cream);
 	border-bottom-color: var(--color-amber);
 }
+
+[x-cloak] {
+	display: none !important;
+}

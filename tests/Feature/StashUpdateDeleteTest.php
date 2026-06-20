@@ -1,0 +1,155 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature;
+
+use App\Stashes\StashInputRecord;
+use App\Stashes\StashItemRecord;
+use App\Stashes\StashRecord;
+use App\Vault\MediaItemSourceRecord;
+use Tempest\Database\PrimaryKey;
+use Tempest\Http\Status;
+
+test('PATCH stash updates provided fields and leaves others unchanged', function (): void {
+    [$headers, $stashId] = $this->bootstrapFakeDownloadStash('patch-stash');
+
+    $before = StashRecord::findById(new PrimaryKey($stashId));
+
+    $response = $this->http->patch('/api/v1/stashes/' . $stashId, [
+        'name' => 'Renamed Stash',
+        'sync_mode' => 'manual',
+    ], headers: $headers);
+
+    $response->assertOk();
+    expect($response->body['stash']['name'])->toBe('Renamed Stash')
+        ->and($response->body['stash']['sync_mode'])->toBe('manual')
+        ->and($response->body['stash']['download_policy'])->toBe($before->downloadPolicy->value)
+        ->and($response->body['stash']['slug'])->toBe($before->slug);
+
+    $after = StashRecord::findById(new PrimaryKey($stashId));
+    expect($after->name)->toBe('Renamed Stash')
+        ->and($after->syncMode->value)->toBe('manual');
+});
+
+test('PATCH stash rejects a blank name', function (): void {
+    [$headers, $stashId] = $this->bootstrapFakeDownloadStash('patch-blank-name');
+
+    $response = $this->http->patch('/api/v1/stashes/' . $stashId, [
+        'name' => '   ',
+    ], headers: $headers);
+
+    $response->assertStatus(Status::BAD_REQUEST);
+    expect($response->body['error']['code'])->toBe('validation_error');
+});
+
+test('PATCH stash rejects an unsupported sync_mode', function (): void {
+    [$headers, $stashId] = $this->bootstrapFakeDownloadStash('patch-bad-sync-mode');
+
+    $response = $this->http->patch('/api/v1/stashes/' . $stashId, [
+        'sync_mode' => 'not-a-real-mode',
+    ], headers: $headers);
+
+    $response->assertStatus(Status::BAD_REQUEST);
+    expect($response->body['error']['code'])->toBe('validation_error');
+});
+
+test('PATCH stash returns 404 for an unknown stash', function (): void {
+    $headers = $this->authHeaders();
+
+    $response = $this->http->patch('/api/v1/stashes/stash_01ARZ3NDEKTSV4RRFFQ69G5FAV', [
+        'name' => 'Does not matter',
+    ], headers: $headers);
+
+    $response->assertStatus(Status::NOT_FOUND);
+    expect($response->body['error']['code'])->toBe('not_found');
+});
+
+test('DELETE stash returns 404 for an unknown stash', function (): void {
+    $headers = $this->authHeaders();
+
+    $response = $this->http->delete('/api/v1/stashes/stash_01ARZ3NDEKTSV4RRFFQ69G5FAV', headers: $headers);
+
+    $response->assertStatus(Status::NOT_FOUND);
+    expect($response->body['error']['code'])->toBe('not_found');
+});
+
+test('DELETE stash cascades to stash items, inputs, and media item sources but leaves media items intact', function (): void {
+    [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('delete-cascade');
+
+    expect(StashItemRecord::select()->where('stashId = ?', $stashId)->all())->not->toBeEmpty();
+    $input = StashInputRecord::select()->where('stashId = ?', $stashId)->first();
+    expect($input)->not->toBeNull();
+    expect(MediaItemSourceRecord::select()->where('stashInputId = ?', (string) $input->id)->all())->not->toBeEmpty();
+
+    $response = $this->http->delete('/api/v1/stashes/' . $stashId, headers: $headers);
+    $response->assertOk();
+    expect($response->body['deleted'])->toBeTrue();
+
+    expect(StashRecord::findById(new PrimaryKey($stashId)))->toBeNull()
+        ->and(StashItemRecord::select()->where('stashId = ?', $stashId)->all())->toBeEmpty()
+        ->and(StashInputRecord::select()->where('stashId = ?', $stashId)->all())->toBeEmpty()
+        ->and(MediaItemSourceRecord::select()->where('stashInputId = ?', (string) $input->id)->all())->toBeEmpty();
+
+    expect(\App\Vault\MediaItemRecord::findById(new PrimaryKey($mediaItemId)))->not->toBeNull();
+});
+
+test('delete-impact reports media items shared with other stashes', function (): void {
+    $headers = $this->authHeaders();
+
+    $createStashForChannel = function (string $channel) use ($headers): string {
+        $preflight = $this->http->post('/api/v1/commands', [
+            'type' => 'stash.preflight',
+            'options' => ['source_uri' => 'fake://channel/' . $channel],
+        ], headers: $headers)->assertStatus(Status::CREATED);
+        $this->processAllJobs();
+
+        $create = $this->http->post('/api/v1/commands', [
+            'type' => 'stash.create_from_preflight',
+            'options' => [
+                'preflight_command_id' => $preflight->body['command_id'],
+                'slug' => $channel . '-' . bin2hex(random_bytes(3)),
+            ],
+        ], headers: $headers)->assertStatus(Status::CREATED);
+        $this->processAllJobs();
+
+        $result = $this->http->get('/api/v1/commands/' . $create->body['command_id'], headers: $headers);
+        $result->assertOk();
+
+        return $result->body['command']['result']['stash_id'];
+    };
+
+    $stashIdA = $createStashForChannel('shared-channel');
+    $stashIdB = $createStashForChannel('shared-channel');
+
+    $response = $this->http->get('/api/v1/stashes/' . $stashIdA . '/delete-impact', headers: $headers);
+    $response->assertOk();
+
+    $impact = $response->body['delete_impact'];
+    expect($impact['shared_items'])->not->toBeEmpty()
+        ->and($impact['orphaned_items'])->toBeEmpty();
+
+    $sharedItem = $impact['shared_items'][0];
+    expect($sharedItem['shared_with_stashes'])->toHaveCount(1)
+        ->and($sharedItem['shared_with_stashes'][0]['id'])->toBe($stashIdB);
+});
+
+test('delete-impact reports orphaned media items when no other stash references them', function (): void {
+    [$headers, $stashId] = $this->bootstrapFakeDownloadStash('orphan-channel');
+
+    $response = $this->http->get('/api/v1/stashes/' . $stashId . '/delete-impact', headers: $headers);
+    $response->assertOk();
+
+    $impact = $response->body['delete_impact'];
+    expect($impact['orphaned_items'])->not->toBeEmpty()
+        ->and($impact['shared_items'])->toBeEmpty();
+});
+
+test('delete-impact returns 404 for an unknown stash', function (): void {
+    $headers = $this->authHeaders();
+
+    $response = $this->http->get('/api/v1/stashes/stash_01ARZ3NDEKTSV4RRFFQ69G5FAV/delete-impact', headers: $headers);
+
+    $response->assertStatus(Status::NOT_FOUND);
+    expect($response->body['error']['code'])->toBe('not_found');
+});

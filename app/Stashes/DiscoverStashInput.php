@@ -41,6 +41,9 @@ final readonly class DiscoverStashInput
                 sourceUri: $resolved->sourceUri,
                 providerInputId: $resolved->providerInputId,
                 title: $sourceTitle,
+                sourceTitle: $resolved->sourceTitle,
+                sourceAvatarUri: $resolved->sourceAvatarUri,
+                estimatedItemCount: $resolved->estimatedItemCount,
             );
         }
 

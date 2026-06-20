@@ -56,6 +56,7 @@ abstract class IntegrationTestCase extends IntegrationTest
             'options' => [
                 'preflight_command_id' => $preflight->body['command_id'],
                 'slug' => $channel . '-' . bin2hex(random_bytes(3)),
+                'download_policy' => 'manual_download',
             ],
         ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
         $this->processAllJobs();
@@ -89,6 +90,7 @@ abstract class IntegrationTestCase extends IntegrationTest
             'options' => [
                 'preflight_command_id' => $preflight->body['command_id'],
                 'slug' => $slug . '-' . bin2hex(random_bytes(3)),
+                'download_policy' => 'manual_download',
             ],
         ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
         $this->processAllJobs();

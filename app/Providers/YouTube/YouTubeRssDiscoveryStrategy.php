@@ -40,9 +40,9 @@ final readonly class YouTubeRssDiscoveryStrategy implements DiscoveryStrategyHan
     /** @return list<DiscoveredItem> */
     private function discoverChannel(ResolvedInput $input): array
     {
-        $channelId = $this->channelIds->resolve($input->providerInputId);
+        $channel = $this->channelIds->resolve($input->providerInputId);
 
-        return $this->fetchFeed(YouTubeUris::channelFeed($channelId), 'channel');
+        return $this->fetchFeed(YouTubeUris::channelFeed($channel->id), 'channel');
     }
 
     /** @return list<DiscoveredItem> */

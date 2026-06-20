@@ -12,6 +12,9 @@ final readonly class ResolvedInput
         public StashdUri $sourceUri,
         public string $providerInputId,
         public ?string $title = null,
+        public ?string $sourceTitle = null,
+        public ?StashdUri $sourceAvatarUri = null,
+        public ?int $estimatedItemCount = null,
     ) {
     }
 }

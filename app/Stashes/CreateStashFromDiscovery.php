@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Stashes;
 
+use App\Commands\CommandDispatchService;
 use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandState;
 use App\Commands\CommandType;
+use App\Downloads\DownloadPolicyEvaluator;
 use App\Providers\ProviderDates;
 use App\Providers\StashdUri;
 use App\Support\PrefixedUlid;
@@ -26,6 +28,8 @@ final readonly class CreateStashFromDiscovery
         private MediaItemRepository $mediaItems,
         private MediaItemSourceRepository $mediaItemSources,
         private StashItemRepository $stashItems,
+        private CommandDispatchService $commandDispatch,
+        private DownloadPolicyEvaluator $downloadPolicy,
     ) {
     }
 
@@ -46,11 +50,8 @@ final readonly class CreateStashFromDiscovery
         }
 
         $name = str((string) ($options['name'] ?? $resolved['title'] ?? 'New Stash'))->trim()->toString();
-        $slug = str((string) ($options['slug'] ?? $this->slugify($name)))->trim()->toString();
-
-        if ($this->stashes->findBySlug($slug) !== null) {
-            throw new InvalidArgumentException("Stash slug already exists: {$slug}");
-        }
+        $requestedSlug = str((string) ($options['slug'] ?? $this->slugify($name)))->trim()->toString();
+        $slug = $this->stashes->nextAvailableSlug($requestedSlug);
 
         $syncMode = SyncMode::tryFrom((string) ($options['sync_mode'] ?? SyncMode::Automatic->value)) ?? SyncMode::Automatic;
         $downloadPolicy = DownloadPolicy::tryFrom((string) ($options['download_policy'] ?? DownloadPolicy::Video->value)) ?? DownloadPolicy::Video;
@@ -63,6 +64,7 @@ final readonly class CreateStashFromDiscovery
             downloadPolicy: $downloadPolicy,
             organizationMode: $organizationMode,
             description: is_string($options['description'] ?? null) ? $options['description'] : null,
+            iconUri: is_string($resolved['source_avatar_uri'] ?? null) ? $resolved['source_avatar_uri'] : null,
         );
 
         $stashId = PrefixedUlid::parse((string) $stash->id);
@@ -83,6 +85,9 @@ final readonly class CreateStashFromDiscovery
         $mediaItemsReused = 0;
         $stashItemsCreated = 0;
         $stashItemsReused = 0;
+
+        /** @var list<PrefixedUlid> $downloadableMediaItemIds */
+        $downloadableMediaItemIds = [];
 
         foreach (array_values($discoveredItems) as $index => $item) {
             if (! is_array($item)) {
@@ -140,15 +145,28 @@ final readonly class CreateStashFromDiscovery
             }
 
             if ($this->stashItems->findByStashAndMediaItem($stashId, $mediaItemId) === null) {
-                $this->stashItems->create(
+                $stashItem = $this->stashItems->create(
                     stashId: $stashId,
                     mediaItemId: $mediaItemId,
                     stashInputId: $stashInputId,
                     position: $index + 1,
                 );
                 $stashItemsCreated++;
+
+                if ($stashItem->state !== StashItemState::Ignored) {
+                    $downloadableMediaItemIds[] = $mediaItemId;
+                }
             } else {
                 $stashItemsReused++;
+            }
+        }
+
+        if ($this->downloadPolicy->allowsAutomaticDownload($stash->downloadPolicy)) {
+            foreach ($downloadableMediaItemIds as $downloadableMediaItemId) {
+                $this->commandDispatch->dispatch(CommandType::ItemDownload, [
+                    'mediaItemId' => $downloadableMediaItemId->toString(),
+                    'stashId' => $stashId->toString(),
+                ]);
             }
         }
 

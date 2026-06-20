@@ -314,6 +314,28 @@ interface StashSummary {
 	updated_at: string
 }
 
+interface StashDeleteImpactItem {
+	media_item_id: string
+	title: string
+}
+
+interface StashDeleteImpactSharedItem extends StashDeleteImpactItem {
+	shared_with_stashes: { id: string; name: string }[]
+}
+
+interface StashDeleteImpactSummary {
+	shared_items: StashDeleteImpactSharedItem[]
+	orphaned_items: StashDeleteImpactItem[]
+}
+
+interface StashEditForm {
+	name: string
+	description: string
+	syncMode: string
+	downloadPolicy: string
+	organizationMode: string
+}
+
 interface StashItemSummary {
 	id: string
 	stash_id: string
@@ -574,6 +596,15 @@ function stashesComponent() {
 		stashes: [] as StashSummary[],
 		statusBadge,
 
+		editingStash: null as StashSummary | null,
+		editForm: { name: '', description: '', syncMode: 'automatic', downloadPolicy: 'video', organizationMode: 'flat' } as StashEditForm,
+		savingEdit: false,
+
+		deletingStash: null as StashSummary | null,
+		deleteImpact: null as StashDeleteImpactSummary | null,
+		loadingDeleteImpact: false,
+		deletingBusy: false,
+
 		async init() {
 			await this.refresh()
 			this.loading = false
@@ -587,6 +618,88 @@ function stashesComponent() {
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
 				this.error = 'Could not reach the server.'
+			}
+		},
+
+		startEdit(stash: StashSummary) {
+			this.editingStash = stash
+			this.editForm = {
+				name: stash.name,
+				description: stash.description ?? '',
+				syncMode: stash.sync_mode,
+				downloadPolicy: stash.download_policy,
+				organizationMode: stash.organization_mode,
+			}
+		},
+
+		cancelEdit() {
+			this.editingStash = null
+		},
+
+		async saveEdit() {
+			if (!this.editingStash || this.editForm.name.trim() === '') return
+			this.savingEdit = true
+			try {
+				const response = await apiFetch(`/api/v1/stashes/${this.editingStash.id}`, {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						name: this.editForm.name.trim(),
+						description: this.editForm.description.trim(),
+						sync_mode: this.editForm.syncMode,
+						download_policy: this.editForm.downloadPolicy,
+						organization_mode: this.editForm.organizationMode,
+					}),
+				})
+				if (!response.ok) {
+					const body = (await response.json()) as { error?: { message?: string } }
+					this.error = body.error?.message ?? 'Could not update that stash.'
+					return
+				}
+				this.editingStash = null
+				this.error = null
+				await this.refresh()
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not reach the server.'
+			} finally {
+				this.savingEdit = false
+			}
+		},
+
+		async startDelete(stash: StashSummary) {
+			this.deletingStash = stash
+			this.deleteImpact = null
+			this.loadingDeleteImpact = true
+			try {
+				const response = await apiFetch(`/api/v1/stashes/${stash.id}/delete-impact`)
+				this.deleteImpact = (await response.json()).delete_impact
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not load delete impact.'
+			} finally {
+				this.loadingDeleteImpact = false
+			}
+		},
+
+		cancelDelete() {
+			this.deletingStash = null
+			this.deleteImpact = null
+		},
+
+		async confirmDelete() {
+			if (!this.deletingStash) return
+			this.deletingBusy = true
+			try {
+				await apiFetch(`/api/v1/stashes/${this.deletingStash.id}`, { method: 'DELETE' })
+				this.deletingStash = null
+				this.deleteImpact = null
+				await this.refresh()
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not delete that stash.'
+			} finally {
+				this.deletingBusy = false
 			}
 		},
 	}
@@ -783,6 +896,15 @@ function stashDetailComponent(stashId: string) {
 		statusBadge,
 		formatRelativeTime,
 
+		editingOpen: false,
+		editForm: { name: '', description: '', syncMode: 'automatic', downloadPolicy: 'video', organizationMode: 'flat' } as StashEditForm,
+		savingEdit: false,
+
+		deletingOpen: false,
+		deleteImpact: null as StashDeleteImpactSummary | null,
+		loadingDeleteImpact: false,
+		deletingBusy: false,
+
 		async init() {
 			await this.refresh()
 			this.loading = false
@@ -836,6 +958,85 @@ function stashDetailComponent(stashId: string) {
 
 		async copyFeedUrl(feedUrl: string) {
 			await navigator.clipboard.writeText(feedUrl)
+		},
+
+		startEdit() {
+			if (!this.stash) return
+			this.editForm = {
+				name: this.stash.name,
+				description: this.stash.description ?? '',
+				syncMode: this.stash.sync_mode,
+				downloadPolicy: this.stash.download_policy,
+				organizationMode: this.stash.organization_mode,
+			}
+			this.editingOpen = true
+		},
+
+		cancelEdit() {
+			this.editingOpen = false
+		},
+
+		async saveEdit() {
+			if (this.editForm.name.trim() === '') return
+			this.savingEdit = true
+			try {
+				const response = await apiFetch(`/api/v1/stashes/${stashId}`, {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						name: this.editForm.name.trim(),
+						description: this.editForm.description.trim(),
+						sync_mode: this.editForm.syncMode,
+						download_policy: this.editForm.downloadPolicy,
+						organization_mode: this.editForm.organizationMode,
+					}),
+				})
+				if (!response.ok) {
+					const body = (await response.json()) as { error?: { message?: string } }
+					this.error = body.error?.message ?? 'Could not update that stash.'
+					return
+				}
+				this.editingOpen = false
+				this.error = null
+				await this.refresh()
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not reach the server.'
+			} finally {
+				this.savingEdit = false
+			}
+		},
+
+		async startDelete() {
+			this.deletingOpen = true
+			this.deleteImpact = null
+			this.loadingDeleteImpact = true
+			try {
+				const response = await apiFetch(`/api/v1/stashes/${stashId}/delete-impact`)
+				this.deleteImpact = (await response.json()).delete_impact
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not load delete impact.'
+			} finally {
+				this.loadingDeleteImpact = false
+			}
+		},
+
+		cancelDelete() {
+			this.deletingOpen = false
+			this.deleteImpact = null
+		},
+
+		async confirmDelete() {
+			this.deletingBusy = true
+			try {
+				await apiFetch(`/api/v1/stashes/${stashId}`, { method: 'DELETE' })
+				window.location.assign('/stashes')
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not delete that stash.'
+				this.deletingBusy = false
+			}
 		},
 
 		async createBroadcast() {

@@ -24,6 +24,7 @@ final readonly class YouTubeProvider implements Provider
         private YouTubeRssDiscoveryStrategy $rssDiscovery,
         private YouTubeDataApiMetadataStrategy $dataApiMetadata,
         private YtdlpDownloadAdapter $downloadAdapter,
+        private YouTubeChannelIdResolver $channelIds,
     ) {
     }
 
@@ -44,7 +45,24 @@ final readonly class YouTubeProvider implements Provider
 
     public function resolveInput(StashdUri $uri): ResolvedInput
     {
-        return YouTubeUriResolver::resolve($uri);
+        $resolved = YouTubeUriResolver::resolve($uri);
+
+        if ($resolved->inputType !== YouTubeInputType::Channel->value) {
+            return $resolved;
+        }
+
+        $channel = $this->channelIds->resolve($resolved->providerInputId);
+
+        return new ResolvedInput(
+            providerKey: $resolved->providerKey,
+            inputType: $resolved->inputType,
+            sourceUri: $resolved->sourceUri,
+            providerInputId: $channel->id,
+            title: $resolved->title,
+            sourceTitle: $channel->title,
+            sourceAvatarUri: $channel->avatarUri !== null ? StashdUri::parse($channel->avatarUri) : null,
+            estimatedItemCount: $channel->estimatedVideoCount,
+        );
     }
 
     public function discoveryStrategies(): array

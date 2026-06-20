@@ -23,6 +23,7 @@ final class StashRecord
         public OrganizationMode $organizationMode,
         public StashState $state,
         public ?string $description = null,
+        public ?string $iconUri = null,
         public ?string $videoQualityProfileId = null,
         public ?string $audioQualityProfileId = null,
         public ?string $createdAt = null,

@@ -17,10 +17,16 @@
 				<section class="rounded-lg border border-line bg-panel/60 p-4">
 					<div class="flex items-center justify-between gap-3">
 						<h2 class="text-sm font-semibold text-cream" x-text="stash?.name"></h2>
-						<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(stash?.state).text">
-							<span class="h-1.5 w-1.5 rounded-full" x-bind:class="statusBadge(stash?.state).dot"></span>
-							<span x-text="stash?.state"></span>
-						</span>
+						<div class="flex items-center gap-2">
+							<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(stash?.state).text">
+								<span class="h-1.5 w-1.5 rounded-full" x-bind:class="statusBadge(stash?.state).dot"></span>
+								<span x-text="stash?.state"></span>
+							</span>
+							<button type="button" x-on:click="startEdit()"
+								class="rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream">Edit</button>
+							<button type="button" x-on:click="startDelete()"
+								class="rounded border border-line px-2 py-1 text-[12px] text-error transition-colors hover:bg-error/10">Delete</button>
+						</div>
 					</div>
 					<p class="mt-1 font-mono text-[12px] text-muted" x-text="stash?.slug"></p>
 					<p class="mt-2 text-[13px] text-muted">
@@ -163,5 +169,92 @@
 				</section>
 			</div>
 		</template>
+
+		<div class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4" x-show="editingOpen" x-cloak>
+			<div class="w-full max-w-md rounded-lg border border-line bg-panel p-4">
+				<h2 class="text-sm font-semibold text-cream">Edit stash</h2>
+
+				<label class="mt-3 block">
+					<span class="mb-1 block text-[12px] text-muted">Name</span>
+					<input type="text" x-model="editForm.name"
+						class="w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
+				</label>
+				<label class="mt-3 block">
+					<span class="mb-1 block text-[12px] text-muted">Description</span>
+					<input type="text" x-model="editForm.description"
+						class="w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
+				</label>
+				<label class="mt-3 block">
+					<span class="mb-1 block text-[12px] text-muted">Sync mode</span>
+					<select x-model="editForm.syncMode"
+						class="w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber">
+						<option value="automatic">Automatic</option>
+						<option value="manual">Manual</option>
+					</select>
+				</label>
+				<label class="mt-3 block">
+					<span class="mb-1 block text-[12px] text-muted">Download policy</span>
+					<select x-model="editForm.downloadPolicy"
+						class="w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber">
+						<option value="video">Video</option>
+						<option value="audio_only">Audio only</option>
+						<option value="metadata_only">Metadata only</option>
+						<option value="manual_download">Manual download</option>
+					</select>
+				</label>
+				<label class="mt-3 block">
+					<span class="mb-1 block text-[12px] text-muted">Organization mode</span>
+					<select x-model="editForm.organizationMode"
+						class="w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber">
+						<option value="flat">Flat</option>
+						<option value="chronological">Chronological</option>
+						<option value="series">Series</option>
+						<option value="seasoned_series">Seasoned series</option>
+					</select>
+				</label>
+
+				<div class="mt-4 flex justify-end gap-2">
+					<button type="button" x-on:click="cancelEdit()"
+						class="rounded border border-line px-3 py-2 text-[13px] text-muted transition-colors hover:text-cream">Cancel</button>
+					<button type="button" x-on:click="saveEdit()"
+						x-bind:disabled="savingEdit || editForm.name.trim() === ''"
+						class="rounded bg-amber px-3 py-2 text-[13px] font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-60">Save</button>
+				</div>
+			</div>
+		</div>
+
+		<div class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4" x-show="deletingOpen" x-cloak>
+			<div class="w-full max-w-md rounded-lg border border-line bg-panel p-4">
+				<h2 class="text-sm font-semibold text-cream">Delete <span x-text="stash?.name"></span>?</h2>
+
+				<template x-if="loadingDeleteImpact">
+					<p class="mt-3 text-[13px] text-muted">Checking what this affects…</p>
+				</template>
+
+				<template x-if="!loadingDeleteImpact && deleteImpact">
+					<div class="mt-3 space-y-2 text-[13px]">
+						<p class="text-muted" x-show="deleteImpact.shared_items.length === 0 && deleteImpact.orphaned_items.length === 0">
+							This stash has no items.
+						</p>
+						<div x-show="deleteImpact.shared_items.length > 0">
+							<p class="text-cream"><span x-text="deleteImpact.shared_items.length"></span> item(s) are also used by other stashes and will be kept in the Vault.</p>
+						</div>
+						<div x-show="deleteImpact.orphaned_items.length > 0">
+							<p class="text-warn"><span x-text="deleteImpact.orphaned_items.length"></span> item(s) will become orphaned in the Vault (no longer referenced by any stash).</p>
+						</div>
+					</div>
+				</template>
+
+				<p class="mt-3 text-[12px] text-muted">The stash, its inputs, and its item links will be removed. Vault originals are kept.</p>
+
+				<div class="mt-4 flex justify-end gap-2">
+					<button type="button" x-on:click="cancelDelete()"
+						class="rounded border border-line px-3 py-2 text-[13px] text-muted transition-colors hover:text-cream">Cancel</button>
+					<button type="button" x-on:click="confirmDelete()"
+						x-bind:disabled="deletingBusy || loadingDeleteImpact"
+						class="rounded bg-error px-3 py-2 text-[13px] font-semibold text-cream transition-colors hover:opacity-90 disabled:opacity-60">Delete stash</button>
+				</div>
+			</div>
+		</div>
 	</div>
 </x-stashd-layout>

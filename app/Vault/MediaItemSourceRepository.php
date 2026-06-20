@@ -53,4 +53,15 @@ final class MediaItemSourceRepository
             ->where('mediaItemId = ? AND stashInputId = ?', $mediaItemId->toString(), $stashInputId->toString())
             ->first();
     }
+
+    public function deleteForStashInput(PrefixedUlid $stashInputId): void
+    {
+        $sources = MediaItemSourceRecord::select()
+            ->where('stashInputId = ?', $stashInputId->toString())
+            ->all();
+
+        foreach ($sources as $source) {
+            $source->delete();
+        }
+    }
 }

@@ -7,6 +7,9 @@
   "https://www.youtube.com/@StashdDemo": "channel_handle_page.html",
   "https://www.youtube.com/c/StashdDemo": "channel_handle_page.html",
   "https://www.youtube.com/user/StashdDemo": "channel_handle_page.html",
+  "https://www.youtube.com/c/StashdExternalIdOnlyChannel": "channel_handle_page_external_id_only.html",
+  "https://www.youtube.com/c/StashdUnresolvableChannel": "channel_handle_page_unresolvable.html",
+  "https://www.youtube.com/c/StashdAbbreviatedCountChannel": "channel_handle_page_abbreviated_count.html",
   "https://www.youtube.com/oembed?format=json&url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DdemoVideo01": "video_oembed.json",
   "https://www.googleapis.com/youtube/v3/videos?id=demoVideo01": "data_api_video.json",
   "https://www.youtube.com/feeds/videos.xml?channel_id=UCStashdPrivateCh12345678": "unavailable.txt"

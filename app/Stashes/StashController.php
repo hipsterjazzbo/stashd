@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace App\Stashes;
 
+use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
 use App\Stashes\Api\StashInputResource;
 use App\Stashes\Api\StashItemResource;
 use App\Stashes\Api\StashResource;
 use App\Support\PrefixedUlid;
+use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
+use Tempest\Router\Delete;
 use Tempest\Router\Get;
+use Tempest\Router\Patch;
 use Tempest\Router\WithMiddleware;
 
 #[AllowApiClients]
@@ -85,6 +89,99 @@ final readonly class StashController
         ]);
     }
 
+    #[Patch('/api/v1/stashes/{id}')]
+    public function update(string $id, Request $request): Json
+    {
+        $stash = $this->stashes->find(PrefixedUlid::parse($id));
+
+        if ($stash === null) {
+            return $this->notFound('Stash not found.');
+        }
+
+        $body = ApiJson::normalizeRequest($request->body);
+
+        $name = null;
+
+        if (isset($body['name'])) {
+            $name = trim((string) $body['name']);
+
+            if ($name === '') {
+                return $this->validationError('name cannot be blank.');
+            }
+        }
+
+        $syncMode = null;
+
+        if (isset($body['syncMode'])) {
+            $syncMode = SyncMode::tryFrom((string) $body['syncMode']);
+
+            if ($syncMode === null) {
+                return $this->validationError('Unsupported sync_mode.');
+            }
+        }
+
+        $downloadPolicy = null;
+
+        if (isset($body['downloadPolicy'])) {
+            $downloadPolicy = DownloadPolicy::tryFrom((string) $body['downloadPolicy']);
+
+            if ($downloadPolicy === null) {
+                return $this->validationError('Unsupported download_policy.');
+            }
+        }
+
+        $organizationMode = null;
+
+        if (isset($body['organizationMode'])) {
+            $organizationMode = OrganizationMode::tryFrom((string) $body['organizationMode']);
+
+            if ($organizationMode === null) {
+                return $this->validationError('Unsupported organization_mode.');
+            }
+        }
+
+        $stash = $this->stashes->update(
+            $stash,
+            name: $name,
+            description: isset($body['description']) ? trim((string) $body['description']) : null,
+            syncMode: $syncMode,
+            downloadPolicy: $downloadPolicy,
+            organizationMode: $organizationMode,
+        );
+
+        return new Json([
+            'stash' => StashResource::fromRecord($stash)->toArray(),
+        ]);
+    }
+
+    #[Delete('/api/v1/stashes/{id}')]
+    public function delete(string $id): Json
+    {
+        $stash = $this->stashes->find(PrefixedUlid::parse($id));
+
+        if ($stash === null) {
+            return $this->notFound('Stash not found.');
+        }
+
+        $this->stashes->delete($stash);
+
+        return new Json(['deleted' => true]);
+    }
+
+    #[Get('/api/v1/stashes/{id}/delete-impact')]
+    public function deleteImpact(string $id): Json
+    {
+        $stash = $this->stashes->find(PrefixedUlid::parse($id));
+
+        if ($stash === null) {
+            return $this->notFound('Stash not found.');
+        }
+
+        return new Json([
+            'delete_impact' => ApiJson::encode($this->stashes->deleteImpact($stash)),
+        ]);
+    }
+
     private function notFound(string $message): Json
     {
         return new Json([
@@ -93,5 +190,15 @@ final readonly class StashController
                 'message' => $message,
             ],
         ], Status::NOT_FOUND);
+    }
+
+    private function validationError(string $message): Json
+    {
+        return new Json([
+            'error' => [
+                'code' => 'validation_error',
+                'message' => $message,
+            ],
+        ], Status::BAD_REQUEST);
     }
 }
