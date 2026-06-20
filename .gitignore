@@ -12,3 +12,5 @@
 composer.phar
 .aider*
 CLAUDE.local.md
+/test-results/
+/playwright-report/

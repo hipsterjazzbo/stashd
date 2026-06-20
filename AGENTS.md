@@ -736,6 +736,12 @@ Do not use live providers by default.
 
 Do not require real network access in normal test runs.
 
+### Live UI / browser testing
+
+Playwright (`@playwright/test`) is set up host-side for driving a real browser against the running dev app — `playwright.config.ts` + `e2e/`, run via `npm run test:e2e`. `baseURL` defaults to `https://stashd.test` (override with `STASHD_BASE_URL`); `ignoreHTTPSErrors` is on for the mkcert dev cert.
+
+This does **not** go through lerd's `pest:browser` feature (`pestphp/pest-plugin-browser` + musl chromium baked into the shared FPM image) — that mechanism only applies to sites running on lerd's shared Alpine FPM image. stashd is a custom-container site (its own Debian/glibc `Containerfile`, served by RoadRunner), so Playwright's bundled (glibc) Chromium runs directly on the host instead.
+
 ## Agent efficiency
 
 Claude Pro usage is limited. Do not waste context.

@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.0",
     "@tailwindcss/vite": "^4.3.1",
     "tailwindcss": "^4.3.1",
     "typescript": "^5.0.0",
