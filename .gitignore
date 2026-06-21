@@ -14,3 +14,4 @@ composer.phar
 CLAUDE.local.md
 /test-results/
 /playwright-report/
+/.env.lerd_override
