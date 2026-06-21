@@ -27,7 +27,7 @@ final class MediaItemRecord
         public ?string $creatorName = null,
         public ?string $creatorProviderId = null,
         public ?int $durationSeconds = null,
-        public ?string $publishedAt = null,
+        public ?DateTime $publishedAt = null,
         public ?string $thumbnailUri = null,
         public ?string $contentType = null,
         public ?DateTime $metadataCapturedAt = null,
