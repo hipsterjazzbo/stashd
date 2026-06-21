@@ -65,7 +65,7 @@ final readonly class MediaServerConnectionService
         }
 
         if ($settings !== null) {
-            $record->settingsJson = json_encode($settings, JSON_THROW_ON_ERROR);
+            $record->settingsJson = MediaServerLibrarySelection::fromArray($settings);
         }
 
         if ($token !== null && trim($token) !== '') {
@@ -119,29 +119,12 @@ final readonly class MediaServerConnectionService
     /** @return array<string, mixed> */
     public function settings(MediaServerConnectionRecord $record): array
     {
-        if ($record->settingsJson === null) {
-            return [];
-        }
-
-        $decoded = json_decode($record->settingsJson, true);
-
-        return is_array($decoded) ? $decoded : [];
+        return $record->settingsJson?->toArray() ?? [];
     }
 
     public function libraryFromSettings(MediaServerConnectionRecord $record): ?MediaServerLibraryRef
     {
-        $settings = $this->settings($record);
-        $libraryId = trim((string) ($settings['library_id'] ?? ''));
-
-        if ($libraryId === '') {
-            return null;
-        }
-
-        return new MediaServerLibraryRef(
-            id: $libraryId,
-            name: (string) ($settings['library_name'] ?? 'Library'),
-            type: isset($settings['library_type']) ? (string) $settings['library_type'] : null,
-        );
+        return $record->settingsJson?->toLibraryRef();
     }
 
     private function storeToken(MediaServerConnectionRecord $record, string $token): void

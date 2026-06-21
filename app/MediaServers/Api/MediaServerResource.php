@@ -28,7 +28,7 @@ final readonly class MediaServerResource implements Arrayable
             'name' => $this->connection->name,
             'baseUri' => $this->connection->baseUri,
             'state' => $this->connection->state->value,
-            'settings' => $this->decodeJson($this->connection->settingsJson),
+            'settings' => $this->connection->settingsJson?->toArray(),
             'lastCheckedAt' => $this->connection->lastCheckedAt,
             'lastError' => $this->connection->lastError,
             'createdAt' => $this->connection->createdAt,
@@ -36,15 +36,4 @@ final readonly class MediaServerResource implements Arrayable
         ]);
     }
 
-    /** @return array<string, mixed>|null */
-    private function decodeJson(?string $json): ?array
-    {
-        if ($json === null) {
-            return null;
-        }
-
-        $decoded = json_decode($json, true);
-
-        return is_array($decoded) ? ApiJson::encode($decoded) : null;
-    }
 }

@@ -22,7 +22,7 @@ final class MediaServerConnectionRecord
         public string $baseUri,
         public MediaServerConnectionState $state,
         public ?string $tokenSecretId = null,
-        public ?string $settingsJson = null,
+        public ?MediaServerLibrarySelection $settingsJson = null,
         public ?DateTime $lastCheckedAt = null,
         public ?string $lastError = null,
         public ?DateTime $createdAt = null,
