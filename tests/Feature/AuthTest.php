@@ -9,26 +9,7 @@ use App\Auth\ApiTokenScopes;
 use App\Auth\AuthService;
 use Tempest\Database\Database;
 use Tempest\Database\Query;
-use Tempest\Framework\Testing\Http\TestResponseHelper;
-use Tempest\Http\Cookie\Cookie;
 use Tempest\Http\Status;
-
-function useSessionCookieFrom(TestResponseHelper $response): void
-{
-    $values = $response->response->getHeader('set-cookie')?->values ?? [];
-
-    foreach ($values as $value) {
-        $cookie = Cookie::createFromString($value);
-
-        if ($cookie->key === AuthService::SESSION_COOKIE) {
-            $_COOKIE[AuthService::SESSION_COOKIE] = $cookie->value;
-
-            return;
-        }
-    }
-
-    throw new RuntimeException('Response did not set a ' . AuthService::SESSION_COOKIE . ' cookie.');
-}
 
 test('owner setup creates the first user', function (): void {
     $response = $this->http->post('/api/v1/auth/setup', [
