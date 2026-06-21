@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
-use Tempest\DateTime\DateTime;
-use Tempest\DateTime\Timezone;
 use App\MediaServers\MediaServerClientRegistry;
 use App\MediaServers\MediaServerConnectionRepository;
 use App\MediaServers\MediaServerConnectionSecrets;
@@ -13,6 +11,8 @@ use App\MediaServers\MediaServerConnectionService;
 use App\Support\PrefixedUlid;
 use App\System\Secret\SecretsService;
 use App\System\State\StateTransitionService;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final readonly class BroadcastTriggerResult
 {
@@ -82,7 +82,7 @@ final readonly class BroadcastTriggerService
         return $this->triggers->create(
             broadcastId: PrefixedUlid::parse((string) $broadcast->id),
             type: $type,
-            settings: ['media_server_connection_id' => $connectionId],
+            settings: ['mediaServerConnectionId' => $connectionId],
         );
     }
 
@@ -97,8 +97,7 @@ final readonly class BroadcastTriggerService
             return new BroadcastTriggerResult(0, 0, 0, []);
         }
 
-        $triggerSettings = $this->decodeJson($trigger->settingsJson);
-        $connectionId = trim((string) ($triggerSettings['media_server_connection_id'] ?? ''));
+        $connectionId = $trigger->settingsJson?->mediaServerConnectionId ?? '';
 
         if ($connectionId === '') {
             return new BroadcastTriggerResult(0, 0, 0, []);
@@ -219,18 +218,6 @@ final readonly class BroadcastTriggerService
         }
 
         $decoded = json_decode($broadcast->settingsJson, true);
-
-        return is_array($decoded) ? $decoded : [];
-    }
-
-    /** @return array<string, mixed> */
-    private function decodeJson(?string $json): array
-    {
-        if ($json === null) {
-            return [];
-        }
-
-        $decoded = json_decode($json, true);
 
         return is_array($decoded) ? $decoded : [];
     }

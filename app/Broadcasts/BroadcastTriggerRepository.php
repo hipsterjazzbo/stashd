@@ -34,7 +34,7 @@ final class BroadcastTriggerRepository
             type: $type,
             enabled: $enabled,
             state: $state,
-            settingsJson: $settings === null ? null : json_encode($settings, JSON_THROW_ON_ERROR),
+            settingsJson: MediaServerScanTriggerSettings::fromArray($settings),
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);

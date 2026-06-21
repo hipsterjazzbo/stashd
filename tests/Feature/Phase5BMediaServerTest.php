@@ -6,8 +6,10 @@ namespace Tests\Feature;
 
 use App\Broadcasts\BroadcastLifecycleService;
 use App\Broadcasts\BroadcastNfoBuilder;
+use App\Broadcasts\BroadcastTriggerRecord;
 use App\Broadcasts\BroadcastTriggerRunRecord;
 use App\Broadcasts\BroadcastType;
+use App\Broadcasts\MediaServerScanTriggerSettings;
 use App\MediaServers\MediaServerConnectionRecord;
 use App\MediaServers\MediaServerLibrarySelection;
 use App\System\Activity\ActivityEventRecord;
@@ -248,13 +250,32 @@ test('broadcast trigger scan success records trigger run without failing broadca
     expect($runs)->not->toBeEmpty()
         ->and($runs[0]->state->value)->toBe('ready');
 
+    $triggerRecord = BroadcastTriggerRecord::select()
+        ->where('broadcastId = ?', $broadcastId)
+        ->first();
+
+    expect($triggerRecord)->not->toBeNull()
+        ->and($triggerRecord->settingsJson)->toBeInstanceOf(MediaServerScanTriggerSettings::class)
+        ->and($triggerRecord->settingsJson?->mediaServerConnectionId)->toBe($connectionId);
+
+    $row = $this->container->get(Database::class)->fetchFirst(new Query(
+        'SELECT settingsJson FROM broadcast_triggers WHERE id = ?',
+        bindings: [(string) $triggerRecord->id],
+    ));
+    $storedSettings = json_decode((string) $row['settingsJson'], true, flags: JSON_THROW_ON_ERROR);
+
+    expect($storedSettings)->toBe([
+        'type' => 'media_server_scan_trigger_settings',
+        'data' => [
+            'mediaServerConnectionId' => $connectionId,
+        ],
+    ]);
+
     $types = array_map(
         static fn (ActivityEventRecord $event): string => $event->type,
         ActivityEventRecord::select()->orderBy('createdAt', \Tempest\Database\Direction::DESC)->limit(15)->all(),
     );
     expect($types)->toContain('broadcast.trigger_succeeded');
-
-    unset($connectionId);
 });
 
 test('broadcast trigger scan failure does not mark broadcast failed', function (): void {
