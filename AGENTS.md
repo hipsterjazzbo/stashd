@@ -130,6 +130,31 @@ Prioritise:
 7. Secret-safe logs, activity, jobs, and metadata.
 8. Calm, dense, accessible UI/UX.
 
+Use Tempest-native facilities by default when they fit the domain.
+
+Prefer Tempest's first-party mechanisms over custom stashd code for framework-level concerns such as:
+
+```text
+database relations and eager loading
+mapper casters/serializers
+DateTime/Duration values
+#[SerializeAs] embedded DTO properties
+#[Hidden] / #[Encrypted] model-property annotations
+discovery
+validation
+query builders
+```
+
+Custom code should exist because stashd has a real domain, security, storage, or product requirement — not because we skipped checking whether Tempest already provides the mechanism.
+
+Examples:
+
+* Prefer Tempest `DateTime` over custom timestamp helpers.
+* Prefer `#[SerializeAs]` for stable embedded JSON values over manual `json_encode()` / `json_decode()`.
+* Prefer `#[Hidden]` for sensitive model-property guardrails over relying only on discipline.
+* Prefer Tempest relations, `with(...)`, and relation-scoped queries where they cleanly express structural data access and reduce N+1 queries.
+* Keep explicit stashd services/repositories where they enforce auth, secrets, storage drift handling, token safety, command/job boundaries, provider behavior, or other domain policy.
+
 Avoid:
 
 * Clever abstractions.
@@ -937,3 +962,5 @@ Actions: `list`, `add`, `remove`, `db_isolate`, `db_share`.
 - Worker unit names follow `lerd-<worker>-<site>` (per-worktree: `lerd-<worker>-<site>-<branch>`)
 
 <!-- lerd:end -->
+
+IMPORTANT: When applicable, prefer using phpstorm-index MCP tools for code navigation and refactoring.

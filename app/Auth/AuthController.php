@@ -7,6 +7,8 @@ namespace App\Auth;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
 use App\Support\PrefixedUlid;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 use Tempest\Http\Cookie\CookieManager;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
@@ -146,7 +148,19 @@ final readonly class AuthController
         }
 
         $scopes = isset($body['scopes']) && is_array($body['scopes']) ? $body['scopes'] : null;
-        $expiresAt = isset($body['expires_at']) && is_string($body['expires_at']) ? $body['expires_at'] : null;
+
+        try {
+            $expiresAt = isset($body['expires_at']) && is_string($body['expires_at'])
+                ? DateTime::parse($body['expires_at'], Timezone::UTC)
+                : null;
+        } catch (\Throwable) {
+            return new Json([
+                'error' => [
+                    'code' => 'validation_error',
+                    'message' => 'expires_at must be a valid datetime.',
+                ],
+            ], Status::BAD_REQUEST);
+        }
 
         $token = $this->auth->createApiToken($user, $name, $scopes, $expiresAt);
 

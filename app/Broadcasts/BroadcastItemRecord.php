@@ -7,6 +7,7 @@ namespace App\Broadcasts;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\DateTime\DateTime;
 
 #[Table(name: 'broadcast_items')]
 final class BroadcastItemRecord
@@ -24,11 +25,11 @@ final class BroadcastItemRecord
         public ?string $tokenPreview = null,
         public ?string $publishedPath = null,
         public ?string $publishedUri = null,
-        public ?string $lastPublishedAt = null,
-        public ?string $lastVerifiedAt = null,
+        public ?DateTime $lastPublishedAt = null,
+        public ?DateTime $lastVerifiedAt = null,
         public ?string $lastError = null,
-        public ?string $createdAt = null,
-        public ?string $updatedAt = null,
+        public ?DateTime $createdAt = null,
+        public ?DateTime $updatedAt = null,
     ) {
     }
 }

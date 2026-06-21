@@ -7,6 +7,7 @@ namespace App\Downloads;
 use App\Providers\StashdUri;
 use App\Stashes\DownloadPolicy;
 use App\Support\PrefixedUlid;
+use Tempest\DateTime\DateTime;
 
 final readonly class DownloadRequest
 {
@@ -22,7 +23,7 @@ final readonly class DownloadRequest
         public ?int $durationSeconds = null,
         public ?StashdUri $thumbnailUri = null,
         public ?string $title = null,
-        public ?string $publishedAt = null,
+        public ?DateTime $publishedAt = null,
     ) {
     }
 }

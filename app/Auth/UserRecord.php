@@ -8,6 +8,7 @@ use Tempest\Auth\Authentication\Authenticatable;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\DateTime\DateTime;
 
 #[Table(name: 'users')]
 final class UserRecord implements Authenticatable
@@ -21,8 +22,8 @@ final class UserRecord implements Authenticatable
         public string $username,
         public string $passwordHash,
         public UserRole $role,
-        public ?string $createdAt = null,
-        public ?string $updatedAt = null,
+        public ?DateTime $createdAt = null,
+        public ?DateTime $updatedAt = null,
     ) {
     }
 }

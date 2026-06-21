@@ -7,6 +7,7 @@ namespace App\Stashes;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\DateTime\DateTime;
 
 #[Table(name: 'stash_items')]
 final class StashItemRecord
@@ -26,13 +27,13 @@ final class StashItemRecord
         public ?string $seasonTitle = null,
         public ?string $displayTitle = null,
         public ?string $displayDescription = null,
-        public ?string $firstSeenAt = null,
-        public ?string $lastSeenAt = null,
-        public ?string $removedAt = null,
+        public ?DateTime $firstSeenAt = null,
+        public ?DateTime $lastSeenAt = null,
+        public ?DateTime $removedAt = null,
         public ?string $removedReason = null,
         public ?string $ignoredReason = null,
-        public ?string $createdAt = null,
-        public ?string $updatedAt = null,
+        public ?DateTime $createdAt = null,
+        public ?DateTime $updatedAt = null,
     ) {
     }
 }

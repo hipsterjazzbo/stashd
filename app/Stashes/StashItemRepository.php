@@ -6,12 +6,14 @@ namespace App\Stashes;
 
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
-use App\Support\RecordTimestamps;
 use InvalidArgumentException;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
+
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final class StashItemRepository
 {
@@ -34,11 +36,13 @@ final class StashItemRepository
             state: $state,
             stashInputId: $stashInputId?->toString(),
             position: $position,
-            firstSeenAt: RecordTimestamps::now(),
-            lastSeenAt: RecordTimestamps::now(),
+            firstSeenAt: DateTime::now(Timezone::UTC),
+            lastSeenAt: DateTime::now(Timezone::UTC),
         );
         $record->id = new PrimaryKey($id);
-        RecordTimestamps::apply($record);
+        $now = DateTime::now(Timezone::UTC);
+        $record->createdAt ??= $now;
+        $record->updatedAt ??= $now;
 
         query(StashItemRecord::class)->insert($record)->execute();
 

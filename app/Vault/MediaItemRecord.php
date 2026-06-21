@@ -7,6 +7,7 @@ namespace App\Vault;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\DateTime\DateTime;
 
 #[Table(name: 'media_items')]
 final class MediaItemRecord
@@ -28,12 +29,12 @@ final class MediaItemRecord
         public ?int $durationSeconds = null,
         public ?string $publishedAt = null,
         public ?string $thumbnailUri = null,
-        public ?string $metadataCapturedAt = null,
-        public ?string $metadataRefreshedAt = null,
-        public ?string $lastSeenUpstreamAt = null,
         public ?string $contentType = null,
-        public ?string $createdAt = null,
-        public ?string $updatedAt = null,
+        public ?DateTime $metadataCapturedAt = null,
+        public ?DateTime $metadataRefreshedAt = null,
+        public ?DateTime $lastSeenUpstreamAt = null,
+        public ?DateTime $createdAt = null,
+        public ?DateTime $updatedAt = null,
     ) {
     }
 }

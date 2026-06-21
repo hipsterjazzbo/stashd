@@ -7,6 +7,7 @@ namespace App\System\Activity;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\DateTime\DateTime;
 
 #[Table(name: 'activity_events')]
 final class ActivityEventRecord
@@ -28,7 +29,7 @@ final class ActivityEventRecord
         public ?string $commandId = null,
         public ?string $groupKey = null,
         public ?string $metadataJson = null,
-        public ?string $createdAt = null,
+        public ?DateTime $createdAt = null,
     ) {
     }
 }

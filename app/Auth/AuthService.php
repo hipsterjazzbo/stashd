@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Auth;
 
 use App\Support\PrefixedUlid;
-use App\Support\RecordTimestamps;
 use RuntimeException;
 use SensitiveParameter;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 use Tempest\Http\Request;
 
 final readonly class AuthService
@@ -106,7 +107,7 @@ final readonly class AuthService
             return null;
         }
 
-        if ($token->expiresAt !== null && strtotime($token->expiresAt) < time()) {
+        if ($token->expiresAt !== null && $token->expiresAt->isBefore(DateTime::now(Timezone::UTC))) {
             return null;
         }
 
@@ -116,7 +117,7 @@ final readonly class AuthService
             return null;
         }
 
-        $token->lastUsedAt = RecordTimestamps::now();
+        $token->lastUsedAt = DateTime::now(Timezone::UTC);
         $token->save();
         $this->context->set($user);
 
@@ -131,7 +132,7 @@ final readonly class AuthService
     {
         $this->revokeWebSessionTokens($user);
 
-        $expiresAt = gmdate(DATE_ATOM, time() + self::WEB_SESSION_TTL_SECONDS);
+        $expiresAt = DateTime::now(Timezone::UTC)->plusSeconds(self::WEB_SESSION_TTL_SECONDS);
 
         return $this->createApiToken($user, self::WEB_SESSION_TOKEN_NAME, expiresAt: $expiresAt)['token'];
     }
@@ -146,7 +147,7 @@ final readonly class AuthService
     }
 
     /** @return array{id: string, token: string, token_preview: string, name: string} */
-    public function createApiToken(UserRecord $user, string $name, ?array $scopes = null, ?string $expiresAt = null): array
+    public function createApiToken(UserRecord $user, string $name, ?array $scopes = null, ?DateTime $expiresAt = null): array
     {
         $plainToken = 'stashd_pat_' . bin2hex(random_bytes(24));
         $record = $this->tokens->create(
@@ -179,12 +180,10 @@ final readonly class AuthService
                 'id' => (string) $token->id,
                 'name' => $token->name,
                 'token_preview' => $token->tokenPreview,
-                'scopes' => $token->scopesJson === null
-                    ? []
-                    : json_decode($token->scopesJson, true, flags: JSON_THROW_ON_ERROR),
-                'last_used_at' => $token->lastUsedAt,
-                'expires_at' => $token->expiresAt,
-                'created_at' => $token->createdAt,
+                'scopes' => $token->scopesJson?->toArray() ?? [],
+                'last_used_at' => $token->lastUsedAt?->toRfc3339(useZ: true),
+                'expires_at' => $token->expiresAt?->toRfc3339(useZ: true),
+                'created_at' => $token->createdAt?->toRfc3339(useZ: true),
             ],
             $tokens,
         ));

@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\System\Activity;
 
 use App\Support\PrefixedUlidGenerator;
-use App\Support\RecordTimestamps;
 use InvalidArgumentException;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
+
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final class ActivityEventRepository
 {
@@ -49,7 +51,7 @@ final class ActivityEventRepository
             metadataJson: $metadata === null ? null : json_encode($metadata, JSON_THROW_ON_ERROR),
         );
         $record->id = new PrimaryKey($id);
-        $record->createdAt = RecordTimestamps::now();
+        $record->createdAt = DateTime::now(Timezone::UTC);
 
         query(ActivityEventRecord::class)->insert($record)->execute();
 

@@ -7,10 +7,11 @@ namespace App\Jobs;
 use App\Commands\CommandRepository;
 use App\Commands\CommandState;
 use App\Support\PrefixedUlid;
-use App\Support\RecordTimestamps;
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
 use App\System\State\StateTransitionService;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final readonly class JobWorkerService implements JobWorkerCallbacks
 {
@@ -28,7 +29,7 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
 
     public function recoverStaleJobs(): int
     {
-        $staleBefore = gmdate('Y-m-d H:i:s', time() - self::STALE_SECONDS);
+        $staleBefore = DateTime::now(Timezone::UTC)->minusSeconds(self::STALE_SECONDS);
         $recovered = 0;
 
         foreach ($this->jobs->listProcessingStale($staleBefore) as $job) {
@@ -37,7 +38,7 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
 
             if ($job->attempts >= $job->maxAttempts) {
                 $this->transitions->transitionJob($job, JobState::Failed);
-                $job->finishedAt = RecordTimestamps::now();
+                $job->finishedAt = DateTime::now(Timezone::UTC);
                 $this->jobs->save($job);
                 $this->failCommandIfNeeded($job, $message);
                 $this->activity->jobFailed($job, $message);
@@ -94,7 +95,7 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
 
     public function heartbeat(JobRecord $job): void
     {
-        $job->heartbeatAt = RecordTimestamps::now();
+        $job->heartbeatAt = DateTime::now(Timezone::UTC);
         $this->jobs->save($job);
     }
 
@@ -104,7 +105,7 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
         $job->progressTotal = $total;
         $job->progressPercent = $total > 0 ? round(($current / $total) * 100, 2) : 0.0;
         $job->progressLabel = $label;
-        $job->heartbeatAt = RecordTimestamps::now();
+        $job->heartbeatAt = DateTime::now(Timezone::UTC);
         $this->jobs->save($job);
         $this->publisher->jobProgress($job);
     }
@@ -120,7 +121,7 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
         }
 
         $job->lastError = $error;
-        $job->finishedAt = RecordTimestamps::now();
+        $job->finishedAt = DateTime::now(Timezone::UTC);
         $this->jobs->save($job);
         $this->transitions->transitionJob($job, JobState::Failed);
         $this->failCommandIfNeeded($job, $error);

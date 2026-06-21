@@ -7,6 +7,7 @@ namespace App\Vault;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\DateTime\DateTime;
 
 #[Table(name: 'raw_metadata_snapshots')]
 final class RawMetadataSnapshotRecord
@@ -21,7 +22,7 @@ final class RawMetadataSnapshotRecord
         public MetadataSnapshotType $snapshotType,
         public string $rawJson,
         public ?string $stashInputId = null,
-        public ?string $createdAt = null,
+        public ?DateTime $createdAt = null,
     ) {
     }
 }

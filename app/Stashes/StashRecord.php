@@ -7,6 +7,7 @@ namespace App\Stashes;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\DateTime\DateTime;
 
 #[Table(name: 'stashes')]
 final class StashRecord
@@ -26,8 +27,8 @@ final class StashRecord
         public ?string $iconUri = null,
         public ?string $videoQualityProfileId = null,
         public ?string $audioQualityProfileId = null,
-        public ?string $createdAt = null,
-        public ?string $updatedAt = null,
+        public ?DateTime $createdAt = null,
+        public ?DateTime $updatedAt = null,
     ) {
     }
 }

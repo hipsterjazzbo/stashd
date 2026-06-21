@@ -8,7 +8,8 @@ use App\Commands\CommandDispatchService;
 use App\Commands\CommandType;
 use App\Stashes\StashInputRepository;
 use App\Stashes\SyncMode;
-use App\Support\RecordTimestamps;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final readonly class RoutineDiscoveryScheduler
 {
@@ -22,7 +23,7 @@ final readonly class RoutineDiscoveryScheduler
 
     public function runDueChecks(): int
     {
-        $now = RecordTimestamps::now();
+        $now = DateTime::now(Timezone::UTC);
         $scheduled = 0;
 
         foreach ($this->inputs->listDueForAutomaticSync($now) as $input) {
@@ -37,7 +38,7 @@ final readonly class RoutineDiscoveryScheduler
             );
 
             $input->lastCheckedAt = $now;
-            $input->nextCheckAt = gmdate('Y-m-d H:i:s', time() + self::CHECK_INTERVAL_SECONDS);
+            $input->nextCheckAt = $now->plusSeconds(self::CHECK_INTERVAL_SECONDS);
             $input->syncMode = $input->syncMode ?? SyncMode::Automatic;
             $this->inputs->save($input);
             $scheduled++;

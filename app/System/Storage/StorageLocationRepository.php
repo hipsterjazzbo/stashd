@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\System\Storage;
 
 use App\Support\PrefixedUlidGenerator;
-use App\Support\RecordTimestamps;
 use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
+
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final class StorageLocationRepository
 {
@@ -33,6 +35,7 @@ final class StorageLocationRepository
         bool $supportsSymlinks,
         ?string $lastError,
     ): StorageLocationRecord {
+        $now = DateTime::now(Timezone::UTC);
         $existing = StorageLocationRecord::select()
             ->where('key = ?', $key)
             ->first();
@@ -49,7 +52,7 @@ final class StorageLocationRepository
             $existing->filesystemId = $filesystemId;
             $existing->supportsHardlinks = $supportsHardlinks;
             $existing->supportsSymlinks = $supportsSymlinks;
-            $existing->lastCheckedAt = gmdate('Y-m-d H:i:s');
+            $existing->lastCheckedAt = $now;
             $existing->lastError = $lastError;
             $existing->save();
 
@@ -70,11 +73,12 @@ final class StorageLocationRepository
             filesystemId: $filesystemId,
             supportsHardlinks: $supportsHardlinks,
             supportsSymlinks: $supportsSymlinks,
-            lastCheckedAt: gmdate('Y-m-d H:i:s'),
+            lastCheckedAt: $now,
             lastError: $lastError,
         );
         $record->id = new PrimaryKey($id);
-        RecordTimestamps::apply($record);
+        $record->createdAt ??= $now;
+        $record->updatedAt ??= $now;
 
         query(StorageLocationRecord::class)->insert($record)->execute();
 

@@ -9,7 +9,6 @@ use App\Providers\StashdUri;
 use App\Stashes\StashItemRepository;
 use App\Stashes\StashRepository;
 use App\Support\PrefixedUlid;
-use App\Support\RecordTimestamps;
 use App\System\State\StateTransitionService;
 use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRepository;
@@ -27,6 +26,8 @@ use App\Vault\StageDownloadFiles;
 use App\Vault\VaultChecksum;
 use App\Vault\VaultPathBuilder;
 use InvalidArgumentException;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final readonly class DownloadMediaItem
 {
@@ -194,7 +195,7 @@ final readonly class DownloadMediaItem
     {
         if ($mediaItem->state === MediaItemState::Discovered) {
             $this->transitions->transitionMediaItem($mediaItem, MediaItemState::MetadataReady);
-            $mediaItem->metadataCapturedAt ??= RecordTimestamps::now();
+            $mediaItem->metadataCapturedAt ??= DateTime::now(Timezone::UTC);
             $this->mediaItems->save($mediaItem);
         }
 
@@ -329,14 +330,14 @@ final readonly class DownloadMediaItem
         $asset->sizeBytes = $sizeBytes;
         $asset->checksum = $checksum;
         $asset->durationSeconds = $file->durationSeconds;
-        $asset->lastVerifiedAt = RecordTimestamps::now();
+        $asset->lastVerifiedAt = DateTime::now(Timezone::UTC);
         $asset->missingAt = null;
         $asset->missingReason = null;
         $this->assets->save($asset);
         $this->transitions->transitionAsset($asset, AssetState::Ready);
 
         if ($file->role === AssetRole::SourceJson) {
-            $mediaItem->metadataCapturedAt = $download->attemptedAt->toRfc3339(useZ: true);
+            $mediaItem->metadataCapturedAt = $download->attemptedAt;
             $this->mediaItems->save($mediaItem);
         }
     }

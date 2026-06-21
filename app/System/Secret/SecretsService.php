@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\System\Secret;
 
-use App\Support\RecordTimestamps;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 use RuntimeException;
 use SensitiveParameter;
 use Tempest\Cryptography\Encryption\EncryptedData;
@@ -59,7 +60,7 @@ final readonly class SecretsService
         }
 
         $plaintext = $this->decrypt($record->encryptedValue);
-        $record->lastUsedAt = RecordTimestamps::now();
+        $record->lastUsedAt = DateTime::now(Timezone::UTC);
         $this->secrets->save($record);
 
         return $plaintext;
@@ -73,7 +74,7 @@ final readonly class SecretsService
             return;
         }
 
-        $record->revokedAt = RecordTimestamps::now();
+        $record->revokedAt = DateTime::now(Timezone::UTC);
         $this->secrets->save($record);
     }
 

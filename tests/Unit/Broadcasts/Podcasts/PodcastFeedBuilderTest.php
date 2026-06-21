@@ -7,6 +7,8 @@ namespace Tests\Unit\Broadcasts\Podcasts;
 use App\Broadcasts\Podcasts\PodcastEpisode;
 use App\Broadcasts\Podcasts\PodcastFeedBuilder;
 use App\Broadcasts\Podcasts\PodcastFeedMetadata;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 test('podcast feed builder emits valid escaped deterministic rss', function (): void {
     $builder = new PodcastFeedBuilder();
@@ -21,7 +23,7 @@ test('podcast feed builder emits valid escaped deterministic rss', function (): 
             guid: 'stashd:broadcast:one:item:two',
             title: 'Episode <Two>',
             description: 'Description & details',
-            publishedAt: '2026-01-02T12:00:00Z',
+            publishedAt: DateTime::parse('2026-01-02T12:00:00Z', Timezone::UTC),
             enclosureUrl: 'http://localhost:8474/b/feed-token/items/item-token/episode.mp3',
             enclosureLength: 456,
             enclosureMimeType: 'audio/mpeg',
@@ -30,7 +32,7 @@ test('podcast feed builder emits valid escaped deterministic rss', function (): 
             guid: 'stashd:broadcast:one:item:one',
             title: 'Episode One',
             description: 'First',
-            publishedAt: '2026-01-01T12:00:00Z',
+            publishedAt: DateTime::parse('2026-01-01T12:00:00Z', Timezone::UTC),
             enclosureUrl: 'http://localhost:8474/b/feed-token/items/item-token-1/episode.mp3',
             enclosureLength: 123,
             enclosureMimeType: 'audio/mpeg',

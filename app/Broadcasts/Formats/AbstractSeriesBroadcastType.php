@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Broadcasts\Formats;
 
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 use App\Broadcasts\BroadcastContext;
 use App\Broadcasts\BroadcastContextFactory;
 use App\Broadcasts\BroadcastFilenameBuilder;
@@ -21,7 +23,6 @@ use App\Broadcasts\BroadcastSidecarWriter;
 use App\Broadcasts\BroadcastVerifyResult;
 use App\Broadcasts\HardlinkPublisher;
 use App\Support\PrefixedUlid;
-use App\Support\RecordTimestamps;
 use App\System\State\StateTransitionService;
 use App\Vault\AssetKind;
 use App\Vault\AssetRepository;
@@ -160,7 +161,7 @@ abstract readonly class AbstractSeriesBroadcastType implements BroadcastFormat
 
                 $item->publishedPath = $planned->absolutePath;
                 $item->publishedUri = null;
-                $item->lastPublishedAt = RecordTimestamps::now();
+                $item->lastPublishedAt = DateTime::now(Timezone::UTC);
                 $item->lastError = null;
                 $this->broadcastItems->save($item);
 
@@ -256,7 +257,7 @@ abstract readonly class AbstractSeriesBroadcastType implements BroadcastFormat
                 $this->transitions->transitionBroadcastItem($item, BroadcastItemState::Ready);
             }
 
-            $item->lastVerifiedAt = RecordTimestamps::now();
+            $item->lastVerifiedAt = DateTime::now(Timezone::UTC);
             $item->lastError = null;
             $this->broadcastItems->save($item);
             $validItemIds[] = (string) $item->id;
@@ -422,7 +423,7 @@ abstract readonly class AbstractSeriesBroadcastType implements BroadcastFormat
         $existing->relativePath = $relativePath;
         $existing->derivedFromAssetId = $sourceAssetId->toString();
         $existing->sizeBytes = is_int($sizeBytes) ? $sizeBytes : $existing->sizeBytes;
-        $existing->lastVerifiedAt = RecordTimestamps::now();
+        $existing->lastVerifiedAt = DateTime::now(Timezone::UTC);
         $existing->missingAt = null;
         $existing->missingReason = null;
 

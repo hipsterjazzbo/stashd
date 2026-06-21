@@ -7,6 +7,7 @@ namespace App\Vault;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\DateTime\DateTime;
 
 #[Table(name: 'assets')]
 final class AssetRecord
@@ -33,11 +34,11 @@ final class AssetRecord
         public ?string $checksum = null,
         public ?int $durationSeconds = null,
         public ?string $derivedFromAssetId = null,
-        public ?string $lastVerifiedAt = null,
-        public ?string $missingAt = null,
+        public ?DateTime $lastVerifiedAt = null,
+        public ?DateTime $missingAt = null,
         public ?string $missingReason = null,
-        public ?string $createdAt = null,
-        public ?string $updatedAt = null,
+        public ?DateTime $createdAt = null,
+        public ?DateTime $updatedAt = null,
     ) {
     }
 }

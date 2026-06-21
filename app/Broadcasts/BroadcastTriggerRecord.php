@@ -7,6 +7,7 @@ namespace App\Broadcasts;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\DateTime\DateTime;
 
 #[Table(name: 'broadcast_triggers')]
 final class BroadcastTriggerRecord
@@ -20,13 +21,13 @@ final class BroadcastTriggerRecord
         public BroadcastTriggerType $type,
         public bool $enabled,
         public BroadcastTriggerState $state,
-        public ?string $settingsJson = null,
-        public ?string $lastTriggeredAt = null,
-        public ?string $lastSuccessAt = null,
-        public ?string $lastFailureAt = null,
+        public ?MediaServerScanTriggerSettings $settingsJson = null,
+        public ?DateTime $lastTriggeredAt = null,
+        public ?DateTime $lastSuccessAt = null,
+        public ?DateTime $lastFailureAt = null,
         public ?string $lastError = null,
-        public ?string $createdAt = null,
-        public ?string $updatedAt = null,
+        public ?DateTime $createdAt = null,
+        public ?DateTime $updatedAt = null,
     ) {
     }
 }

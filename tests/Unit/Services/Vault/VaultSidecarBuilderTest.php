@@ -25,7 +25,7 @@ test('vault sidecar builder produces normalized metadata and source json', funct
         downloadPolicy: DownloadPolicy::Video,
         tempDirectory: sys_get_temp_dir(),
         title: 'Demo Episode',
-        publishedAt: '2026-06-15T08:30:00Z',
+        publishedAt: DateTime::parse('2026-06-15T08:30:00Z', Timezone::UTC),
     );
 
     $metadata = json_decode($builder->metadataJson($request, $capturedAt), true, flags: JSON_THROW_ON_ERROR);

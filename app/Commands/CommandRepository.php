@@ -6,12 +6,14 @@ namespace App\Commands;
 
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
-use App\Support\RecordTimestamps;
 use InvalidArgumentException;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
+
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final class CommandRepository
 {
@@ -37,7 +39,9 @@ final class CommandRepository
             createdByUserId: $createdByUserId?->toString(),
         );
         $record->id = new PrimaryKey($id);
-        RecordTimestamps::apply($record);
+        $now = DateTime::now(Timezone::UTC);
+        $record->createdAt ??= $now;
+        $record->updatedAt ??= $now;
 
         query(CommandRecord::class)->insert($record)->execute();
 
@@ -52,7 +56,7 @@ final class CommandRepository
 
     public function save(CommandRecord $record): CommandRecord
     {
-        $record->updatedAt = RecordTimestamps::now();
+        $record->updatedAt = DateTime::now(Timezone::UTC);
         $record->save();
 
         return $record;

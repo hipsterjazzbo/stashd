@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs\Handlers;
 
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandState;
@@ -14,7 +16,6 @@ use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
 use App\Support\PrefixedUlid;
-use App\Support\RecordTimestamps;
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
 use App\System\Health\HealthService;
@@ -70,7 +71,7 @@ final readonly class StorageCheckJobHandler implements JobHandler
         $job->progressTotal = 2;
         $job->progressPercent = 100.0;
         $job->progressLabel = 'Storage check complete';
-        $job->finishedAt = RecordTimestamps::now();
+        $job->finishedAt = DateTime::now(Timezone::UTC);
         $this->jobs->save($job);
 
         $this->transitions->transitionJob($job, JobState::Ready);

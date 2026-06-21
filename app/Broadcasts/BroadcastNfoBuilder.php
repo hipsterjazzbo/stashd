@@ -6,6 +6,8 @@ namespace App\Broadcasts;
 
 use App\Stashes\StashItemRecord;
 use App\Vault\MediaItemRecord;
+use Tempest\DateTime\FormatPattern;
+use Tempest\DateTime\Timezone;
 
 /** Minimal deterministic NFO sidecars from stored metadata only. */
 final class BroadcastNfoBuilder
@@ -49,7 +51,7 @@ final class BroadcastNfoBuilder
         }
 
         if ($mediaItem->publishedAt !== null) {
-            $lines[] = '  <aired>' . $this->escape(substr($mediaItem->publishedAt, 0, 10)) . '</aired>';
+            $lines[] = '  <aired>' . $this->escape($mediaItem->publishedAt->format(FormatPattern::SQL_DATE, Timezone::UTC)) . '</aired>';
         }
 
         $lines[] = '</episodedetails>';
