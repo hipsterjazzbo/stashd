@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Providers\YouTube;
 
-use App\Config\YouTubeConfig;
 use App\Providers\Core\DiscoveredItem;
 use App\Providers\Provider;
 use App\Providers\ProviderException;
@@ -20,8 +19,9 @@ final readonly class YouTubeProvider implements Provider
     public const string KEY = 'youtube';
 
     public function __construct(
-        private YouTubeConfig $config,
+        private YouTubeDataApiKeyResolver $dataApiKey,
         private YouTubeRssDiscoveryStrategy $rssDiscovery,
+        private YouTubeDataApiDiscoveryStrategy $dataApiDiscovery,
         private YouTubeDataApiMetadataStrategy $dataApiMetadata,
         private YtdlpDownloadAdapter $downloadAdapter,
         private YouTubeChannelIdResolver $channelIds,
@@ -76,6 +76,15 @@ final readonly class YouTubeProvider implements Provider
                 supportsBackfill: true,
                 priority: 10,
             ),
+            new ProviderStrategy(
+                key: YouTubeDataApiDiscoveryStrategy::STRATEGY_KEY,
+                purpose: StrategyPurpose::Discovery,
+                cost: StrategyCost::Medium,
+                requiresAuth: true,
+                supportsIncremental: true,
+                supportsBackfill: true,
+                priority: 10,
+            ),
         ];
     }
 
@@ -107,18 +116,19 @@ final readonly class YouTubeProvider implements Provider
 
     public function discover(ResolvedInput $input, ProviderStrategy $strategy): array
     {
-        if ($strategy->key === YouTubeRssDiscoveryStrategy::STRATEGY_KEY) {
-            return $this->rssDiscovery->discover($input);
-        }
-
-        throw new InvalidArgumentException("Unsupported YouTube discovery strategy: {$strategy->key}");
+        return match ($strategy->key) {
+            YouTubeRssDiscoveryStrategy::STRATEGY_KEY => $this->rssDiscovery->discover($input),
+            YouTubeDataApiDiscoveryStrategy::STRATEGY_KEY => $this->dataApiDiscovery->discover($input),
+            default => throw new InvalidArgumentException("Unsupported YouTube discovery strategy: {$strategy->key}"),
+        };
     }
 
     public function isStrategyAvailable(ProviderStrategy $strategy): bool
     {
         return match ($strategy->key) {
             YouTubeRssDiscoveryStrategy::STRATEGY_KEY => true,
-            YouTubeDataApiMetadataStrategy::STRATEGY_KEY => $this->config->hasDataApiKey(),
+            YouTubeDataApiDiscoveryStrategy::STRATEGY_KEY => $this->dataApiKey->hasKey(),
+            YouTubeDataApiMetadataStrategy::STRATEGY_KEY => $this->dataApiKey->hasKey(),
             YouTubeYtdlpDownloadStrategy::STRATEGY_KEY => $this->downloadAdapter->isAvailable(),
             default => false,
         };

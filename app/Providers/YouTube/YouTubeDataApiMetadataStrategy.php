@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Providers\YouTube;
 
-use App\Config\YouTubeConfig;
 use App\Providers\Core\DiscoveredItem;
 use App\Providers\MetadataStrategyHandler;
 use App\Providers\ProviderDates;
@@ -20,7 +19,7 @@ final readonly class YouTubeDataApiMetadataStrategy implements MetadataStrategyH
     public const string STRATEGY_KEY = 'youtube.data_api';
 
     public function __construct(
-        private YouTubeConfig $config,
+        private YouTubeDataApiKeyResolver $dataApiKey,
         private ProviderHttpClient $http,
     ) {
     }
@@ -32,13 +31,13 @@ final readonly class YouTubeDataApiMetadataStrategy implements MetadataStrategyH
 
     public function enrich(ResolvedInput $input, DiscoveredItem $item): DiscoveredItem
     {
-        if (! $this->config->hasDataApiKey()) {
+        if (! $this->dataApiKey->hasKey()) {
             throw new ProviderException('YouTube Data API key is not configured.', 'data_api_unavailable');
         }
 
         $response = $this->http->get(YouTubeUris::dataApiVideo(
             $item->providerItemId,
-            (string) $this->config->dataApiKey,
+            (string) $this->dataApiKey->key(),
         ));
 
         if (! $response->isSuccessful()) {
@@ -82,7 +81,8 @@ final readonly class YouTubeDataApiMetadataStrategy implements MetadataStrategyH
 
         $durationSeconds = $item->durationSeconds;
         if (isset($entry['contentDetails']['duration']) && is_string($entry['contentDetails']['duration'])) {
-            $durationSeconds = self::parseIso8601Duration($entry['contentDetails']['duration']) ?? $durationSeconds;
+            $parsed = YouTubeDurations::parseIso8601($entry['contentDetails']['duration']);
+            $durationSeconds = $parsed !== null ? (int) $parsed->getTotalSeconds() : $durationSeconds;
         }
 
         return new DiscoveredItem(
@@ -98,20 +98,5 @@ final readonly class YouTubeDataApiMetadataStrategy implements MetadataStrategyH
                 'data_api' => $payload,
             ],
         );
-    }
-
-    private static function parseIso8601Duration(string $duration): ?int
-    {
-        if (! str($duration)->matches('/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/')) {
-            return null;
-        }
-
-        preg_match('/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/', $duration, $matches);
-
-        $hours = (int) ($matches[1] ?? 0);
-        $minutes = (int) ($matches[2] ?? 0);
-        $seconds = (int) ($matches[3] ?? 0);
-
-        return ($hours * 3600) + ($minutes * 60) + $seconds;
     }
 }

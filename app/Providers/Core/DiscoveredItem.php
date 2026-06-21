@@ -21,6 +21,7 @@ final readonly class DiscoveredItem
         public ?DateTime $publishedAt = null,
         public ?StashdUri $thumbnailUri = null,
         public ?array $rawMetadata = null,
+        public ?string $contentType = null,
     ) {
     }
 
@@ -35,6 +36,7 @@ final readonly class DiscoveredItem
             'duration_seconds' => $item->durationSeconds,
             'published_at' => $item->publishedAt?->toRfc3339(useZ: true),
             'thumbnail_uri' => $item->thumbnailUri?->toString(),
+            'content_type' => $item->contentType,
         ];
 
         if ($item->rawMetadata !== null) {

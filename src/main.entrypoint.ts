@@ -495,6 +495,10 @@ interface ApiTokenSummary {
 	created_at: string
 }
 
+interface YoutubeApiKeyStatus {
+	configured: boolean
+}
+
 interface MediaServerSummary {
 	id: string
 	type: string
@@ -1148,6 +1152,11 @@ function settingsComponent() {
 		newMediaServerToken: '',
 		creatingMediaServer: false,
 
+		youtubeApiKey: { configured: false } as YoutubeApiKeyStatus,
+		editingYoutubeApiKey: false,
+		newYoutubeApiKey: '',
+		savingYoutubeApiKey: false,
+
 		testingId: null as string | null,
 		testResults: {} as Record<string, { ok: boolean; message: string; server_name?: string; version?: string }>,
 
@@ -1161,16 +1170,18 @@ function settingsComponent() {
 
 		async refresh() {
 			try {
-				const [meResponse, healthResponse, tokensResponse, mediaServersResponse] = await Promise.all([
+				const [meResponse, healthResponse, tokensResponse, mediaServersResponse, youtubeApiKeyResponse] = await Promise.all([
 					apiFetch('/api/v1/auth/me'),
 					apiFetch('/api/v1/system/health'),
 					apiFetch('/api/v1/auth/tokens'),
 					apiFetch('/api/v1/media-servers'),
+					apiFetch('/api/v1/providers/youtube/credentials'),
 				])
 				this.me = (await meResponse.json()).user
 				this.health = await healthResponse.json()
 				this.tokens = (await tokensResponse.json()).tokens
 				this.mediaServers = (await mediaServersResponse.json()).media_servers
+				this.youtubeApiKey = await youtubeApiKeyResponse.json()
 				this.error = null
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
@@ -1274,6 +1285,32 @@ function settingsComponent() {
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
 				this.error = 'Could not delete that connection.'
+			}
+		},
+
+		async saveYoutubeApiKey() {
+			if (this.newYoutubeApiKey.trim() === '') return
+			this.savingYoutubeApiKey = true
+			try {
+				const response = await apiFetch('/api/v1/providers/youtube/credentials', {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ api_key: this.newYoutubeApiKey.trim() }),
+				})
+				if (!response.ok) {
+					const body = (await response.json()) as { error?: { message?: string } }
+					this.error = body.error?.message ?? 'Could not save that key.'
+					return
+				}
+				this.newYoutubeApiKey = ''
+				this.editingYoutubeApiKey = false
+				this.error = null
+				await this.refresh()
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not reach the server.'
+			} finally {
+				this.savingYoutubeApiKey = false
 			}
 		},
 	}

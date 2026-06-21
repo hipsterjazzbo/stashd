@@ -33,6 +33,7 @@ final class MediaItemRepository
         ?int $durationSeconds = null,
         ?DateTime $publishedAt = null,
         StashdUri|string|null $thumbnailUri = null,
+        ?string $contentType = null,
     ): MediaItemRecord {
         $id = $this->ids->generate('media')->toString();
         $record = new MediaItemRecord(
@@ -46,6 +47,7 @@ final class MediaItemRepository
             durationSeconds: $durationSeconds,
             publishedAt: $publishedAt?->toRfc3339(useZ: true),
             thumbnailUri: $thumbnailUri instanceof StashdUri ? $thumbnailUri->toString() : $thumbnailUri,
+            contentType: $contentType,
         );
         $record->id = new PrimaryKey($id);
         RecordTimestamps::apply($record);

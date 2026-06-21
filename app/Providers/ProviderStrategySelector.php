@@ -42,7 +42,7 @@ final readonly class ProviderStrategySelector
             throw new InvalidArgumentException("No available {$purpose->value} strategies for provider {$provider->key()}.");
         }
 
-        usort($strategies, static function (ProviderStrategy $a, ProviderStrategy $b): int {
+        usort($strategies, static function (ProviderStrategy $a, ProviderStrategy $b) use ($options): int {
             $costOrder = [
                 StrategyCost::Low->value => 0,
                 StrategyCost::Medium->value => 1,
@@ -51,6 +51,11 @@ final readonly class ProviderStrategySelector
             ];
 
             $costCompare = ($costOrder[$a->cost->value] ?? 99) <=> ($costOrder[$b->cost->value] ?? 99);
+
+            if ($options->preferHighestCapability) {
+                $costCompare = -$costCompare;
+            }
+
             if ($costCompare !== 0) {
                 return $costCompare;
             }

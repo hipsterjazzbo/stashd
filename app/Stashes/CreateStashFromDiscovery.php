@@ -124,6 +124,7 @@ final readonly class CreateStashFromDiscovery
                     thumbnailUri: is_string($item['thumbnail_uri'] ?? null) && str($item['thumbnail_uri'])->trim()->isNotEmpty()
                         ? StashdUri::parse(str($item['thumbnail_uri'])->trim()->toString())
                         : null,
+                    contentType: is_string($item['content_type'] ?? null) ? $item['content_type'] : null,
                 );
                 $mediaItemsCreated++;
             } else {

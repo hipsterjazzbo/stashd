@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domain\Provider\YouTube;
 
-use App\Config\YouTubeConfig;
 use App\Config\YtdlpConfig;
 use App\Providers\Http\FixtureProviderHttpClient;
 use App\Providers\ProviderStrategySelector;
 use App\Providers\StrategyCost;
 use App\Providers\StrategyPurpose;
 use App\Providers\StrategySelectionOptions;
+use App\Providers\YouTube\FixtureYouTubeDataApiKeyResolver;
 use App\Providers\YouTube\YouTubeChannelIdResolver;
+use App\Providers\YouTube\YouTubeDataApiDiscoveryStrategy;
 use App\Providers\YouTube\YouTubeDataApiMetadataStrategy;
 use App\Providers\YouTube\YouTubeProvider;
 use App\Providers\YouTube\YouTubeRssDiscoveryStrategy;
@@ -24,6 +25,7 @@ function youtubeProviderWithFixtures(?string $apiKey = null, bool $realDownloads
     $fixturesDirectory = __DIR__ . '/../../../../fixtures/providers/youtube/http';
     $map = json_decode((string) file_get_contents($fixturesDirectory . '/map.json'), true, flags: JSON_THROW_ON_ERROR);
     $http = new FixtureProviderHttpClient($fixturesDirectory, $map);
+    $dataApiKey = new FixtureYouTubeDataApiKeyResolver($apiKey);
     $ytdlpConfig = new YtdlpConfig(
         binary: 'stub-yt-dlp',
         timeoutSeconds: 60,
@@ -34,15 +36,19 @@ function youtubeProviderWithFixtures(?string $apiKey = null, bool $realDownloads
     );
 
     return new YouTubeProvider(
-        config: new YouTubeConfig(dataApiKey: $apiKey),
+        dataApiKey: $dataApiKey,
         rssDiscovery: new YouTubeRssDiscoveryStrategy(
             http: $http,
             channelIds: new YouTubeChannelIdResolver($http),
             parser: new YouTubeRssParser(),
             videos: new YouTubeVideoDiscovery($http),
         ),
+        dataApiDiscovery: new YouTubeDataApiDiscoveryStrategy(
+            dataApiKey: $dataApiKey,
+            http: $http,
+        ),
         dataApiMetadata: new YouTubeDataApiMetadataStrategy(
-            config: new YouTubeConfig(dataApiKey: $apiKey),
+            dataApiKey: $dataApiKey,
             http: $http,
         ),
         downloadAdapter: new YouTubeYtdlpDownloadStrategy(
@@ -107,6 +113,43 @@ test('youtube strategy selector prefers rss for discovery and skips ytdlp withou
         ->toThrow(\InvalidArgumentException::class);
 });
 
+test('youtube strategy selector keeps preferring rss for discovery even when a data api key is configured', function (): void {
+    $provider = youtubeProviderWithFixtures(apiKey: 'test-api-key');
+    $selector = new ProviderStrategySelector();
+
+    $discovery = $selector->select($provider, StrategyPurpose::Discovery);
+
+    expect($discovery->key)->toBe('youtube.rss')
+        ->and($discovery->cost)->toBe(StrategyCost::Low);
+});
+
+test('youtube strategy selector prefers data api discovery for a backfill-intent selection when configured', function (): void {
+    $provider = youtubeProviderWithFixtures(apiKey: 'test-api-key');
+    $selector = new ProviderStrategySelector();
+
+    $discovery = $selector->select(
+        $provider,
+        StrategyPurpose::Discovery,
+        new StrategySelectionOptions(preferHighestCapability: true),
+    );
+
+    expect($discovery->key)->toBe('youtube.data_api_discovery')
+        ->and($discovery->cost)->toBe(StrategyCost::Medium);
+});
+
+test('youtube strategy selector falls back to rss for a backfill-intent selection without a key', function (): void {
+    $provider = youtubeProviderWithFixtures(apiKey: null);
+    $selector = new ProviderStrategySelector();
+
+    $discovery = $selector->select(
+        $provider,
+        StrategyPurpose::Discovery,
+        new StrategySelectionOptions(preferHighestCapability: true),
+    );
+
+    expect($discovery->key)->toBe('youtube.rss');
+});
+
 test('youtube strategy selector prefers data api metadata when configured', function (): void {
     $provider = youtubeProviderWithFixtures(apiKey: 'test-api-key');
     $selector = new ProviderStrategySelector();
@@ -150,7 +193,7 @@ test('youtube data api metadata strategy captures snippet description', function
     $map = json_decode((string) file_get_contents($fixturesDirectory . '/map.json'), true, flags: JSON_THROW_ON_ERROR);
     $http = new FixtureProviderHttpClient($fixturesDirectory, $map);
     $strategy = new YouTubeDataApiMetadataStrategy(
-        config: new YouTubeConfig(dataApiKey: 'test-api-key'),
+        dataApiKey: new FixtureYouTubeDataApiKeyResolver('test-api-key'),
         http: $http,
     );
 

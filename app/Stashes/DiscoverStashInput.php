@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Stashes;
 
+use App\Jobs\JobIntent;
 use App\Providers\Core\DiscoveredItem;
 use App\Providers\ProviderRegistry;
 use App\Providers\ProviderStrategySelector;
 use App\Providers\ResolvedInput;
 use App\Providers\StashdUri;
 use App\Providers\StrategyPurpose;
+use App\Providers\StrategySelectionOptions;
 
 use function Tempest\Support\str;
 
@@ -22,7 +24,7 @@ final readonly class DiscoverStashInput
     }
 
     /** @param array<string, mixed> $payload */
-    public function execute(array $payload): PreflightExecutionResult
+    public function execute(array $payload, JobIntent $intent = JobIntent::Preflight): PreflightExecutionResult
     {
         $sourceUri = str((string) ($payload['source_uri'] ?? ''))->trim()->toString();
         $sourceTitle = isset($payload['source_title']) && is_string($payload['source_title']) && str($payload['source_title'])->trim()->isNotEmpty()
@@ -47,7 +49,10 @@ final readonly class DiscoverStashInput
             );
         }
 
-        $strategy = $this->strategySelector->select($provider, StrategyPurpose::Discovery);
+        $selectionOptions = $intent === JobIntent::InitialBackfill
+            ? new StrategySelectionOptions(preferHighestCapability: true)
+            : null;
+        $strategy = $this->strategySelector->select($provider, StrategyPurpose::Discovery, $selectionOptions);
         $discovered = $provider->discover($resolved, $strategy);
         $discoveredItems = DiscoveredItem::manyToArray($discovered);
 

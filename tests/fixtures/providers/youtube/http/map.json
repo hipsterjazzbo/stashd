@@ -12,5 +12,9 @@
   "https://www.youtube.com/c/StashdAbbreviatedCountChannel": "channel_handle_page_abbreviated_count.html",
   "https://www.youtube.com/oembed?format=json&url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DdemoVideo01": "video_oembed.json",
   "https://www.googleapis.com/youtube/v3/videos?id=demoVideo01": "data_api_video.json",
-  "https://www.youtube.com/feeds/videos.xml?channel_id=UCStashdPrivateCh12345678": "unavailable.txt"
+  "https://www.youtube.com/feeds/videos.xml?channel_id=UCStashdPrivateCh12345678": "unavailable.txt",
+  "https://www.googleapis.com/youtube/v3/channels?id=UCStashdDemoCh0012345678&part=contentDetails&key=test-api-key": "data_api_channel_uploads.json",
+  "https://www.googleapis.com/youtube/v3/playlistItems?playlistId=UUStashdDemoCh0012345678&part=snippet&maxResults=50&key=test-api-key&pageToken=PAGE2": "data_api_playlist_items_page2.json",
+  "https://www.googleapis.com/youtube/v3/playlistItems?playlistId=UUStashdDemoCh0012345678&part=snippet&maxResults=50&key=test-api-key": "data_api_playlist_items_page1.json",
+  "https://www.googleapis.com/youtube/v3/videos?id=StashdVid01": "data_api_videos_batch.json"
 }

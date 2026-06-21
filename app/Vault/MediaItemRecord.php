@@ -31,6 +31,7 @@ final class MediaItemRecord
         public ?string $metadataCapturedAt = null,
         public ?string $metadataRefreshedAt = null,
         public ?string $lastSeenUpstreamAt = null,
+        public ?string $contentType = null,
         public ?string $createdAt = null,
         public ?string $updatedAt = null,
     ) {
