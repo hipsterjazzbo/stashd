@@ -17,6 +17,8 @@ use function Tempest\Database\query;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
+use function Tempest\Support\str;
+
 final class StashRepository
 {
     public function __construct(
@@ -67,6 +69,13 @@ final class StashRepository
     public function findBySlug(string $slug): ?StashRecord
     {
         return StashRecord::select()->where('slug = ?', $slug)->first();
+    }
+
+    public function slugify(string $name): string
+    {
+        $slug = str($name)->slug()->toString();
+
+        return $slug !== '' ? $slug : 'stash';
     }
 
     /**

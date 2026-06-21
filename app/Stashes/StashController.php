@@ -17,6 +17,7 @@ use Tempest\Http\Status;
 use Tempest\Router\Delete;
 use Tempest\Router\Get;
 use Tempest\Router\Patch;
+use Tempest\Router\Post;
 use Tempest\Router\WithMiddleware;
 
 #[AllowApiClients]
@@ -39,6 +40,54 @@ final readonly class StashController
                 $this->stashes->list(),
             ),
         ]);
+    }
+
+    #[Post('/api/v1/stashes')]
+    public function create(Request $request): Json
+    {
+        $body = ApiJson::normalizeRequest($request->body);
+
+        $name = trim((string) ($body['name'] ?? ''));
+        if ($name === '') {
+            $name = 'New Stash';
+        }
+
+        $syncMode = SyncMode::Automatic;
+        if (isset($body['syncMode'])) {
+            $syncMode = SyncMode::tryFrom((string) $body['syncMode']);
+            if ($syncMode === null) {
+                return $this->validationError('Unsupported sync_mode.');
+            }
+        }
+
+        $downloadPolicy = DownloadPolicy::Video;
+        if (isset($body['downloadPolicy'])) {
+            $downloadPolicy = DownloadPolicy::tryFrom((string) $body['downloadPolicy']);
+            if ($downloadPolicy === null) {
+                return $this->validationError('Unsupported download_policy.');
+            }
+        }
+
+        $organizationMode = OrganizationMode::Flat;
+        if (isset($body['organizationMode'])) {
+            $organizationMode = OrganizationMode::tryFrom((string) $body['organizationMode']);
+            if ($organizationMode === null) {
+                return $this->validationError('Unsupported organization_mode.');
+            }
+        }
+
+        $stash = $this->stashes->create(
+            name: $name,
+            slug: $this->stashes->nextAvailableSlug($this->stashes->slugify($name)),
+            syncMode: $syncMode,
+            downloadPolicy: $downloadPolicy,
+            organizationMode: $organizationMode,
+            description: isset($body['description']) ? trim((string) $body['description']) : null,
+        );
+
+        return new Json([
+            'stash' => StashResource::fromRecord($stash)->toArray(),
+        ], Status::CREATED);
     }
 
     #[Get('/api/v1/stashes/{id}')]

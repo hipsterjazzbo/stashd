@@ -50,7 +50,7 @@ final readonly class CreateStashFromDiscovery
         }
 
         $name = str((string) ($options['name'] ?? $resolved['title'] ?? 'New Stash'))->trim()->toString();
-        $requestedSlug = str((string) ($options['slug'] ?? $this->slugify($name)))->trim()->toString();
+        $requestedSlug = str((string) ($options['slug'] ?? $this->stashes->slugify($name)))->trim()->toString();
         $slug = $this->stashes->nextAvailableSlug($requestedSlug);
 
         $syncMode = SyncMode::tryFrom((string) ($options['sync_mode'] ?? SyncMode::Automatic->value)) ?? SyncMode::Automatic;
@@ -211,12 +211,5 @@ final readonly class CreateStashFromDiscovery
         }
 
         return $decoded;
-    }
-
-    private function slugify(string $name): string
-    {
-        $slug = str($name)->slug()->toString();
-
-        return $slug !== '' ? $slug : 'stash';
     }
 }

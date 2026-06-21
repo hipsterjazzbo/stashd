@@ -226,42 +226,6 @@ function summarizeEvent(event: ActivityEvent): string {
 // listener, so every name has to be wired up individually.
 const EVENT_TYPES = ['job.created', 'job.progress', 'job.completed', 'job.failed', 'activity.created'] as const
 
-/**
- * Opens one EventSource, re-running `checkTerminal` on every relevant SSE
- * event (and once immediately, in case the thing it's waiting on already
- * finished before this connection opened), and closes the connection as soon
- * as it returns true.
- *
- * Only for short, one-shot waits (Create Stash's preflight/create steps) —
- * never held open for a page's whole lifetime like Dashboard/Activity/Stash
- * detail. EventsController holds a RoadRunner worker for its full poll-loop
- * duration regardless of how soon the client closes (see docs/TODO.md's SSE
- * note), so this is used once or twice per stash created, not perpetually.
- */
-function awaitSseTerminal(checkTerminal: () => Promise<boolean>): void {
-	if (!('EventSource' in window)) {
-		void checkTerminal()
-		return
-	}
-
-	const source = new EventSource('/api/v1/events')
-	let closed = false
-
-	const tick = async () => {
-		if (closed) return
-		if (await checkTerminal()) {
-			closed = true
-			source.close()
-		}
-	}
-
-	for (const type of EVENT_TYPES) {
-		source.addEventListener(type, () => void tick())
-	}
-
-	void tick()
-}
-
 interface StorageLocation {
 	key: string
 	path: string
@@ -429,62 +393,6 @@ interface AssetSummary {
 	updated_at: string
 }
 
-interface ResolvedInputSummary {
-	provider_key: string
-	input_type: string
-	source_uri: string
-	provider_input_id: string
-	title: string | null
-}
-
-interface DiscoveredItemSummary {
-	provider_item_id: string
-	canonical_uri: string
-	title: string
-	description: string | null
-	duration_seconds: number | null
-	published_at: string | null
-	thumbnail_uri: string | null
-}
-
-interface PreflightReview {
-	command_id: string
-	state: string
-	review_url: string | null
-	preflight: {
-		source_uri: string
-		source_title: string | null
-		origin: string
-		resolved_input: ResolvedInputSummary | null
-		discovery: {
-			strategy_key: string
-			estimated_item_count: number
-			estimated_total_duration_seconds: number
-			discovered_items: DiscoveredItemSummary[]
-			sample_items: DiscoveredItemSummary[]
-		} | null
-	} | null
-	ui_note: string
-}
-
-interface CommandSummary {
-	id: string
-	type: string
-	state: string
-	target_type: string | null
-	target_id: string | null
-	options: Record<string, unknown> | null
-	result: Record<string, unknown> | null
-	created_by_user_id: string | null
-	created_at: string
-	updated_at: string
-}
-
-interface CommandShowResponse {
-	command: CommandSummary
-	jobs: JobSummary[]
-}
-
 interface ApiTokenSummary {
 	id: string
 	name: string
@@ -609,6 +517,11 @@ function stashesComponent() {
 		loadingDeleteImpact: false,
 		deletingBusy: false,
 
+		creatingStash: false,
+		newStashForm: { title: '', link: '' },
+		newStashError: null as string | null,
+		creatingBusy: false,
+
 		async init() {
 			await this.refresh()
 			this.loading = false
@@ -706,181 +619,42 @@ function stashesComponent() {
 				this.deletingBusy = false
 			}
 		},
-	}
-}
 
-function createStashComponent() {
-	return {
-		step: 'paste' as 'paste' | 'reviewing' | 'configure' | 'creating' | 'failed',
-		error: null as string | null,
-		submitting: false,
+		startCreate() {
+			this.newStashForm = { title: '', link: '' }
+			this.newStashError = null
+			this.creatingStash = true
+		},
 
-		sourceUri: '',
-		sourceTitle: '',
+		cancelCreate() {
+			this.creatingStash = false
+		},
 
-		preflightCommandId: null as string | null,
-		estimatedItemCount: null as number | null,
-		estimatedTotalDurationSeconds: null as number | null,
-		sampleItems: [] as DiscoveredItemSummary[],
-
-		name: '',
-		slug: '',
-		description: '',
-		syncMode: 'automatic',
-		downloadPolicy: 'video',
-		organizationMode: 'flat',
-		advancedOpen: false,
-
-		createCommandId: null as string | null,
-		failedStage: null as 'preflight' | 'create' | null,
-		failureMessage: null as string | null,
-
-		formatDuration,
-
-		async startPreflight() {
-			if (this.sourceUri.trim() === '') return
-			this.submitting = true
+		async submitCreateStash() {
+			this.creatingBusy = true
 			try {
-				const response = await apiFetch('/api/v1/stashes/preflight', {
+				const response = await apiFetch('/api/v1/stashes', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
-						source_uri: this.sourceUri.trim(),
-						source_title: this.sourceTitle.trim() || null,
-						origin: 'create_stash',
+						name: this.newStashForm.title.trim() || undefined,
 					}),
 				})
 				if (!response.ok) {
 					const body = (await response.json()) as { error?: { message?: string } }
-					this.error = body.error?.message ?? 'Could not start discovery.'
+					this.newStashError = body.error?.message ?? 'Could not create the stash.'
 					return
 				}
-				const body = (await response.json()) as { command_id: string }
-				this.preflightCommandId = body.command_id
-				this.error = null
-				this.step = 'reviewing'
-				awaitSseTerminal(() => this.checkPreflightTerminal())
+				const body = (await response.json()) as { stash: StashSummary }
+				const link = this.newStashForm.link.trim()
+				this.creatingStash = false
+				window.location.assign(link ? `/stashes/${body.stash.id}?link=${encodeURIComponent(link)}` : `/stashes/${body.stash.id}`)
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
-				this.error = 'Could not reach the server.'
+				this.newStashError = 'Could not reach the server.'
 			} finally {
-				this.submitting = false
+				this.creatingBusy = false
 			}
-		},
-
-		async checkPreflightTerminal(): Promise<boolean> {
-			try {
-				const response = await apiFetch(`/api/v1/commands/${this.preflightCommandId}`)
-				const body = (await response.json()) as CommandShowResponse
-
-				if (body.command.state === 'completed') {
-					const review = await apiFetch(`/api/v1/stashes/preflight/${this.preflightCommandId}/review`)
-					const reviewBody = (await review.json()) as PreflightReview
-					const discovery = reviewBody.preflight?.discovery ?? null
-					this.estimatedItemCount = discovery?.estimated_item_count ?? null
-					this.estimatedTotalDurationSeconds = discovery?.estimated_total_duration_seconds ?? null
-					this.sampleItems = discovery?.sample_items ?? []
-					this.name = reviewBody.preflight?.resolved_input?.title ?? (this.sourceTitle || 'New stash')
-					this.step = 'configure'
-					return true
-				}
-
-				if (body.command.state === 'failed' || body.command.state === 'rejected') {
-					this.failedStage = 'preflight'
-					this.failureMessage = body.jobs[0]?.last_error ?? 'Discovery failed.'
-					this.step = 'failed'
-					return true
-				}
-
-				return false
-			} catch (cause) {
-				if (cause instanceof UnauthenticatedError) return true
-				this.failedStage = 'preflight'
-				this.failureMessage = 'Could not reach the server.'
-				this.step = 'failed'
-				return true
-			}
-		},
-
-		async submitCreate() {
-			if (this.name.trim() === '') return
-			this.submitting = true
-			try {
-				const response = await apiFetch('/api/v1/commands', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						type: 'stash.create_from_preflight',
-						options: {
-							preflight_command_id: this.preflightCommandId,
-							name: this.name.trim(),
-							slug: this.slug.trim() || undefined,
-							description: this.description.trim() || undefined,
-							sync_mode: this.syncMode,
-							download_policy: this.downloadPolicy,
-							organization_mode: this.organizationMode,
-						},
-					}),
-				})
-				if (!response.ok) {
-					const body = (await response.json()) as { error?: { message?: string } }
-					this.error = body.error?.message ?? 'Could not create the stash.'
-					return
-				}
-				const body = (await response.json()) as { command_id: string }
-				this.createCommandId = body.command_id
-				this.error = null
-				this.step = 'creating'
-				awaitSseTerminal(() => this.checkCreateTerminal())
-			} catch (cause) {
-				if (cause instanceof UnauthenticatedError) return
-				this.error = 'Could not reach the server.'
-			} finally {
-				this.submitting = false
-			}
-		},
-
-		async checkCreateTerminal(): Promise<boolean> {
-			try {
-				const response = await apiFetch(`/api/v1/commands/${this.createCommandId}`)
-				const body = (await response.json()) as CommandShowResponse
-
-				if (body.command.state === 'completed') {
-					const stashId = body.command.result?.stash_id as string | undefined
-					if (stashId) window.location.assign(`/stashes/${stashId}`)
-					return true
-				}
-
-				if (body.command.state === 'failed' || body.command.state === 'rejected') {
-					this.failedStage = 'create'
-					this.failureMessage = body.jobs[0]?.last_error ?? 'Stash creation failed.'
-					this.step = 'failed'
-					return true
-				}
-
-				return false
-			} catch (cause) {
-				if (cause instanceof UnauthenticatedError) return true
-				this.failedStage = 'create'
-				this.failureMessage = 'Could not reach the server.'
-				this.step = 'failed'
-				return true
-			}
-		},
-
-		resetToPaste() {
-			this.step = 'paste'
-			this.sourceUri = ''
-			this.sourceTitle = ''
-			this.preflightCommandId = null
-			this.failedStage = null
-			this.failureMessage = null
-		},
-
-		backToConfigure() {
-			this.step = 'configure'
-			this.failedStage = null
-			this.failureMessage = null
 		},
 	}
 }
@@ -1319,7 +1093,6 @@ function settingsComponent() {
 Alpine.data('dashboard', dashboardComponent)
 Alpine.data('activity', activityComponent)
 Alpine.data('stashes', stashesComponent)
-Alpine.data('createStash', createStashComponent)
 Alpine.data('stashDetail', stashDetailComponent)
 Alpine.data('vault', vaultComponent)
 Alpine.data('vaultDetail', vaultDetailComponent)

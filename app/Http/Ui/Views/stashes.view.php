@@ -4,10 +4,10 @@
 			<h1 class="text-base font-semibold text-cream">Stashes</h1>
 			<div class="flex items-center gap-4">
 				<p class="text-[13px] text-error" x-show="error" x-text="error"></p>
-				<a href="/stashes/new"
+				<button type="button" x-on:click="startCreate()"
 					class="rounded bg-amber px-3 py-1.5 text-[13px] font-semibold text-espresso transition-colors hover:bg-amber-dim">
 					+ New stash
-				</a>
+				</button>
 			</div>
 		</div>
 
@@ -110,6 +110,32 @@
 					<button type="button" x-on:click="saveEdit()"
 						x-bind:disabled="savingEdit || editForm.name.trim() === ''"
 						class="rounded bg-amber px-3 py-2 text-[13px] font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-60">Save</button>
+				</div>
+			</div>
+		</div>
+
+		<div class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4" x-show="creatingStash" x-cloak>
+			<div class="w-full max-w-md rounded-lg border border-line bg-panel p-4">
+				<h2 class="text-sm font-semibold text-cream">New stash</h2>
+				<p class="mt-1 text-[13px] text-error" x-show="newStashError" x-text="newStashError"></p>
+
+				<label class="mt-3 block">
+					<span class="mb-1 block text-[12px] text-muted">Title (optional)</span>
+					<input type="text" x-model="newStashForm.title"
+						class="w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
+				</label>
+				<label class="mt-3 block">
+					<span class="mb-1 block text-[12px] text-muted">Link (optional)</span>
+					<input type="text" x-model="newStashForm.link" placeholder="https://www.youtube.com/@channel"
+						class="w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
+				</label>
+
+				<div class="mt-4 flex justify-end gap-2">
+					<button type="button" x-on:click="cancelCreate()"
+						class="rounded border border-line px-3 py-2 text-[13px] text-muted transition-colors hover:text-cream">Cancel</button>
+					<button type="button" x-on:click="submitCreateStash()"
+						x-bind:disabled="creatingBusy"
+						class="rounded bg-amber px-3 py-2 text-[13px] font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-60">Create</button>
 				</div>
 			</div>
 		</div>
