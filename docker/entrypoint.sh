@@ -1,7 +1,13 @@
 #!/bin/sh
 set -eu
 
-APP_DIR="/var/www/html"
+# /var/www/html is the image's own WORKDIR, baked at build time. Under lerd's
+# custom-container dev setup, the live host checkout is bind-mounted with
+# --workdir pointed at it instead, so the inherited cwd here is the real
+# source tree, not /var/www/html -- letting dev code changes take effect on a
+# plain container restart instead of a full image rebuild. In prod (no
+# --workdir override), this naturally resolves to /var/www/html, unchanged.
+APP_DIR="$(pwd)"
 DATA_DIR="${STASHD_DATA_PATH:-/data}"
 MEDIA_DIR="${STASHD_MEDIA_PATH:-/media}"
 PUID="${PUID:-1000}"
@@ -28,7 +34,16 @@ remap_app_user() {
 }
 
 run_app() {
-    if [ "$(id -u)" -eq 0 ]; then
+    # Dropping to the unprivileged stashd user only makes sense against the
+    # image's own baked copy: under rootless Podman, "root" inside the
+    # container is the user-namespace-mapped equivalent of the host user that
+    # started it (the same mapping lerd's own exec sessions rely on), but a
+    # non-root in-container uid maps to an unrelated host subuid -- which
+    # can't write to the live bind-mounted checkout even when it numerically
+    # matches the host owner's uid. Dev's live mount is already the
+    # developer's own machine/source, so there's nothing to additionally
+    # sandbox by dropping privileges there.
+    if [ "$APP_DIR" = "/var/www/html" ] && [ "$(id -u)" -eq 0 ]; then
         gosu stashd:"${PGID}" "$@"
     else
         "$@"
@@ -42,6 +57,33 @@ ensure_writable() {
             chown -R "${PUID}:${PGID}" "$dir" || true
         fi
     done
+
+    # SqliteConfigurator creates the database file's own parent directory,
+    # but only once BootstrapService runs -- and Database is resolved (and
+    # connects eagerly) earlier than that, while the container is still
+    # building BootstrapService's other constructor dependencies. A
+    # DB_DATABASE pointing at a not-yet-existing nested path under DATA_DIR
+    # (e.g. "database/database.sqlite") needs its directory to exist before
+    # that first connection attempt, so it's created here too. DB_DATABASE
+    # isn't a real shell env var -- it only lives in .env, read by PHP's
+    # Dotenv at application boot -- so an explicit OS env var (matching
+    # Dotenv's immutable/already-set precedence) is preferred if present,
+    # falling back to reading .env directly.
+    db_database="${DB_DATABASE:-}"
+    if [ -z "$db_database" ] && [ -f "$APP_DIR/.env" ]; then
+        db_database=$(grep -m1 '^DB_DATABASE=' "$APP_DIR/.env" | cut -d= -f2-)
+    fi
+    if [ -n "$db_database" ] && [ "$db_database" != ':memory:' ]; then
+        case "$db_database" in
+            /*) db_path="$db_database" ;;
+            *) db_path="${DATA_DIR}/${db_database}" ;;
+        esac
+        db_dir=$(dirname "$db_path")
+        mkdir -p "$db_dir"
+        if [ "$(id -u)" -eq 0 ]; then
+            chown -R "${PUID}:${PGID}" "$db_dir" || true
+        fi
+    fi
 }
 
 ensure_signing_key() {
@@ -50,30 +92,42 @@ ensure_signing_key() {
         return 0
     fi
 
-    # A symlink into the bind-mounted $DATA_DIR is deliberately avoided here:
-    # some container security profiles (confirmed via AppArmor's docker-default
-    # on this host) deny non-root traversal of a symlink that crosses from the
-    # image's own filesystem into a bind-mounted volume, even though root can
-    # follow it fine. Copying the file instead never crosses that boundary.
-    persisted_env="$DATA_DIR/.env"
+    # The $DATA_DIR roundtrip below only matters when $APP_DIR is the image's
+    # own ephemeral baked copy (prod, or a dev image that still bakes source):
+    # its .env resets to the repo's committed copy on every rebuild and would
+    # otherwise lose a freshly generated key. When $APP_DIR is the live
+    # bind-mounted dev checkout, .env is the developer's real, persistent
+    # file -- key:generate --no-override is enough, and copying another file
+    # over it here would clobber their local settings.
+    if [ "$APP_DIR" = "/var/www/html" ]; then
+        # A symlink into the bind-mounted $DATA_DIR is deliberately avoided here:
+        # some container security profiles (confirmed via AppArmor's docker-default
+        # on this host) deny non-root traversal of a symlink that crosses from the
+        # image's own filesystem into a bind-mounted volume, even though root can
+        # follow it fine. Copying the file instead never crosses that boundary.
+        persisted_env="$DATA_DIR/.env"
 
-    if [ -f "$persisted_env" ]; then
-        cp "$persisted_env" "$APP_DIR/.env" || true
-        if [ "$(id -u)" -eq 0 ]; then
-            chown "${PUID}:${PGID}" "$APP_DIR/.env" || true
+        if [ -f "$persisted_env" ]; then
+            cp "$persisted_env" "$APP_DIR/.env" || true
+            if [ "$(id -u)" -eq 0 ]; then
+                chown "${PUID}:${PGID}" "$APP_DIR/.env" || true
+            fi
         fi
-    fi
 
-    run_app php tempest key:generate --no-override
+        run_app php tempest key:generate --no-override
 
-    cp "$APP_DIR/.env" "$persisted_env"
-    if [ "$(id -u)" -eq 0 ]; then
-        chown "${PUID}:${PGID}" "$persisted_env" || true
+        cp "$APP_DIR/.env" "$persisted_env"
+        if [ "$(id -u)" -eq 0 ]; then
+            chown "${PUID}:${PGID}" "$persisted_env" || true
+        fi
+    else
+        run_app php tempest key:generate --no-override
     fi
 }
 
 prepare_runtime() {
     cd "$APP_DIR"
+    git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
     ensure_writable
     ensure_signing_key
     export STASHD_DATA_PATH="$DATA_DIR"
@@ -99,6 +153,10 @@ export_runtime_env() {
 case "$ROLE" in
     all)
         prepare_runtime
+        # $APP_DIR is only known at runtime (see the comment near its
+        # declaration above), so the per-program `directory=` lines are
+        # rendered into place here rather than baked into the image.
+        sed "s#__APP_DIR__#${APP_DIR}#g" /etc/supervisor/stashd.conf.template > /etc/supervisor/conf.d/stashd.conf
         log "starting supervisord"
         exec /usr/bin/supervisord -n -c /etc/supervisor/supervisord.conf
         ;;

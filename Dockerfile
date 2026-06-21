@@ -46,7 +46,7 @@ WORKDIR /var/www/html
 RUN groupadd -g "${PGID}" stashd \
     && useradd -u "${PUID}" -g stashd -d /var/www/html -s /usr/sbin/nologin stashd
 
-COPY docker/supervisord.conf /etc/supervisor/conf.d/stashd.conf
+COPY docker/supervisord.conf.template /etc/supervisor/stashd.conf.template
 COPY docker/entrypoint.sh /usr/local/bin/stashd-entrypoint
 RUN chmod +x /usr/local/bin/stashd-entrypoint
 
@@ -64,6 +64,15 @@ CMD ["all"]
 
 FROM base AS dev
 
+# This target intentionally does not COPY application source, install
+# composer/npm dependencies, or bake the rr binary: lerd's custom-container
+# dev setup bind-mounts the live host checkout over --workdir at runtime
+# instead (see docker/entrypoint.sh), so source edits take effect on a plain
+# container restart rather than a full image rebuild. That bind-mounted
+# checkout is expected to already have vendor/, public/build/, and ./rr in
+# place (via `composer install`, `npm run build`, and `vendor/bin/rr get` run
+# against the host checkout, e.g. through lerd's exec tooling) -- the same
+# prerequisites any non-Dockerized local PHP setup would need.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends $PHPIZE_DEPS \
     && pecl install xdebug pcov \
@@ -73,18 +82,6 @@ RUN apt-get update \
 COPY docker/php-dev.ini /usr/local/etc/php/conf.d/zz-stashd-dev.ini
 
 ENV XDEBUG_MODE=off
-
-COPY composer.json composer.lock ./
-RUN composer install --optimize-autoloader --no-interaction --no-scripts
-
-COPY . .
-COPY --from=assets /app/public/build ./public/build
-RUN git config --global --add safe.directory /var/www/html \
-    && composer dump-autoload --optimize \
-    && php vendor/bin/tempest discovery:generate --no-interaction \
-    && vendor/bin/rr get --no-config
-
-RUN chown -R stashd:stashd /var/www/html
 
 FROM base AS prod
 
