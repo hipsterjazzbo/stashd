@@ -36,7 +36,7 @@ final class ApiTokenRepository
             name: $name,
             tokenHash: $tokenHash,
             tokenPreview: $tokenPreview,
-            scopesJson: $scopes === null ? null : json_encode($scopes, JSON_THROW_ON_ERROR),
+            scopesJson: $scopes === null ? null : ApiTokenScopes::fromArray($scopes),
             expiresAt: $expiresAt,
             createdAt: $now,
         );

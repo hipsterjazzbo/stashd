@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Auth\ApiTokenRecord;
+use App\Auth\ApiTokenScopes;
 use App\Auth\AuthService;
+use Tempest\Database\Database;
+use Tempest\Database\Query;
 use Tempest\Framework\Testing\Http\TestResponseHelper;
 use Tempest\Http\Cookie\Cookie;
 use Tempest\Http\Status;
@@ -225,4 +229,44 @@ test('api tokens can be revoked', function (): void {
     $this->http->delete('/api/v1/auth/tokens/' . $created->body['id'], headers: $headers)->assertOk();
 
     $this->http->get('/api/v1/auth/me', headers: $headers)->assertStatus(Status::UNAUTHORIZED);
+});
+
+test('api token scopes are stored as a typed value object', function (): void {
+    $headers = $this->authHeaders();
+
+    $created = $this->http->post('/api/v1/auth/tokens', [
+        'name' => 'scoped-token',
+        'scopes' => ['media:read', ' media:read ', '', 'broadcast:write', 123],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    $record = ApiTokenRecord::select()
+        ->where('id = ?', $created->body['id'])
+        ->first();
+
+    expect($record)->not->toBeNull()
+        ->and($record->scopesJson)->toBeInstanceOf(ApiTokenScopes::class)
+        ->and($record->scopesJson?->toArray())->toBe(['media:read', 'broadcast:write']);
+
+    $row = $this->container->get(Database::class)->fetchFirst(new Query(
+        'SELECT scopesJson FROM api_tokens WHERE id = ?',
+        bindings: [$created->body['id']],
+    ));
+    $storedScopes = json_decode((string) $row['scopesJson'], true, flags: JSON_THROW_ON_ERROR);
+
+    expect($storedScopes)->toBe([
+        'type' => 'api_token_scopes',
+        'data' => [
+            'values' => ['media:read', 'broadcast:write'],
+        ],
+    ]);
+
+    $tokenList = $this->http->get('/api/v1/auth/tokens', headers: $headers);
+
+    $scopedToken = array_values(array_filter(
+        $tokenList->body['tokens'],
+        static fn (array $token): bool => $token['id'] === $created->body['id'],
+    ))[0] ?? null;
+
+    expect($scopedToken)->not->toBeNull()
+        ->and($scopedToken['scopes'])->toBe(['media:read', 'broadcast:write']);
 });

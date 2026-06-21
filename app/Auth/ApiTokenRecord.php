@@ -21,7 +21,7 @@ final class ApiTokenRecord
         public string $name,
         public string $tokenHash,
         public ?string $tokenPreview = null,
-        public ?string $scopesJson = null,
+        public ?ApiTokenScopes $scopesJson = null,
         public ?DateTime $lastUsedAt = null,
         public ?DateTime $expiresAt = null,
         public ?DateTime $createdAt = null,
