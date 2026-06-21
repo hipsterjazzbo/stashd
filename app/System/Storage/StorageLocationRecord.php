@@ -7,6 +7,7 @@ namespace App\System\Storage;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\DateTime\DateTime;
 
 #[Table(name: 'storage_locations')]
 final class StorageLocationRecord
@@ -28,10 +29,10 @@ final class StorageLocationRecord
         public ?string $filesystemId = null,
         public bool $supportsHardlinks = false,
         public bool $supportsSymlinks = false,
-        public ?string $lastCheckedAt = null,
+        public ?DateTime $lastCheckedAt = null,
         public ?string $lastError = null,
-        public ?string $createdAt = null,
-        public ?string $updatedAt = null,
+        public ?DateTime $createdAt = null,
+        public ?DateTime $updatedAt = null,
     ) {
     }
 }

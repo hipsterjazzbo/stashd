@@ -7,6 +7,7 @@ namespace App\Commands;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\DateTime\DateTime;
 
 #[Table(name: 'commands')]
 final class CommandRecord
@@ -23,8 +24,8 @@ final class CommandRecord
         public ?string $optionsJson = null,
         public ?string $resultJson = null,
         public ?string $createdByUserId = null,
-        public ?string $createdAt = null,
-        public ?string $updatedAt = null,
+        public ?DateTime $createdAt = null,
+        public ?DateTime $updatedAt = null,
     ) {
     }
 }

@@ -24,11 +24,12 @@ use App\Stashes\StashItemRecord;
 use App\Stashes\StashItemState;
 use App\Stashes\StashRecord;
 use App\Stashes\StashState;
-use App\Support\RecordTimestamps;
 use App\Vault\AssetRecord;
 use App\Vault\AssetState;
 use App\Vault\MediaItemRecord;
 use App\Vault\MediaItemState;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final readonly class StateTransitionService
 {
@@ -100,7 +101,7 @@ final readonly class StateTransitionService
 
     /**
      * @template TState of object
-     * @template TRecord of object{state: TState, updatedAt: ?string, save(): void}
+     * @template TRecord of object{state: TState, updatedAt: ?DateTime, save(): void}
      *
      * @param TRecord $record
      * @param TState $current
@@ -119,7 +120,7 @@ final readonly class StateTransitionService
         }
 
         $record->state = $next;
-        $record->updatedAt = RecordTimestamps::now();
+        $record->updatedAt = DateTime::now(Timezone::UTC);
         $record->save();
 
         return $record;

@@ -7,6 +7,7 @@ namespace App\System\Storage;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\DateTime\DateTime;
 
 #[Table(name: 'storage_checks')]
 final class StorageCheckRecord
@@ -21,8 +22,8 @@ final class StorageCheckRecord
         public StorageCheckState $state,
         public ?string $message = null,
         public ?string $detailsJson = null,
-        public ?string $createdAt = null,
-        public ?string $updatedAt = null,
+        public ?DateTime $createdAt = null,
+        public ?DateTime $updatedAt = null,
     ) {
     }
 }

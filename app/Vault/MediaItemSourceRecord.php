@@ -7,6 +7,7 @@ namespace App\Vault;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\DateTime\DateTime;
 
 #[Table(name: 'media_item_sources')]
 final class MediaItemSourceRecord
@@ -20,7 +21,7 @@ final class MediaItemSourceRecord
         public string $providerKey,
         public string $providerInputId,
         public string $discoveredUri,
-        public string $discoveredAt,
+        public DateTime $discoveredAt,
         public ?string $stashInputId = null,
         public ?int $position = null,
         public ?int $rawPosition = null,

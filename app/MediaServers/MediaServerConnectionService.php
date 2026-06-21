@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\MediaServers;
 
 use App\Support\PrefixedUlid;
-use App\Support\RecordTimestamps;
 use App\System\Secret\SecretRepository;
 use App\System\Secret\SecretsService;
 use App\System\Secret\SecretType;
 use App\System\State\StateTransitionService;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final readonly class MediaServerConnectionService
 {
@@ -86,7 +87,7 @@ final readonly class MediaServerConnectionService
         $token = $this->requireToken($record);
         $status = $this->clients->clientFor($record)->testConnection($record, $token);
 
-        $record->lastCheckedAt = RecordTimestamps::now();
+        $record->lastCheckedAt = DateTime::now(Timezone::UTC);
         $record->lastError = $status->ok ? null : $status->message;
 
         if ($status->ok) {

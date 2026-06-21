@@ -6,12 +6,14 @@ namespace App\Stashes;
 
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
-use App\Support\RecordTimestamps;
 use InvalidArgumentException;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
+
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final class StashInputRepository
 {
@@ -41,7 +43,9 @@ final class StashInputRepository
             syncMode: $syncMode,
         );
         $record->id = new PrimaryKey($id);
-        RecordTimestamps::apply($record);
+        $now = DateTime::now(Timezone::UTC);
+        $record->createdAt ??= $now;
+        $record->updatedAt ??= $now;
 
         query(StashInputRecord::class)->insert($record)->execute();
 
@@ -56,14 +60,14 @@ final class StashInputRepository
 
     public function save(StashInputRecord $record): StashInputRecord
     {
-        $record->updatedAt = RecordTimestamps::now();
+        $record->updatedAt = DateTime::now(Timezone::UTC);
         $record->save();
 
         return $record;
     }
 
     /** @return list<StashInputRecord> */
-    public function listDueForAutomaticSync(string $now): array
+    public function listDueForAutomaticSync(DateTime $now): array
     {
         return StashInputRecord::select()
             ->where(

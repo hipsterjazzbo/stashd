@@ -7,6 +7,7 @@ namespace App\Jobs;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\DateTime\DateTime;
 
 #[Table(name: 'jobs')]
 final class JobRecord
@@ -24,10 +25,10 @@ final class JobRecord
         public int $priority = 100,
         public int $attempts = 0,
         public int $maxAttempts = 3,
-        public ?string $scheduledAt = null,
-        public ?string $startedAt = null,
-        public ?string $finishedAt = null,
-        public ?string $heartbeatAt = null,
+        public ?DateTime $scheduledAt = null,
+        public ?DateTime $startedAt = null,
+        public ?DateTime $finishedAt = null,
+        public ?DateTime $heartbeatAt = null,
         public ?int $progressCurrent = null,
         public ?int $progressTotal = null,
         public ?float $progressPercent = null,
@@ -36,8 +37,8 @@ final class JobRecord
         public ?int $progressEtaSeconds = null,
         public ?string $lastError = null,
         public ?string $payloadJson = null,
-        public ?string $createdAt = null,
-        public ?string $updatedAt = null,
+        public ?DateTime $createdAt = null,
+        public ?DateTime $updatedAt = null,
     ) {
     }
 }

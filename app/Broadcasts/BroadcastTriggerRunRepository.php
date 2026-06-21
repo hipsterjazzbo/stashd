@@ -6,11 +6,13 @@ namespace App\Broadcasts;
 
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
-use App\Support\RecordTimestamps;
 use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
+
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final class BroadcastTriggerRunRepository
 {
@@ -29,10 +31,10 @@ final class BroadcastTriggerRunRepository
             triggerId: $triggerId->toString(),
             state: $state,
             reason: $reason,
-            startedAt: RecordTimestamps::now(),
+            startedAt: DateTime::now(Timezone::UTC),
         );
         $record->id = new PrimaryKey($id);
-        $record->createdAt = RecordTimestamps::now();
+        $record->createdAt = DateTime::now(Timezone::UTC);
 
         query(BroadcastTriggerRunRecord::class)->insert($record)->execute();
 

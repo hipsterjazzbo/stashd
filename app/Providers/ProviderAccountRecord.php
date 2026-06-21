@@ -7,6 +7,7 @@ namespace App\Providers;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\DateTime\DateTime;
 
 #[Table(name: 'provider_accounts')]
 final class ProviderAccountRecord
@@ -21,10 +22,10 @@ final class ProviderAccountRecord
         public ProviderAuthType $authType,
         public ProviderAccountState $state,
         public ?string $secretId = null,
-        public ?string $lastCheckedAt = null,
+        public ?DateTime $lastCheckedAt = null,
         public ?string $lastError = null,
-        public ?string $createdAt = null,
-        public ?string $updatedAt = null,
+        public ?DateTime $createdAt = null,
+        public ?DateTime $updatedAt = null,
     ) {
     }
 }

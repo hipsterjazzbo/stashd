@@ -11,10 +11,11 @@ use App\Jobs\JobIntent;
 use App\Jobs\JobRecord;
 use App\Jobs\JobState;
 use App\Jobs\JobWorkerService;
-use App\Support\RecordTimestamps;
 use App\System\Activity\ActivityEventRecord;
 use App\System\Event\EventNotificationRecord;
 use App\System\Event\EventPublisher;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 use Tempest\Http\Status;
 
 test('commands api dispatches stash preflight command', function (): void {
@@ -127,8 +128,8 @@ test('stale processing jobs are recovered or failed based on attempts', function
     $job->state = JobState::Processing;
     $job->attempts = 1;
     $job->maxAttempts = 3;
-    $job->heartbeatAt = gmdate('Y-m-d H:i:s', time() - 300);
-    $job->startedAt = RecordTimestamps::now();
+    $job->heartbeatAt = DateTime::now(Timezone::UTC)->minusSeconds(300);
+    $job->startedAt = DateTime::now(Timezone::UTC);
     $job->save();
 
     $worker = $this->container->get(JobWorkerService::class);
@@ -140,7 +141,7 @@ test('stale processing jobs are recovered or failed based on attempts', function
 
     $job->state = JobState::Processing;
     $job->attempts = 3;
-    $job->heartbeatAt = gmdate('Y-m-d H:i:s', time() - 300);
+    $job->heartbeatAt = DateTime::now(Timezone::UTC)->minusSeconds(300);
     $job->save();
 
     expect($worker->recoverStaleJobs())->toBe(1);

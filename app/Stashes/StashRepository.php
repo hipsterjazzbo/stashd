@@ -6,7 +6,6 @@ namespace App\Stashes;
 
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
-use App\Support\RecordTimestamps;
 use App\Vault\MediaItemRepository;
 use App\Vault\MediaItemSourceRepository;
 use InvalidArgumentException;
@@ -14,6 +13,9 @@ use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
+
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final class StashRepository
 {
@@ -47,7 +49,9 @@ final class StashRepository
             iconUri: $iconUri,
         );
         $record->id = new PrimaryKey($id);
-        RecordTimestamps::apply($record);
+        $now = DateTime::now(Timezone::UTC);
+        $record->createdAt ??= $now;
+        $record->updatedAt ??= $now;
 
         query(StashRecord::class)->insert($record)->execute();
 
@@ -132,7 +136,7 @@ final class StashRepository
             $stash->organizationMode = $organizationMode;
         }
 
-        $stash->updatedAt = RecordTimestamps::now();
+        $stash->updatedAt = DateTime::now(Timezone::UTC);
         $stash->save();
 
         return $stash;

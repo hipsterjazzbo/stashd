@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs\Handlers;
 
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandState;
@@ -14,7 +16,6 @@ use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
 use App\Support\PrefixedUlid;
-use App\Support\RecordTimestamps;
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
 use App\System\State\StateTransitionService;
@@ -66,7 +67,7 @@ final readonly class VerifyVaultJobHandler implements JobHandler
         $job->progressTotal = 1;
         $job->progressPercent = 100.0;
         $job->progressLabel = 'Vault verification complete';
-        $job->finishedAt = RecordTimestamps::now();
+        $job->finishedAt = DateTime::now(Timezone::UTC);
         $this->jobs->save($job);
         $context->progress($job, 1, 1, $job->progressLabel);
 

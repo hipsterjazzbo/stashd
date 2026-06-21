@@ -4,19 +4,26 @@ declare(strict_types=1);
 
 namespace App\Broadcasts\Podcasts;
 
+use DateTimeZone;
+use Tempest\DateTime\DateTime;
+
 final readonly class PodcastFeedBuilder
 {
     /** @param list<PodcastEpisode> $episodes */
     public function build(PodcastFeedMetadata $metadata, array $episodes): string
     {
         $items = $episodes;
-        usort($items, static fn (PodcastEpisode $a, PodcastEpisode $b): int => [
-            $a->publishedAt,
-            $a->guid,
-        ] <=> [
-            $b->publishedAt,
-            $b->guid,
-        ]);
+        usort($items, static function (PodcastEpisode $a, PodcastEpisode $b): int {
+            if ($a->publishedAt->isBefore($b->publishedAt)) {
+                return -1;
+            }
+
+            if ($a->publishedAt->isAfter($b->publishedAt)) {
+                return 1;
+            }
+
+            return $a->guid <=> $b->guid;
+        });
 
         $xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
         $xml .= "<rss version=\"2.0\" xmlns:itunes=\"http://www.itunes.com/dtds/podcast-1.0.dtd\">\n";
@@ -65,14 +72,11 @@ final readonly class PodcastFeedBuilder
         return htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
     }
 
-    private function pubDate(string $value): string
+    private function pubDate(DateTime $value): string
     {
-        $timestamp = strtotime($value);
-
-        if ($timestamp === false) {
-            $timestamp = 0;
-        }
-
-        return gmdate(DATE_RSS, $timestamp);
+        return $value
+            ->toNativeDateTime()
+            ->setTimezone(new DateTimeZone('UTC'))
+            ->format(DATE_RSS);
     }
 }

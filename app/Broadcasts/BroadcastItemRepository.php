@@ -6,11 +6,13 @@ namespace App\Broadcasts;
 
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
-use App\Support\RecordTimestamps;
 use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
+
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final class BroadcastItemRepository
 {
@@ -33,7 +35,9 @@ final class BroadcastItemRepository
             state: $state,
         );
         $record->id = new PrimaryKey($id);
-        RecordTimestamps::apply($record);
+        $now = DateTime::now(Timezone::UTC);
+        $record->createdAt ??= $now;
+        $record->updatedAt ??= $now;
 
         query(BroadcastItemRecord::class)->insert($record)->execute();
 
@@ -48,7 +52,7 @@ final class BroadcastItemRepository
 
     public function save(BroadcastItemRecord $record): BroadcastItemRecord
     {
-        $record->updatedAt = RecordTimestamps::now();
+        $record->updatedAt = DateTime::now(Timezone::UTC);
         $record->save();
 
         return $record;

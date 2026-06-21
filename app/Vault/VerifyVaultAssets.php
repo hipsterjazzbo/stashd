@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Vault;
 
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 use App\Support\PrefixedUlid;
-use App\Support\RecordTimestamps;
 use App\System\State\StateTransitionService;
 use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRepository;
@@ -92,7 +93,7 @@ final readonly class VerifyVaultAssets
             return $this->markChecksumMismatch($asset);
         }
 
-        $asset->lastVerifiedAt = RecordTimestamps::now();
+        $asset->lastVerifiedAt = DateTime::now(Timezone::UTC);
         $asset->missingAt = null;
         $asset->missingReason = null;
 
@@ -115,7 +116,7 @@ final readonly class VerifyVaultAssets
             $this->transitions->transitionAsset($asset, AssetState::Missing);
         }
 
-        $asset->missingAt = RecordTimestamps::now();
+        $asset->missingAt = DateTime::now(Timezone::UTC);
         $asset->missingReason = 'vault_file_missing';
         $this->assets->save($asset);
         $this->syncMediaItemAfterAssetMissing($asset);
@@ -129,7 +130,7 @@ final readonly class VerifyVaultAssets
             $this->transitions->transitionAsset($asset, AssetState::Stale);
         }
 
-        $asset->missingAt = RecordTimestamps::now();
+        $asset->missingAt = DateTime::now(Timezone::UTC);
         $asset->missingReason = 'checksum_mismatch';
         $this->assets->save($asset);
 

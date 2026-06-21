@@ -6,7 +6,6 @@ namespace App\Vault;
 
 use App\Downloads\DownloadRequest;
 use App\Downloads\DownloadResult;
-use App\Providers\ProviderDates;
 use Tempest\DateTime\DateTime;
 
 /**
@@ -108,14 +107,8 @@ final class VaultSidecarBuilder
             && ! str_contains($value, '://');
     }
 
-    private function normalizeTimestamp(?string $value): ?string
+    private function normalizeTimestamp(?DateTime $value): ?string
     {
-        if ($value === null || trim($value) === '') {
-            return null;
-        }
-
-        $parsed = ProviderDates::tryParse($value);
-
-        return $parsed?->toRfc3339(useZ: true);
+        return $value?->toRfc3339(useZ: true);
     }
 }

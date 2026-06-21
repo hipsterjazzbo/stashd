@@ -51,7 +51,7 @@ final readonly class EventsController
                             'id' => $lastId,
                             'event' => $notification->eventType,
                             'payload' => is_array($payload) ? $payload : [],
-                            'created_at' => $notification->createdAt,
+                            'created_at' => $notification->createdAt?->toRfc3339(useZ: true),
                         ]),
                         event: $notification->eventType,
                     );

@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 use App\MediaServers\MediaServerClientRegistry;
 use App\MediaServers\MediaServerConnectionRepository;
 use App\MediaServers\MediaServerConnectionSecrets;
 use App\MediaServers\MediaServerConnectionService;
 use App\Support\PrefixedUlid;
-use App\Support\RecordTimestamps;
 use App\System\Secret\SecretsService;
 use App\System\State\StateTransitionService;
 
@@ -153,13 +154,13 @@ final readonly class BroadcastTriggerService
                 $broadcastRoot,
             );
 
-            $run->finishedAt = RecordTimestamps::now();
+            $run->finishedAt = DateTime::now(Timezone::UTC);
             $run->responseSummary = $this->secrets->redact($result->message);
 
             if ($result->ok) {
                 $this->transitionRun($run, BroadcastTriggerRunState::Ready);
-                $trigger->lastTriggeredAt = RecordTimestamps::now();
-                $trigger->lastSuccessAt = RecordTimestamps::now();
+                $trigger->lastTriggeredAt = DateTime::now(Timezone::UTC);
+                $trigger->lastSuccessAt = DateTime::now(Timezone::UTC);
                 $trigger->lastError = null;
 
                 if ($trigger->state !== BroadcastTriggerState::Ready) {
@@ -187,7 +188,7 @@ final readonly class BroadcastTriggerService
                 'error' => $run->error,
             ]]);
         } catch (\Throwable $throwable) {
-            $run->finishedAt = RecordTimestamps::now();
+            $run->finishedAt = DateTime::now(Timezone::UTC);
             $run->error = $this->secrets->redact($throwable->getMessage());
             $this->transitionRun($run, BroadcastTriggerRunState::Failed);
             $this->markTriggerFailed($trigger, $run->error);
@@ -236,8 +237,8 @@ final readonly class BroadcastTriggerService
 
     private function markTriggerFailed(\App\Broadcasts\BroadcastTriggerRecord $trigger, string $error): void
     {
-        $trigger->lastTriggeredAt = RecordTimestamps::now();
-        $trigger->lastFailureAt = RecordTimestamps::now();
+        $trigger->lastTriggeredAt = DateTime::now(Timezone::UTC);
+        $trigger->lastFailureAt = DateTime::now(Timezone::UTC);
         $trigger->lastError = $this->secrets->redact($error);
 
         if ($trigger->state !== BroadcastTriggerState::Failed) {

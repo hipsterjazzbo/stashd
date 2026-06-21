@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Api;
 
+use Tempest\DateTime\DateTimeInterface;
+
 final class ApiJson
 {
     /** @param array<string, mixed> $body */
@@ -54,7 +56,7 @@ final class ApiJson
             if (is_array($value)) {
                 $encoded[$encodedKey] = array_is_list($value)
                     ? array_map(
-                        static fn (mixed $item): mixed => is_array($item) ? self::camelToSnake($item) : $item,
+                        static fn (mixed $item): mixed => is_array($item) ? self::camelToSnake($item) : self::encodeValue($item),
                         $value,
                     )
                     : self::camelToSnake($value);
@@ -62,10 +64,19 @@ final class ApiJson
                 continue;
             }
 
-            $encoded[$encodedKey] = $value;
+            $encoded[$encodedKey] = self::encodeValue($value);
         }
 
         return $encoded;
+    }
+
+    private static function encodeValue(mixed $value): mixed
+    {
+        if ($value instanceof DateTimeInterface) {
+            return $value->toRfc3339(useZ: true);
+        }
+
+        return $value;
     }
 
     private static function snakeToCamelKey(string $key): string

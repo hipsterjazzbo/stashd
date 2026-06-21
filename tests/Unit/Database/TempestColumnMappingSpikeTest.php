@@ -10,6 +10,10 @@ use Tempest\Database\Query;
 
 use function Tempest\Database\query;
 
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\FormatPattern;
+use Tempest\DateTime\Timezone;
+use Tests\Fixtures\Mapping\TempestMappingCamelCaseDateTimeRecord;
 use Tests\Fixtures\Mapping\TempestMappingCamelCaseRecord;
 use Tests\Fixtures\Mapping\TempestMappingSnakeCaseRecord;
 use Tests\Fixtures\Mapping\TempestMappingTestRecord;
@@ -223,6 +227,47 @@ final class TempestColumnMappingSpikeTest extends IntegrationTestCase
             ->first();
 
         expect($reloaded?->progressPercent)->toBe(91.0);
+    }
+
+    public function test_tempest_datetime_properties_round_trip_against_camel_case_columns(): void
+    {
+        $record = new TempestMappingCamelCaseDateTimeRecord(
+            createdAt: DateTime::parse('2026-06-16T12:00:00+00:00', Timezone::UTC),
+            supportsHardlinks: true,
+            progressPercent: 42.5,
+            lastCheckedAt: DateTime::parse('2026-06-16T12:05:00+00:00', Timezone::UTC),
+        );
+        $record->id = new PrimaryKey('map_datetime_1');
+
+        query(TempestMappingCamelCaseDateTimeRecord::class)->insert($record)->execute();
+
+        $row = $this->db->fetchFirst(new Query(
+            'SELECT createdAt, lastCheckedAt FROM tempest_mapping_camel WHERE id = ?',
+            bindings: ['map_datetime_1'],
+        ));
+
+        expect($row)->toBeArray()
+            ->and($row['createdAt'])->toBe('2026-06-16 12:00:00')
+            ->and($row['lastCheckedAt'])->toBe('2026-06-16 12:05:00');
+
+        $loaded = TempestMappingCamelCaseDateTimeRecord::select()
+            ->where('id = ?', 'map_datetime_1')
+            ->first();
+
+        expect($loaded)->not->toBeNull()
+            ->and($loaded->createdAt)->toBeInstanceOf(DateTime::class)
+            ->and($loaded->createdAt->format(FormatPattern::SQL_DATE_TIME, Timezone::UTC))->toBe('2026-06-16 12:00:00')
+            ->and($loaded->lastCheckedAt)->toBeInstanceOf(DateTime::class)
+            ->and($loaded->lastCheckedAt?->format(FormatPattern::SQL_DATE_TIME, Timezone::UTC))->toBe('2026-06-16 12:05:00');
+
+        $loaded->lastCheckedAt = DateTime::parse('2026-06-16T12:15:00+00:00', Timezone::UTC);
+        $loaded->save();
+
+        $reloaded = TempestMappingCamelCaseDateTimeRecord::select()
+            ->where('id = ?', 'map_datetime_1')
+            ->first();
+
+        expect($reloaded?->lastCheckedAt?->format(FormatPattern::SQL_DATE_TIME, Timezone::UTC))->toBe('2026-06-16 12:15:00');
     }
 
     private function createFixtureTables(): void

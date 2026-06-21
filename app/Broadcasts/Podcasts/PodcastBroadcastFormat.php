@@ -21,9 +21,10 @@ use App\Broadcasts\Formats\BroadcastFormat;
 use App\Stashes\StashItemRecord;
 use App\Stashes\StashItemState;
 use App\Support\PrefixedUlid;
-use App\Support\RecordTimestamps;
 use App\System\State\StateTransitionService;
 use App\Vault\MediaItemRecord;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 abstract readonly class PodcastBroadcastFormat implements BroadcastFormat
 {
@@ -156,7 +157,7 @@ abstract readonly class PodcastBroadcastFormat implements BroadcastFormat
                 continue;
             }
 
-            $item->lastVerifiedAt = RecordTimestamps::now();
+            $item->lastVerifiedAt = DateTime::now(Timezone::UTC);
             $item->lastError = null;
 
             if ($item->state !== BroadcastItemState::Ready) {
@@ -224,7 +225,7 @@ abstract readonly class PodcastBroadcastFormat implements BroadcastFormat
 
         $item->publishedPath = null;
         $item->publishedUri = null;
-        $item->lastPublishedAt = RecordTimestamps::now();
+        $item->lastPublishedAt = DateTime::now(Timezone::UTC);
         $item->lastError = null;
         $this->broadcastItems->save($item);
         $this->transitions->transitionBroadcastItem($item, BroadcastItemState::Ready);
@@ -267,7 +268,7 @@ abstract readonly class PodcastBroadcastFormat implements BroadcastFormat
             guid: $this->guids->forItem($item),
             title: $this->episodeTitle($stashItem, $mediaItem),
             description: $this->episodeDescription($stashItem, $mediaItem),
-            publishedAt: $mediaItem->publishedAt ?? $stashItem->firstSeenAt ?? $context->broadcast->createdAt ?? RecordTimestamps::now(),
+            publishedAt: $mediaItem->publishedAt ?? $stashItem->firstSeenAt ?? $context->broadcast->createdAt ?? DateTime::now(Timezone::UTC),
             enclosureUrl: $this->urls->episodeUrl($broadcastToken, $itemToken, $selection->extension),
             enclosureLength: $selection->length,
             enclosureMimeType: $selection->mimeType,

@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\System\Secret;
 
 use App\Support\PrefixedUlidGenerator;
-use App\Support\RecordTimestamps;
 use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
+
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final class SecretRepository
 {
@@ -46,7 +48,9 @@ final class SecretRepository
             metadataJson: $metadata === null ? null : json_encode($metadata, JSON_THROW_ON_ERROR),
         );
         $record->id = new PrimaryKey($id);
-        RecordTimestamps::apply($record);
+        $now = DateTime::now(Timezone::UTC);
+        $record->createdAt ??= $now;
+        $record->updatedAt ??= $now;
 
         query(SecretRecord::class)->insert($record)->execute();
 
@@ -56,7 +60,7 @@ final class SecretRepository
 
     public function save(SecretRecord $record): SecretRecord
     {
-        $record->updatedAt = RecordTimestamps::now();
+        $record->updatedAt = DateTime::now(Timezone::UTC);
         $record->save();
 
         return $record;

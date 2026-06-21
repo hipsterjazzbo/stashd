@@ -7,8 +7,9 @@ namespace App\Broadcasts;
 use App\Broadcasts\Podcasts\PodcastTokenRotationResult;
 use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Support\PrefixedUlid;
-use App\Support\RecordTimestamps;
 use App\System\State\StateTransitionService;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final readonly class BroadcastLifecycleResult
 {
@@ -53,7 +54,7 @@ final readonly class BroadcastLifecycleService
         $broadcast = $this->broadcasts->find($broadcastId);
 
         if ($broadcast !== null) {
-            $broadcast->lastPlannedAt = RecordTimestamps::now();
+            $broadcast->lastPlannedAt = DateTime::now(Timezone::UTC);
             $this->broadcasts->save($broadcast);
         }
 
@@ -68,16 +69,16 @@ final readonly class BroadcastLifecycleService
         $this->transitionToProcessing($broadcast);
 
         $plan = $this->planOnly($broadcastId);
-        $broadcast->lastPlannedAt = RecordTimestamps::now();
+        $broadcast->lastPlannedAt = DateTime::now(Timezone::UTC);
         $this->broadcasts->save($broadcast);
 
         $publish = $this->publishOnly($broadcastId, $plan);
-        $broadcast->lastBuiltAt = RecordTimestamps::now();
+        $broadcast->lastBuiltAt = DateTime::now(Timezone::UTC);
         $broadcast->lastError = null;
         $this->broadcasts->save($broadcast);
 
         $verify = $this->verifyOnly($broadcastId);
-        $broadcast->lastVerifiedAt = RecordTimestamps::now();
+        $broadcast->lastVerifiedAt = DateTime::now(Timezone::UTC);
         $this->applyVerifyState($broadcast, $verify);
         $this->broadcasts->save($broadcast);
 
@@ -101,7 +102,7 @@ final readonly class BroadcastLifecycleService
         $broadcast = $this->broadcasts->find($broadcastId);
 
         if ($broadcast !== null) {
-            $broadcast->lastVerifiedAt = RecordTimestamps::now();
+            $broadcast->lastVerifiedAt = DateTime::now(Timezone::UTC);
             $this->applyVerifyState($broadcast, $verify);
             $this->broadcasts->save($broadcast);
         }

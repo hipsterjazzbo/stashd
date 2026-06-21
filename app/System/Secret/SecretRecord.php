@@ -7,6 +7,7 @@ namespace App\System\Secret;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\DateTime\DateTime;
 
 #[Table(name: 'secrets')]
 final class SecretRecord
@@ -21,10 +22,10 @@ final class SecretRecord
         public string $encryptedValue,
         public string $nonce,
         public ?string $metadataJson = null,
-        public ?string $lastUsedAt = null,
-        public ?string $revokedAt = null,
-        public ?string $createdAt = null,
-        public ?string $updatedAt = null,
+        public ?DateTime $lastUsedAt = null,
+        public ?DateTime $revokedAt = null,
+        public ?DateTime $createdAt = null,
+        public ?DateTime $updatedAt = null,
     ) {
     }
 }

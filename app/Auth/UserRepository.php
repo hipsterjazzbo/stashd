@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Auth;
 
 use App\Support\PrefixedUlidGenerator;
-use App\Support\RecordTimestamps;
 use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
+
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final class UserRepository
 {
@@ -47,7 +49,9 @@ final class UserRepository
             role: UserRole::Owner,
         );
         $record->id = new PrimaryKey($id);
-        RecordTimestamps::apply($record);
+        $now = DateTime::now(Timezone::UTC);
+        $record->createdAt ??= $now;
+        $record->updatedAt ??= $now;
 
         query(UserRecord::class)->insert($record)->execute();
 

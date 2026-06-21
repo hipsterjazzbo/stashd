@@ -6,11 +6,13 @@ namespace App\MediaServers;
 
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
-use App\Support\RecordTimestamps;
 use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
+
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final class MediaServerConnectionRepository
 {
@@ -37,7 +39,9 @@ final class MediaServerConnectionRepository
             settingsJson: $settings === null ? null : json_encode($settings, JSON_THROW_ON_ERROR),
         );
         $record->id = new PrimaryKey($id);
-        RecordTimestamps::apply($record);
+        $now = DateTime::now(Timezone::UTC);
+        $record->createdAt ??= $now;
+        $record->updatedAt ??= $now;
 
         query(MediaServerConnectionRecord::class)->insert($record)->execute();
 
@@ -52,7 +56,7 @@ final class MediaServerConnectionRepository
 
     public function save(MediaServerConnectionRecord $record): MediaServerConnectionRecord
     {
-        $record->updatedAt = RecordTimestamps::now();
+        $record->updatedAt = DateTime::now(Timezone::UTC);
         $record->save();
 
         return $record;

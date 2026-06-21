@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs\Handlers;
 
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 use App\Broadcasts\BroadcastException;
 use App\Broadcasts\BroadcastLifecycleService;
 use App\Broadcasts\BroadcastRepository;
@@ -18,7 +20,6 @@ use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
 use App\Support\PrefixedUlid;
-use App\Support\RecordTimestamps;
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
 use App\System\State\StateTransitionService;
@@ -80,7 +81,7 @@ final readonly class BroadcastJobHandler implements JobHandler
             $job->progressCurrent = $job->progressTotal;
             $job->progressPercent = 100.0;
             $job->progressLabel = 'Broadcast ' . $action . ' complete';
-            $job->finishedAt = RecordTimestamps::now();
+            $job->finishedAt = DateTime::now(Timezone::UTC);
             $this->jobs->save($job);
             $context->progress($job, $job->progressTotal, $job->progressTotal, $job->progressLabel);
 

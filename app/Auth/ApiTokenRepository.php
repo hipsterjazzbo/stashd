@@ -6,11 +6,13 @@ namespace App\Auth;
 
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
-use App\Support\RecordTimestamps;
 use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
+
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final class ApiTokenRepository
 {
@@ -25,10 +27,10 @@ final class ApiTokenRepository
         string $tokenHash,
         string $tokenPreview,
         ?array $scopes = null,
-        ?string $expiresAt = null,
+        ?DateTime $expiresAt = null,
     ): ApiTokenRecord {
         $id = $this->ids->generate('token')->toString();
-        $now = RecordTimestamps::now();
+        $now = DateTime::now(Timezone::UTC);
         $record = new ApiTokenRecord(
             userId: $userId->toString(),
             name: $name,
@@ -70,7 +72,7 @@ final class ApiTokenRepository
             return;
         }
 
-        $record->revokedAt = RecordTimestamps::now();
+        $record->revokedAt = DateTime::now(Timezone::UTC);
         $record->save();
     }
 }

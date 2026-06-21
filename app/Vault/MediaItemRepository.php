@@ -7,7 +7,6 @@ namespace App\Vault;
 use App\Providers\StashdUri;
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
-use App\Support\RecordTimestamps;
 use InvalidArgumentException;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
@@ -15,6 +14,7 @@ use Tempest\Database\PrimaryKey;
 use function Tempest\Database\query;
 
 use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final class MediaItemRepository
 {
@@ -44,11 +44,13 @@ final class MediaItemRepository
             upstreamState: UpstreamState::Available,
             description: $description,
             durationSeconds: $durationSeconds,
-            publishedAt: $publishedAt?->toRfc3339(useZ: true),
+            publishedAt: $publishedAt,
             thumbnailUri: $thumbnailUri instanceof StashdUri ? $thumbnailUri->toString() : $thumbnailUri,
         );
         $record->id = new PrimaryKey($id);
-        RecordTimestamps::apply($record);
+        $now = DateTime::now(Timezone::UTC);
+        $record->createdAt ??= $now;
+        $record->updatedAt ??= $now;
 
         query(MediaItemRecord::class)->insert($record)->execute();
 
@@ -70,7 +72,7 @@ final class MediaItemRepository
 
     public function save(MediaItemRecord $record): MediaItemRecord
     {
-        $record->updatedAt = RecordTimestamps::now();
+        $record->updatedAt = DateTime::now(Timezone::UTC);
         $record->save();
 
         return $record;

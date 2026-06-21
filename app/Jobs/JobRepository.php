@@ -6,13 +6,15 @@ namespace App\Jobs;
 
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
-use App\Support\RecordTimestamps;
 use App\System\State\StateTransitionService;
 use InvalidArgumentException;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
+
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final class JobRepository
 {
@@ -40,7 +42,9 @@ final class JobRepository
             payloadJson: $payload === null ? null : json_encode($payload, JSON_THROW_ON_ERROR),
         );
         $record->id = new PrimaryKey($id);
-        RecordTimestamps::apply($record);
+        $now = DateTime::now(Timezone::UTC);
+        $record->createdAt ??= $now;
+        $record->updatedAt ??= $now;
 
         query(JobRecord::class)->insert($record)->execute();
 
@@ -55,7 +59,7 @@ final class JobRepository
 
     public function save(JobRecord $record): JobRecord
     {
-        $record->updatedAt = RecordTimestamps::now();
+        $record->updatedAt = DateTime::now(Timezone::UTC);
         $record->save();
 
         return $record;
@@ -74,8 +78,8 @@ final class JobRepository
         }
 
         $record->attempts++;
-        $record->startedAt = RecordTimestamps::now();
-        $record->heartbeatAt = RecordTimestamps::now();
+        $record->startedAt = DateTime::now(Timezone::UTC);
+        $record->heartbeatAt = DateTime::now(Timezone::UTC);
         $record->lastError = null;
         $this->save($record);
 
@@ -83,7 +87,7 @@ final class JobRepository
     }
 
     /** @return list<JobRecord> */
-    public function listProcessingStale(string $staleBefore): array
+    public function listProcessingStale(DateTime $staleBefore): array
     {
         return JobRecord::select()
             ->where('state = ? AND heartbeatAt IS NOT NULL AND heartbeatAt < ?', JobState::Processing, $staleBefore)

@@ -7,6 +7,7 @@ namespace App\Auth;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\DateTime\DateTime;
 
 #[Table(name: 'api_tokens')]
 final class ApiTokenRecord
@@ -21,10 +22,10 @@ final class ApiTokenRecord
         public string $tokenHash,
         public ?string $tokenPreview = null,
         public ?string $scopesJson = null,
-        public ?string $lastUsedAt = null,
-        public ?string $expiresAt = null,
-        public ?string $createdAt = null,
-        public ?string $revokedAt = null,
+        public ?DateTime $lastUsedAt = null,
+        public ?DateTime $expiresAt = null,
+        public ?DateTime $createdAt = null,
+        public ?DateTime $revokedAt = null,
     ) {
     }
 }

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\System\Storage;
 
 use App\Config\StashdConfig;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final readonly class StorageCapabilityChecker
 {
@@ -130,7 +132,7 @@ final readonly class StorageCapabilityChecker
             $record->lastError = $result->message;
         }
 
-        $record->lastCheckedAt = gmdate('Y-m-d H:i:s');
+        $record->lastCheckedAt = DateTime::now(Timezone::UTC);
         $record->save();
     }
 

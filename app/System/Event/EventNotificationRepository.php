@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\System\Event;
 
 use App\Support\PrefixedUlidGenerator;
-use App\Support\RecordTimestamps;
 use InvalidArgumentException;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
+
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final class EventNotificationRepository
 {
@@ -28,7 +30,7 @@ final class EventNotificationRepository
             payloadJson: json_encode($payload, JSON_THROW_ON_ERROR),
         );
         $record->id = new PrimaryKey($id);
-        $record->createdAt = RecordTimestamps::now();
+        $record->createdAt = DateTime::now(Timezone::UTC);
 
         query(EventNotificationRecord::class)->insert($record)->execute();
 

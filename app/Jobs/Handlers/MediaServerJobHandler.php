@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs\Handlers;
 
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandState;
@@ -16,7 +18,6 @@ use App\Jobs\JobState;
 use App\MediaServers\MediaServerConnectionService;
 use App\MediaServers\MediaServerException;
 use App\Support\PrefixedUlid;
-use App\Support\RecordTimestamps;
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
 use App\System\State\StateTransitionService;
@@ -66,7 +67,7 @@ final readonly class MediaServerJobHandler implements JobHandler
         $job->progressCurrent = 2;
         $job->progressPercent = 100.0;
         $job->progressLabel = 'Media server ' . $action . ' complete';
-        $job->finishedAt = RecordTimestamps::now();
+        $job->finishedAt = DateTime::now(Timezone::UTC);
         $this->jobs->save($job);
         $context->progress($job, 2, 2, $job->progressLabel);
 

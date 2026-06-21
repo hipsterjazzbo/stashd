@@ -6,11 +6,13 @@ namespace App\Vault;
 
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
-use App\Support\RecordTimestamps;
 use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
+
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 final class MediaItemSourceRepository
 {
@@ -33,7 +35,7 @@ final class MediaItemSourceRepository
             providerKey: $providerKey,
             providerInputId: $providerInputId,
             discoveredUri: $discoveredUri,
-            discoveredAt: RecordTimestamps::now(),
+            discoveredAt: DateTime::now(Timezone::UTC),
             stashInputId: $stashInputId?->toString(),
             position: $position,
         );

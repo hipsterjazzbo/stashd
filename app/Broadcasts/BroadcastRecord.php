@@ -7,6 +7,7 @@ namespace App\Broadcasts;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
+use Tempest\DateTime\DateTime;
 
 #[Table(name: 'broadcasts')]
 final class BroadcastRecord
@@ -24,12 +25,12 @@ final class BroadcastRecord
         public ?string $tokenSecretId = null,
         public ?string $tokenPreview = null,
         public ?string $settingsJson = null,
-        public ?string $lastPlannedAt = null,
-        public ?string $lastBuiltAt = null,
-        public ?string $lastVerifiedAt = null,
+        public ?DateTime $lastPlannedAt = null,
+        public ?DateTime $lastBuiltAt = null,
+        public ?DateTime $lastVerifiedAt = null,
         public ?string $lastError = null,
-        public ?string $createdAt = null,
-        public ?string $updatedAt = null,
+        public ?DateTime $createdAt = null,
+        public ?DateTime $updatedAt = null,
     ) {
     }
 }
