@@ -1,0 +1,1677 @@
+openapi: 3.0.3
+info:
+  title: Stashd API
+  version: "1.0"
+  description: >
+    Stashd's self-hosted media preservation API. Almost everything lives
+    under /api/v1 and requires authentication, either a session cookie
+    (browser UI) or a bearer API token (scripts/automation). The handful
+    of unauthenticated routes are called out explicitly below.
+
+    All request and response bodies are snake_case JSON. Errors share one
+    envelope shape (see the Error schema) and never include secret
+    material in `details`.
+servers:
+  - url: /
+tags:
+  - name: Auth
+  - name: System
+  - name: Stashes
+  - name: StashInputs
+  - name: StashItems
+  - name: Items
+  - name: Broadcasts
+  - name: Commands
+  - name: Jobs
+  - name: Activity
+  - name: Events
+  - name: MediaServers
+  - name: Providers
+  - name: Feeds
+security:
+  - bearerAuth: []
+  - sessionCookie: []
+
+paths:
+  /health:
+    get:
+      operationId: publicHealth
+      tags: [System]
+      summary: Public liveness check
+      security: []
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  version: { type: string }
+        "503":
+          description: Service is degraded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: degraded }
+                  version: { type: string }
+
+  /api/v1/system/health:
+    get:
+      operationId: detailedHealth
+      tags: [System]
+      summary: Detailed health (database, storage, per-location disk usage)
+      responses:
+        "200":
+          description: Health report
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthReport" }
+        "503":
+          description: Degraded health report (same shape as 200)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthReport" }
+
+  /api/v1/activity:
+    get:
+      operationId: listActivity
+      tags: [Activity]
+      summary: Recent activity log entries (durable; newest first)
+      responses:
+        "200":
+          description: Recent activity events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items: { $ref: "#/components/schemas/ActivityEvent" }
+
+  /api/v1/events:
+    get:
+      operationId: streamEvents
+      tags: [Events]
+      summary: Server-Sent Events stream of ephemeral notifications
+      description: >
+        text/event-stream. Polls for new notifications and pushes them as
+        they occur; the connection ends after a bounded number of
+        iterations (clients should reconnect, which EventSource does by
+        default). Capped concurrently per server — once full, a new
+        connection receives a single retry-directive event and no data.
+      responses:
+        "200":
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+
+  /api/v1/auth/setup:
+    post:
+      operationId: setupOwner
+      tags: [Auth]
+      summary: Create the (single) owner account. Only works before setup has run.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, username, password]
+              properties:
+                email: { type: string, format: email }
+                username: { type: string }
+                password: { type: string, format: password }
+      responses:
+        "201":
+          description: Owner created and session cookie issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: "#/components/schemas/User" }
+                  setup_required: { type: boolean, example: false }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "409":
+          description: Owner account already exists
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/auth/login:
+    post:
+      operationId: login
+      tags: [Auth]
+      summary: Log in and receive a session cookie
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          description: Setup required (no owner account exists yet)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/auth/logout:
+    post:
+      operationId: logout
+      tags: [Auth]
+      summary: Revoke the current web session and clear the cookie
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
+
+  /api/v1/auth/me:
+    get:
+      operationId: me
+      tags: [Auth]
+      summary: Current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/auth/tokens:
+    get:
+      operationId: listApiTokens
+      tags: [Auth]
+      summary: List this user's API tokens (web-session tokens excluded)
+      responses:
+        "200":
+          description: Tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tokens:
+                    type: array
+                    items: { $ref: "#/components/schemas/ApiTokenSummary" }
+    post:
+      operationId: createApiToken
+      tags: [Auth]
+      summary: Create an API token. The plaintext token is only ever returned here.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                scopes:
+                  type: array
+                  items: { type: string }
+                  nullable: true
+                expires_at: { type: string, format: date-time, nullable: true }
+      responses:
+        "201":
+          description: Token created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiTokenCreated" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+
+  /api/v1/auth/tokens/{tokenId}:
+    delete:
+      operationId: revokeApiToken
+      tags: [Auth]
+      summary: Revoke an API token
+      parameters:
+        - $ref: "#/components/parameters/TokenId"
+      responses:
+        "200":
+          description: Revoked
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
+
+  /api/v1/stashes:
+    get:
+      operationId: listStashes
+      tags: [Stashes]
+      summary: List stashes
+      responses:
+        "200":
+          description: Stashes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stashes:
+                    type: array
+                    items: { $ref: "#/components/schemas/Stash" }
+    post:
+      operationId: createStash
+      tags: [Stashes]
+      summary: Create an empty stash (no provider source yet; add one via POST .../inputs)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, default: New Stash }
+                description: { type: string, nullable: true }
+                sync_mode: { $ref: "#/components/schemas/SyncMode" }
+                download_policy: { $ref: "#/components/schemas/DownloadPolicy" }
+                organization_mode: { $ref: "#/components/schemas/OrganizationMode" }
+      responses:
+        "201":
+          description: Stash created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stash: { $ref: "#/components/schemas/Stash" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+
+  /api/v1/stashes/{id}:
+    parameters:
+      - $ref: "#/components/parameters/StashId"
+    get:
+      operationId: showStash
+      tags: [Stashes]
+      summary: Stash detail
+      responses:
+        "200":
+          description: Stash
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stash: { $ref: "#/components/schemas/Stash" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateStash
+      tags: [Stashes]
+      summary: Update stash fields (all optional; only provided fields change)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string, nullable: true }
+                sync_mode: { $ref: "#/components/schemas/SyncMode" }
+                download_policy: { $ref: "#/components/schemas/DownloadPolicy" }
+                organization_mode: { $ref: "#/components/schemas/OrganizationMode" }
+      responses:
+        "200":
+          description: Updated stash
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stash: { $ref: "#/components/schemas/Stash" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteStash
+      tags: [Stashes]
+      summary: Delete a stash. Does not delete media items shared with other stashes.
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { type: object, properties: { deleted: { type: boolean } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/stashes/{id}/delete-impact:
+    get:
+      operationId: stashDeleteImpact
+      tags: [Stashes]
+      summary: Preview what deleting this stash would affect, before deleting it
+      parameters:
+        - $ref: "#/components/parameters/StashId"
+      responses:
+        "200":
+          description: Delete impact
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  delete_impact: { $ref: "#/components/schemas/DeleteImpact" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/stashes/{id}/items:
+    get:
+      operationId: listStashItems
+      tags: [StashItems]
+      summary: List a stash's items, with embedded media-item summary and on-disk size
+      parameters:
+        - $ref: "#/components/parameters/StashId"
+      responses:
+        "200":
+          description: Stash items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/StashItem" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/stashes/{id}/inputs:
+    get:
+      operationId: listStashInputs
+      tags: [StashInputs]
+      summary: List a stash's inputs (provider sources, e.g. a YouTube channel)
+      parameters:
+        - $ref: "#/components/parameters/StashId"
+      responses:
+        "200":
+          description: Stash inputs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  inputs:
+                    type: array
+                    items: { $ref: "#/components/schemas/StashInput" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: addStashInput
+      tags: [StashInputs]
+      summary: >
+        Commit a previously-run preflight (POST /stashes/preflight) onto
+        this stash, discovering and downloading-eligible items. This is
+        the create flow's second step -- preflight resolves and previews
+        a source without committing anything; this endpoint commits it.
+      parameters:
+        - $ref: "#/components/parameters/StashId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [preflight_command_id]
+              properties:
+                preflight_command_id:
+                  type: string
+                  description: command_id returned by POST /stashes/preflight
+                options:
+                  type: object
+                  description: >
+                    Universal filters (title_regex_include, title_regex_exclude)
+                    plus any provider-declared options from the preflight
+                    review's input_options (e.g. YouTube's include_shorts,
+                    include_live). Keys are opaque -- echo back exactly what
+                    the review step declared.
+                  additionalProperties: true
+      responses:
+        "201":
+          description: Command accepted (asynchronous; poll GET /commands/{id})
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommandDispatchResult" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/stashes/preflight:
+    post:
+      operationId: createPreflight
+      tags: [StashInputs]
+      summary: >
+        Resolve and preview a provider source URI without committing it.
+        The create flow's first step -- run this before deciding which
+        stash (new or existing) to add it to.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_uri]
+              properties:
+                source_uri: { type: string, example: "https://www.youtube.com/@channel" }
+                source_title: { type: string, nullable: true }
+                origin:
+                  type: string
+                  enum: [create_stash, manual_paste, api, browser_extension, scheduler]
+                  default: api
+      responses:
+        "201":
+          description: Command accepted (asynchronous; poll the review endpoint below)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommandDispatchResult" }
+        "400":
+          description: Validation error, or the source URI's provider/URL shape isn't supported
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                unsupported_url:
+                  value:
+                    error:
+                      code: unsupported_provider_url
+                      message: "YouTube handle URL is missing a handle. (https://www.youtube.com/@)"
+
+  /api/v1/stashes/preflight/{commandId}/review:
+    get:
+      operationId: reviewPreflight
+      tags: [StashInputs]
+      summary: Poll a preflight command for its review payload (resolved source, sample items, filter declarations)
+      parameters:
+        - name: commandId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Review payload (preflight may still be running; check state)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PreflightReview" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/stashes/{stashId}/broadcasts:
+    get:
+      operationId: listBroadcasts
+      tags: [Broadcasts]
+      summary: List a stash's broadcasts
+      parameters:
+        - $ref: "#/components/parameters/StashIdInPath"
+      responses:
+        "200":
+          description: Broadcasts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  broadcasts:
+                    type: array
+                    items: { $ref: "#/components/schemas/Broadcast" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: createBroadcast
+      tags: [Broadcasts]
+      summary: Create a broadcast for a stash
+      parameters:
+        - $ref: "#/components/parameters/StashIdInPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, name]
+              properties:
+                type: { $ref: "#/components/schemas/BroadcastType" }
+                name: { type: string }
+                slug: { type: string, description: Derived from name if omitted }
+                settings:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "201":
+          description: >
+            Broadcast created. policy_mismatch is non-null when the
+            stash's download_policy won't produce media this broadcast
+            type needs (e.g. metadata_only feeding a video broadcast) --
+            still created, but won't publish anything until resolved.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  broadcast: { $ref: "#/components/schemas/Broadcast" }
+                  policy_mismatch:
+                    nullable: true
+                    $ref: "#/components/schemas/PolicyMismatch"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/broadcasts/{id}:
+    get:
+      operationId: showBroadcast
+      tags: [Broadcasts]
+      summary: Broadcast detail
+      parameters:
+        - $ref: "#/components/parameters/BroadcastId"
+      responses:
+        "200":
+          description: Broadcast
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  broadcast: { $ref: "#/components/schemas/Broadcast" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/broadcasts/{id}/items:
+    get:
+      operationId: listBroadcastItems
+      tags: [Broadcasts]
+      summary: List a broadcast's published items
+      parameters:
+        - $ref: "#/components/parameters/BroadcastId"
+      responses:
+        "200":
+          description: Broadcast items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/BroadcastItem" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/broadcasts/{id}/season-mapping:
+    patch:
+      operationId: updateSeasonMapping
+      tags: [Broadcasts]
+      summary: >
+        Set per-input season overrides for a series broadcast. Replaces
+        the whole mapping (not a merge); omit an input to reset it to the
+        default season derivation. Series broadcast types only.
+      parameters:
+        - $ref: "#/components/parameters/BroadcastId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mapping]
+              properties:
+                mapping:
+                  type: object
+                  description: stash_input_id -> season number (positive integer)
+                  additionalProperties: { type: integer, minimum: 1 }
+                  example: { "input_01K...": 2 }
+      responses:
+        "200":
+          description: Updated broadcast
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  broadcast: { $ref: "#/components/schemas/Broadcast" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/items:
+    get:
+      operationId: listItems
+      tags: [Items]
+      summary: List media items across all stashes (the Vault)
+      responses:
+        "200":
+          description: Media items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/MediaItem" }
+
+  /api/v1/items/{id}:
+    get:
+      operationId: showItem
+      tags: [Items]
+      summary: Media item detail
+      parameters:
+        - $ref: "#/components/parameters/MediaItemId"
+      responses:
+        "200":
+          description: Media item
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  item: { $ref: "#/components/schemas/MediaItem" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/items/{id}/assets:
+    get:
+      operationId: listItemAssets
+      tags: [Items]
+      summary: List a media item's assets (vault original, derived/broadcast-generated files), with regenerate/delete guidance
+      parameters:
+        - $ref: "#/components/parameters/MediaItemId"
+      responses:
+        "200":
+          description: Assets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  assets:
+                    type: array
+                    items: { $ref: "#/components/schemas/Asset" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/items/{id}/stashes:
+    get:
+      operationId: listItemStashes
+      tags: [Items]
+      summary: Which stashes contain this media item
+      parameters:
+        - $ref: "#/components/parameters/MediaItemId"
+      responses:
+        "200":
+          description: Stashes containing this item
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stashes:
+                    type: array
+                    items: { $ref: "#/components/schemas/Stash" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/items/{id}/broadcasts:
+    get:
+      operationId: listItemBroadcasts
+      tags: [Items]
+      summary: Which broadcasts include this media item
+      parameters:
+        - $ref: "#/components/parameters/MediaItemId"
+      responses:
+        "200":
+          description: Broadcasts including this item
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  broadcasts:
+                    type: array
+                    items: { $ref: "#/components/schemas/Broadcast" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/commands:
+    post:
+      operationId: dispatchCommand
+      tags: [Commands]
+      summary: Dispatch a command (the generic entry point behind most async operations)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type: { $ref: "#/components/schemas/CommandType" }
+                options:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "201":
+          description: Command accepted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommandDispatchResult" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+
+  /api/v1/commands/{id}:
+    get:
+      operationId: showCommand
+      tags: [Commands]
+      summary: Command detail, with its jobs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Command and jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  command: { $ref: "#/components/schemas/Command" }
+                  jobs:
+                    type: array
+                    items: { $ref: "#/components/schemas/Job" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/jobs:
+    get:
+      operationId: listJobs
+      tags: [Jobs]
+      summary: List recent jobs
+      responses:
+        "200":
+          description: Jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobs:
+                    type: array
+                    items: { $ref: "#/components/schemas/Job" }
+
+  /api/v1/jobs/{id}:
+    get:
+      operationId: showJob
+      tags: [Jobs]
+      summary: Job detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Job
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job: { $ref: "#/components/schemas/Job" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/media-servers:
+    get:
+      operationId: listMediaServers
+      tags: [MediaServers]
+      summary: List configured media server connections
+      responses:
+        "200":
+          description: Connections
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  media_servers:
+                    type: array
+                    items: { $ref: "#/components/schemas/MediaServerConnection" }
+    post:
+      operationId: createMediaServer
+      tags: [MediaServers]
+      summary: Add a media server connection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, name, base_uri]
+              properties:
+                type: { $ref: "#/components/schemas/MediaServerType" }
+                name: { type: string }
+                base_uri: { type: string, format: uri }
+                token: { type: string, nullable: true }
+                settings:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "201":
+          description: Connection created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  media_server: { $ref: "#/components/schemas/MediaServerConnection" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+
+  /api/v1/media-servers/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: showMediaServer
+      tags: [MediaServers]
+      summary: Media server connection detail
+      responses:
+        "200":
+          description: Connection
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  media_server: { $ref: "#/components/schemas/MediaServerConnection" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateMediaServer
+      tags: [MediaServers]
+      summary: Update a media server connection (all fields optional)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                base_uri: { type: string, format: uri }
+                token: { type: string }
+                settings:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "200":
+          description: Updated connection
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  media_server: { $ref: "#/components/schemas/MediaServerConnection" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteMediaServer
+      tags: [MediaServers]
+      summary: Remove a media server connection
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { type: object, properties: { deleted: { type: boolean } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/media-servers/{id}/libraries:
+    get:
+      operationId: listMediaServerLibraries
+      tags: [MediaServers]
+      summary: List libraries available on the remote media server
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Libraries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  libraries:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        type: { type: string }
+        "400":
+          description: Connection error reaching the remote server
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/media-servers/{id}/test:
+    post:
+      operationId: testMediaServer
+      tags: [MediaServers]
+      summary: Test connectivity to the remote media server
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Test result (ok may be false; this endpoint reports rather than throws on a failed test)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: object
+                    properties:
+                      ok: { type: boolean }
+                      message: { type: string }
+                      server_name: { type: string, nullable: true }
+                      version: { type: string, nullable: true }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/providers/youtube/credentials:
+    get:
+      operationId: showYouTubeCredentials
+      tags: [Providers]
+      summary: Whether a YouTube Data API key is configured (never returns the key itself)
+      responses:
+        "200":
+          description: Configuration status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured: { type: boolean }
+    put:
+      operationId: setYouTubeCredentials
+      tags: [Providers]
+      summary: Set the YouTube Data API key (stored encrypted; used for channel/playlist discovery)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [api_key]
+              properties:
+                api_key: { type: string }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured: { type: boolean, example: true }
+        "400": { $ref: "#/components/responses/ValidationError" }
+
+  /b/{broadcastToken}/feed.xml:
+    get:
+      operationId: podcastFeed
+      tags: [Feeds]
+      summary: Public podcast RSS feed for an audio/video podcast broadcast
+      description: >
+        Token-authenticated (the token is the broadcast's secret, not a
+        user credential) and unauthenticated otherwise -- this is what
+        podcast clients subscribe to directly.
+      security: []
+      parameters:
+        - name: broadcastToken
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: RSS 2.0 feed
+          content:
+            application/rss+xml:
+              schema: { type: string }
+        "404":
+          description: Unknown or rotated token
+
+  /b/{broadcastToken}/items/{itemToken}/{episodeFile}:
+    get:
+      operationId: podcastEpisode
+      tags: [Feeds]
+      summary: Public podcast episode media file, linked from the feed above
+      security: []
+      parameters:
+        - name: broadcastToken
+          in: path
+          required: true
+          schema: { type: string }
+        - name: itemToken
+          in: path
+          required: true
+          schema: { type: string }
+        - name: episodeFile
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Episode media file
+        "404":
+          description: Unknown or rotated token
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: stashd_pat_<random>
+      description: API token, created via POST /api/v1/auth/tokens.
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: stashd_session
+      description: HttpOnly session cookie issued by /api/v1/auth/login or /setup. What the browser UI uses.
+
+  parameters:
+    StashId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    StashIdInPath:
+      name: stashId
+      in: path
+      required: true
+      schema: { type: string }
+    BroadcastId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    MediaItemId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    TokenId:
+      name: tokenId
+      in: path
+      required: true
+      schema: { type: string }
+
+  responses:
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Missing or invalid credentials
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: >
+                Stable machine-readable code, e.g. not_found,
+                validation_error, unauthenticated, invalid_credentials,
+                setup_required, setup_already_completed,
+                unsupported_provider_url, storage_hardlink_unavailable.
+            message: { type: string }
+            details:
+              type: object
+              additionalProperties: true
+              description: Always secret-safe; may be omitted.
+
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string }
+        username: { type: string }
+        role: { type: string, enum: [owner] }
+
+    ApiTokenSummary:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        token_preview: { type: string, description: "First chars of the token, e.g. stashd_pat_abc123…" }
+        scopes:
+          type: array
+          items: { type: string }
+        last_used_at: { type: string, format: date-time, nullable: true }
+        expires_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    ApiTokenCreated:
+      type: object
+      description: Returned only at creation time -- the plaintext token is never retrievable again.
+      properties:
+        id: { type: string }
+        token: { type: string, description: "Plaintext token, e.g. stashd_pat_<48 hex chars>. Store it now." }
+        token_preview: { type: string }
+        name: { type: string }
+
+    SyncMode: { type: string, enum: [automatic, manual] }
+    DownloadPolicy: { type: string, enum: [video, audio_only, metadata_only, manual_download] }
+    OrganizationMode: { type: string, enum: [flat, chronological, series, seasoned_series] }
+    StashState: { type: string, enum: [ready, failed, disabled] }
+    StashItemState: { type: string, enum: [active, removed, hidden, ignored] }
+    StashInputState: { type: string, enum: [ready, failed, disabled] }
+    MediaItemState: { type: string, enum: [discovered, metadata_ready, download_pending, downloading, ready, failed, ignored, missing] }
+    UpstreamState: { type: string, enum: [available, unavailable, private, deleted, region_blocked, unknown] }
+    AssetRole: { type: string, enum: [vault_original, source_thumbnail, subtitle, transcript, podcast_audio, episode_artwork, feed_artwork, feed_xml, nfo, hardlink, remuxed_video, metadata_json, source_json] }
+    AssetKind: { type: string, enum: [video, audio, image, subtitle, metadata, link, feed, other] }
+    AssetState: { type: string, enum: [pending, processing, ready, stale, missing, failed] }
+    BroadcastType: { type: string, enum: [filesystem_series, jellyfin_series, plex_series, audio_podcast, video_podcast] }
+    BroadcastState: { type: string, enum: [pending, processing, ready, stale, failed, disabled] }
+    BroadcastItemState: { type: string, enum: [pending, processing, ready, stale, failed, disabled] }
+    JobState: { type: string, enum: [pending, processing, ready, failed, cancelled] }
+    CommandState: { type: string, enum: [accepted, rejected, running, completed, failed] }
+    MediaServerType: { type: string, enum: [jellyfin, plex] }
+    MediaServerState: { type: string, enum: [ready, failed, disabled] }
+    ActivityLevel: { type: string, enum: [info, success, warning, error] }
+    CommandType:
+      type: string
+      description: One of the dispatchable command types.
+      enum:
+        - stash.preflight
+        - stash.add_input
+        - stash.sync
+        - stash.backfill
+        - item.refresh_metadata
+        - item.download
+        - asset.verify
+        - broadcast.plan
+        - broadcast.rebuild
+        - broadcast.verify
+        - broadcast.prune
+        - broadcast.trigger
+        - broadcast.rotate_token
+        - media_server.test_connection
+        - media_server.list_libraries
+        - system.boot
+        - system.storage_check
+        - system.prune_temp
+        - system.verify_vault
+    JobIntent:
+      type: string
+      enum:
+        - preflight
+        - add_input
+        - routine_discovery
+        - initial_backfill
+        - metadata_capture
+        - metadata_refresh
+        - download
+        - enrich
+        - broadcast
+        - repair
+        - storage_check
+        - boot
+        - verify_vault
+        - media_server
+
+    Stash:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        slug: { type: string }
+        description: { type: string, nullable: true }
+        sync_mode: { $ref: "#/components/schemas/SyncMode" }
+        download_policy: { $ref: "#/components/schemas/DownloadPolicy" }
+        organization_mode: { $ref: "#/components/schemas/OrganizationMode" }
+        state: { $ref: "#/components/schemas/StashState" }
+        icon_uri:
+          type: string
+          nullable: true
+          description: Resolved channel/owner avatar, if the provider exposed one.
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    StashInput:
+      type: object
+      properties:
+        id: { type: string }
+        stash_id: { type: string }
+        provider_key: { type: string, example: youtube }
+        input_type: { type: string, example: channel }
+        source_uri: { type: string }
+        provider_input_id: { type: string }
+        state: { $ref: "#/components/schemas/StashInputState" }
+        consecutive_failures: { type: integer }
+        title: { type: string, nullable: true }
+        sync_mode: { $ref: "#/components/schemas/SyncMode" }
+        options:
+          type: object
+          nullable: true
+          description: >
+            Universal filters (title_regex_include/exclude) plus
+            provider-declared options (e.g. YouTube's include_shorts,
+            include_live), keyed by opaque option keys under `provider`.
+          properties:
+            title_regex_include: { type: string, nullable: true }
+            title_regex_exclude: { type: string, nullable: true }
+            provider:
+              type: object
+              additionalProperties: true
+        last_checked_at: { type: string, format: date-time, nullable: true }
+        next_check_at: { type: string, format: date-time, nullable: true }
+        last_success_at: { type: string, format: date-time, nullable: true }
+        last_failure_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    StashItem:
+      type: object
+      properties:
+        id: { type: string }
+        stash_id: { type: string }
+        media_item_id: { type: string }
+        stash_input_id: { type: string, nullable: true }
+        state: { $ref: "#/components/schemas/StashItemState" }
+        position: { type: integer, nullable: true }
+        season_number: { type: integer, nullable: true }
+        episode_number: { type: integer, nullable: true }
+        season_title: { type: string, nullable: true }
+        display_title: { type: string, nullable: true }
+        display_description: { type: string, nullable: true }
+        first_seen_at: { type: string, format: date-time, nullable: true }
+        last_seen_at: { type: string, format: date-time, nullable: true }
+        removed_at: { type: string, format: date-time, nullable: true }
+        removed_reason: { type: string, nullable: true }
+        ignored_reason:
+          type: string
+          nullable: true
+          description: e.g. filter_title_regex, filter_video_type (set when state is ignored).
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        media_item:
+          type: object
+          nullable: true
+          description: Embedded summary, avoiding an N+1 fetch per item.
+          properties:
+            title: { type: string }
+            state: { $ref: "#/components/schemas/MediaItemState" }
+            thumbnail_uri: { type: string, nullable: true }
+            duration_seconds: { type: integer, nullable: true }
+            content_type: { type: string, nullable: true, example: short }
+        total_asset_size_bytes:
+          type: integer
+          nullable: true
+          description: Sum of size_bytes across every asset for this item.
+
+    MediaItem:
+      type: object
+      properties:
+        id: { type: string }
+        provider_key: { type: string }
+        provider_item_id: { type: string }
+        canonical_uri: { type: string }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        state: { $ref: "#/components/schemas/MediaItemState" }
+        upstream_state: { $ref: "#/components/schemas/UpstreamState" }
+        content_type: { type: string, nullable: true }
+        creator_name: { type: string, nullable: true }
+        duration_seconds: { type: integer, nullable: true }
+        published_at: { type: string, format: date-time, nullable: true }
+        thumbnail_uri: { type: string, nullable: true }
+        last_seen_upstream_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Asset:
+      type: object
+      properties:
+        id: { type: string }
+        media_item_id: { type: string, nullable: true }
+        broadcast_id: { type: string, nullable: true }
+        role: { $ref: "#/components/schemas/AssetRole" }
+        kind: { $ref: "#/components/schemas/AssetKind" }
+        state: { $ref: "#/components/schemas/AssetState" }
+        derived_from_asset_id: { type: string, nullable: true }
+        path: { type: string, nullable: true }
+        relative_path: { type: string, nullable: true }
+        mime_type: { type: string, nullable: true }
+        container: { type: string, nullable: true }
+        size_bytes: { type: integer, nullable: true }
+        checksum: { type: string, nullable: true }
+        duration_seconds: { type: integer, nullable: true }
+        last_verified_at: { type: string, format: date-time, nullable: true }
+        missing_at: { type: string, format: date-time, nullable: true }
+        missing_reason: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        generated_by:
+          type: string
+          nullable: true
+          description: Broadcast name, if this asset was produced for a broadcast; null for a source asset fetched from the provider.
+        can_regenerate:
+          type: boolean
+          nullable: true
+          description: For a source asset, true only if the media item's upstream is still available. For a generated asset, true if the vault original is ready to rebuild from.
+        safe_to_delete:
+          type: boolean
+          nullable: true
+          description: Always false for source assets (nothing else can reproduce them); always true for generated/broadcast-tied assets (a rebuild recreates them).
+
+    Broadcast:
+      type: object
+      properties:
+        id: { type: string }
+        stash_id: { type: string }
+        type: { $ref: "#/components/schemas/BroadcastType" }
+        name: { type: string }
+        slug: { type: string }
+        state: { $ref: "#/components/schemas/BroadcastState" }
+        settings:
+          type: object
+          additionalProperties: true
+          nullable: true
+          description: Type-specific settings; series types may include season_mapping keyed by stash_input_id.
+        last_planned_at: { type: string, format: date-time, nullable: true }
+        last_built_at: { type: string, format: date-time, nullable: true }
+        last_verified_at: { type: string, format: date-time, nullable: true }
+        last_error: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        feed_url:
+          type: string
+          nullable: true
+          description: Present only for podcast broadcast types.
+        token_preview:
+          type: string
+          nullable: true
+          description: Present only alongside feed_url.
+
+    BroadcastItem:
+      type: object
+      properties:
+        id: { type: string }
+        broadcast_id: { type: string }
+        stash_item_id: { type: string }
+        media_item_id: { type: string }
+        state: { $ref: "#/components/schemas/BroadcastItemState" }
+        token_preview: { type: string, nullable: true }
+        published_path: { type: string, nullable: true }
+        published_uri: { type: string, nullable: true }
+        last_published_at: { type: string, format: date-time, nullable: true }
+        last_verified_at: { type: string, format: date-time, nullable: true }
+        last_error: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    PolicyMismatch:
+      type: object
+      properties:
+        download_policy: { $ref: "#/components/schemas/DownloadPolicy" }
+        broadcast_type: { $ref: "#/components/schemas/BroadcastType" }
+        message: { type: string }
+        compatible_download_policies:
+          type: array
+          items: { $ref: "#/components/schemas/DownloadPolicy" }
+
+    DeleteImpact:
+      type: object
+      properties:
+        shared_items:
+          type: array
+          description: Items also present in other stashes -- deleting this stash won't remove them from the vault.
+          items:
+            type: object
+            properties:
+              media_item_id: { type: string }
+              title: { type: string }
+              shared_with_stashes:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string }
+                    name: { type: string }
+        orphaned_items:
+          type: array
+          description: Items only in this stash -- they remain in the vault after deletion, but lose their only stash membership.
+          items:
+            type: object
+            properties:
+              media_item_id: { type: string }
+              title: { type: string }
+
+    Command:
+      type: object
+      properties:
+        id: { type: string }
+        type: { $ref: "#/components/schemas/CommandType" }
+        state: { $ref: "#/components/schemas/CommandState" }
+        target_type: { type: string, nullable: true }
+        target_id: { type: string, nullable: true }
+        options:
+          type: object
+          additionalProperties: true
+          nullable: true
+        result:
+          type: object
+          additionalProperties: true
+          nullable: true
+        created_by_user_id: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CommandDispatchResult:
+      type: object
+      description: Returned by every command-dispatching endpoint (POST .../commands, .../preflight, .../inputs).
+      properties:
+        command_id: { type: string }
+        command_state: { $ref: "#/components/schemas/CommandState" }
+        command_type: { $ref: "#/components/schemas/CommandType" }
+        job_ids:
+          type: array
+          items: { type: string }
+        jobs:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              intent: { $ref: "#/components/schemas/JobIntent" }
+              state: { $ref: "#/components/schemas/JobState" }
+
+    Job:
+      type: object
+      properties:
+        id: { type: string }
+        command_id: { type: string, nullable: true }
+        intent: { $ref: "#/components/schemas/JobIntent" }
+        entity_type:
+          type: string
+          nullable: true
+          description: e.g. media_item -- set by item.download jobs, paired with entity_id for matching live progress to a specific item.
+        entity_id: { type: string, nullable: true }
+        state: { $ref: "#/components/schemas/JobState" }
+        priority: { type: integer }
+        attempts: { type: integer }
+        max_attempts: { type: integer }
+        scheduled_at: { type: string, format: date-time, nullable: true }
+        started_at: { type: string, format: date-time, nullable: true }
+        finished_at: { type: string, format: date-time, nullable: true }
+        heartbeat_at: { type: string, format: date-time, nullable: true }
+        progress_current: { type: integer, nullable: true }
+        progress_total: { type: integer, nullable: true }
+        progress_percent: { type: integer, nullable: true }
+        progress_label: { type: string, nullable: true }
+        last_error: { type: string, nullable: true }
+        payload:
+          type: object
+          additionalProperties: true
+          nullable: true
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ActivityEvent:
+      type: object
+      properties:
+        id: { type: string }
+        level: { $ref: "#/components/schemas/ActivityLevel" }
+        type: { type: string, example: stash.input_added }
+        message: { type: string, description: "Pre-rendered, secret-redacted, human-readable." }
+        entity_type: { type: string, nullable: true }
+        entity_id: { type: string, nullable: true }
+        stash_id: { type: string, nullable: true }
+        media_item_id: { type: string, nullable: true }
+        broadcast_id: { type: string, nullable: true }
+        job_id: { type: string, nullable: true }
+        command_id: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    MediaServerConnection:
+      type: object
+      properties:
+        id: { type: string }
+        type: { $ref: "#/components/schemas/MediaServerType" }
+        name: { type: string }
+        base_uri: { type: string }
+        state: { $ref: "#/components/schemas/MediaServerState" }
+        settings:
+          type: object
+          additionalProperties: true
+          nullable: true
+        last_checked_at: { type: string, format: date-time, nullable: true }
+        last_error: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    HealthReport:
+      type: object
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        version: { type: string }
+        database:
+          type: object
+          properties:
+            writable: { type: boolean }
+        storage:
+          type: object
+          properties:
+            ready: { type: boolean }
+            vault_broadcast_hardlink: { type: boolean }
+            message: { type: string, nullable: true }
+            locations:
+              type: array
+              items:
+                type: object
+                properties:
+                  key: { type: string, example: vault }
+                  path: { type: string }
+                  state: { type: string }
+                  readable: { type: boolean }
+                  writable: { type: boolean }
+                  supports_hardlinks: { type: boolean }
+                  last_error: { type: string, nullable: true }
+                  free_bytes: { type: integer, nullable: true }
+                  total_bytes: { type: integer, nullable: true }
+
+    PreflightReview:
+      type: object
+      properties:
+        command_id: { type: string }
+        state: { $ref: "#/components/schemas/CommandState" }
+        review_url: { type: string, nullable: true }
+        ui_note: { type: string }
+        preflight:
+          type: object
+          nullable: true
+          description: Null until the preflight job finishes; poll until state is completed.
+          properties:
+            source_uri: { type: string }
+            source_title: { type: string, nullable: true }
+            origin: { type: string }
+            review_url: { type: string }
+            resolved_input:
+              type: object
+              properties:
+                provider_key: { type: string }
+                input_type: { type: string }
+                source_uri: { type: string }
+                provider_input_id: { type: string }
+                title: { type: string, nullable: true }
+                source_title: { type: string, nullable: true }
+                source_avatar_uri: { type: string, nullable: true }
+                estimated_item_count: { type: integer, nullable: true }
+            discovery:
+              type: object
+              properties:
+                strategy_key: { type: string }
+                estimated_item_count: { type: integer }
+                estimated_total_duration_seconds: { type: integer }
+                discovered_items:
+                  type: array
+                  items: { type: object, additionalProperties: true }
+                sample_items:
+                  type: array
+                  items: { type: object, additionalProperties: true }
+            universal_filters:
+              type: array
+              description: Always present, regardless of provider.
+              items:
+                type: object
+                properties:
+                  key: { type: string, enum: [title_regex_include, title_regex_exclude] }
+                  label: { type: string }
+                  type: { type: string, enum: [string] }
+            input_options:
+              type: array
+              description: Provider-declared toggles for this specific resolved input (e.g. YouTube channel-only include_shorts/include_live).
+              items:
+                type: object
+                properties:
+                  key: { type: string, example: include_shorts }
+                  label: { type: string }
+                  type: { type: string, enum: [bool, enum] }
+                  default: {}
+                  choices:
+                    type: array
+                    nullable: true
+                    items: { type: string }
+                  applicable_input_types:
+                    type: array
+                    items: { type: string }
