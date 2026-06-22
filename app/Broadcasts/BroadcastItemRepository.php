@@ -75,4 +75,12 @@ final class BroadcastItemRepository
             ->where('broadcastId = ? AND stashItemId = ?', $broadcastId->toString(), $stashItemId->toString())
             ->first();
     }
+
+    /** @return list<BroadcastItemRecord> */
+    public function listForMediaItem(PrefixedUlid $mediaItemId): array
+    {
+        return BroadcastItemRecord::select()
+            ->where('mediaItemId = ?', $mediaItemId->toString())
+            ->all();
+    }
 }

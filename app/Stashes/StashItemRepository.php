@@ -73,6 +73,14 @@ final class StashItemRepository
             ->all();
     }
 
+    /** @return list<StashItemRecord> */
+    public function listForMediaItem(PrefixedUlid $mediaItemId): array
+    {
+        return StashItemRecord::select()
+            ->where('mediaItemId = ?', $mediaItemId->toString())
+            ->all();
+    }
+
     /**
      * @param list<string> $mediaItemIds
      * @return list<StashItemRecord>

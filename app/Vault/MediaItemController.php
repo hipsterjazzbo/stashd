@@ -4,8 +4,14 @@ declare(strict_types=1);
 
 namespace App\Vault;
 
+use App\Broadcasts\Api\BroadcastResource;
+use App\Broadcasts\BroadcastItemRepository;
+use App\Broadcasts\BroadcastRepository;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
+use App\Stashes\Api\StashResource;
+use App\Stashes\StashItemRepository;
+use App\Stashes\StashRepository;
 use App\Support\PrefixedUlid;
 use App\Vault\Api\AssetResource;
 use App\Vault\Api\MediaItemResource;
@@ -21,6 +27,10 @@ final readonly class MediaItemController
     public function __construct(
         private MediaItemRepository $mediaItems,
         private AssetRepository $assets,
+        private StashItemRepository $stashItems,
+        private StashRepository $stashes,
+        private BroadcastItemRepository $broadcastItems,
+        private BroadcastRepository $broadcasts,
     ) {
     }
 
@@ -41,12 +51,7 @@ final readonly class MediaItemController
         $item = $this->mediaItems->find(PrefixedUlid::parse($id));
 
         if ($item === null) {
-            return new Json([
-                'error' => [
-                    'code' => 'not_found',
-                    'message' => 'Media item not found.',
-                ],
-            ], Status::NOT_FOUND);
+            return $this->notFound();
         }
 
         return new Json([
@@ -57,15 +62,8 @@ final readonly class MediaItemController
     #[Get('/api/v1/items/{id}/assets')]
     public function assets(string $id): Json
     {
-        $item = $this->mediaItems->find(PrefixedUlid::parse($id));
-
-        if ($item === null) {
-            return new Json([
-                'error' => [
-                    'code' => 'not_found',
-                    'message' => 'Media item not found.',
-                ],
-            ], Status::NOT_FOUND);
+        if ($this->mediaItems->find(PrefixedUlid::parse($id)) === null) {
+            return $this->notFound();
         }
 
         return new Json([
@@ -74,5 +72,71 @@ final readonly class MediaItemController
                 $this->assets->listForMediaItem(PrefixedUlid::parse($id)),
             ),
         ]);
+    }
+
+    /** Which stashes contain this media item — no back-reference existed before T12. */
+    #[Get('/api/v1/items/{id}/stashes')]
+    public function stashes(string $id): Json
+    {
+        $mediaItemId = PrefixedUlid::parse($id);
+
+        if ($this->mediaItems->find($mediaItemId) === null) {
+            return $this->notFound();
+        }
+
+        $stashIds = array_values(array_unique(array_map(
+            static fn ($stashItem): string => $stashItem->stashId,
+            $this->stashItems->listForMediaItem($mediaItemId),
+        )));
+
+        $stashes = array_filter(array_map(
+            fn (string $stashId) => $this->stashes->find(PrefixedUlid::parse($stashId)),
+            $stashIds,
+        ));
+
+        return new Json([
+            'stashes' => array_map(
+                static fn ($stash): array => StashResource::fromRecord($stash)->toArray(),
+                array_values($stashes),
+            ),
+        ]);
+    }
+
+    /** Which broadcasts include this media item — no back-reference existed before T12. */
+    #[Get('/api/v1/items/{id}/broadcasts')]
+    public function broadcasts(string $id): Json
+    {
+        $mediaItemId = PrefixedUlid::parse($id);
+
+        if ($this->mediaItems->find($mediaItemId) === null) {
+            return $this->notFound();
+        }
+
+        $broadcastIds = array_values(array_unique(array_map(
+            static fn ($broadcastItem): string => $broadcastItem->broadcastId,
+            $this->broadcastItems->listForMediaItem($mediaItemId),
+        )));
+
+        $broadcasts = array_filter(array_map(
+            fn (string $broadcastId) => $this->broadcasts->find(PrefixedUlid::parse($broadcastId)),
+            $broadcastIds,
+        ));
+
+        return new Json([
+            'broadcasts' => array_map(
+                static fn ($broadcast): array => BroadcastResource::fromRecord($broadcast)->toArray(),
+                array_values($broadcasts),
+            ),
+        ]);
+    }
+
+    private function notFound(): Json
+    {
+        return new Json([
+            'error' => [
+                'code' => 'not_found',
+                'message' => 'Media item not found.',
+            ],
+        ], Status::NOT_FOUND);
     }
 }

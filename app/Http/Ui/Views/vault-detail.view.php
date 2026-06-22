@@ -18,18 +18,57 @@
 		<template x-if="!loading">
 			<div class="space-y-6">
 				<section class="rounded-lg border border-line bg-panel/60 p-4">
-					<div class="flex items-center justify-between gap-3">
-						<h2 class="text-sm font-semibold text-cream" x-text="item?.title"></h2>
-						<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(item?.state).text">
+					<div class="flex items-start justify-between gap-3">
+						<div class="flex items-start gap-3">
+							<img x-show="item?.thumbnail_uri" x-bind:src="item?.thumbnail_uri" class="h-16 w-28 shrink-0 rounded object-cover" alt=""/>
+							<div>
+								<h2 class="text-sm font-semibold text-cream" x-text="item?.title"></h2>
+								<p class="mt-1 text-[13px] text-muted" x-show="item?.description" x-text="item?.description"></p>
+								<p class="mt-2 text-[13px] text-muted">
+									<span x-text="formatDuration(item?.duration_seconds)"></span>
+									·
+									<span x-text="formatRelativeTime(item?.published_at)"></span>
+									<span x-show="item?.creator_name"> · <span x-text="item?.creator_name"></span></span>
+								</p>
+							</div>
+						</div>
+						<span class="inline-flex shrink-0 items-center gap-1.5" x-bind:class="statusBadge(item?.state).text">
 							<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(item?.state).dot, statusBadge(item?.state).pulse ? 'pulse-dot' : '']"></span>
 							<span x-text="item?.state"></span>
 						</span>
 					</div>
-					<p class="mt-2 text-[13px] text-muted">
-						<span x-text="formatDuration(item?.duration_seconds)"></span>
-						·
-						<span x-text="formatRelativeTime(item?.published_at)"></span>
-					</p>
+				</section>
+
+				<section class="rounded-lg border border-line bg-panel/60">
+					<h2 class="border-b border-line px-4 py-3 text-[13px] font-semibold text-cream">Metadata</h2>
+					<dl class="grid grid-cols-2 gap-x-4 gap-y-2 p-4 text-[13px] sm:grid-cols-3">
+						<div>
+							<dt class="text-[11px] uppercase tracking-wide text-muted">Provider</dt>
+							<dd class="text-cream" x-text="item?.provider_key"></dd>
+						</div>
+						<div>
+							<dt class="text-[11px] uppercase tracking-wide text-muted">Content type</dt>
+							<dd class="text-cream" x-text="item?.content_type ?? '—'"></dd>
+						</div>
+						<div>
+							<dt class="text-[11px] uppercase tracking-wide text-muted">Upstream state</dt>
+							<dd class="text-cream" x-text="item?.upstream_state"></dd>
+						</div>
+						<div>
+							<dt class="text-[11px] uppercase tracking-wide text-muted">Published</dt>
+							<dd class="text-cream" x-text="formatRelativeTime(item?.published_at)"></dd>
+						</div>
+						<div>
+							<dt class="text-[11px] uppercase tracking-wide text-muted">Last seen upstream</dt>
+							<dd class="text-cream" x-text="formatRelativeTime(item?.last_seen_upstream_at)"></dd>
+						</div>
+						<div class="col-span-2 sm:col-span-3">
+							<dt class="text-[11px] uppercase tracking-wide text-muted">Canonical URI</dt>
+							<dd class="truncate font-mono text-muted">
+								<a x-bind:href="item?.canonical_uri" target="_blank" rel="noopener" class="hover:text-cream" x-text="item?.canonical_uri"></a>
+							</dd>
+						</div>
+					</dl>
 				</section>
 
 				<section class="rounded-lg border border-line bg-panel/60">
@@ -66,6 +105,31 @@
 					<p class="border-t border-line px-4 py-3 text-[12px] text-muted">
 						Regeneration and delete-safety metadata isn't available yet for these assets.
 					</p>
+				</section>
+
+				<section class="rounded-lg border border-line bg-panel/60">
+					<h2 class="border-b border-line px-4 py-3 text-[13px] font-semibold text-cream">In these stashes</h2>
+					<ul class="divide-y divide-line/60" x-show="stashes.length > 0">
+						<template x-for="stash in stashes" x-bind:key="stash.id">
+							<li class="px-4 py-3">
+								<a class="text-[13px] text-cream transition-colors hover:text-amber" x-bind:href="'/stashes/' + stash.id" x-text="stash.name"></a>
+							</li>
+						</template>
+					</ul>
+					<p class="px-4 py-3 text-[13px] text-muted" x-show="stashes.length === 0">Not part of any stash.</p>
+				</section>
+
+				<section class="rounded-lg border border-line bg-panel/60">
+					<h2 class="border-b border-line px-4 py-3 text-[13px] font-semibold text-cream">In these broadcasts</h2>
+					<ul class="divide-y divide-line/60" x-show="broadcasts.length > 0">
+						<template x-for="broadcast in broadcasts" x-bind:key="broadcast.id">
+							<li class="flex items-center justify-between gap-3 px-4 py-3">
+								<a class="text-[13px] text-cream transition-colors hover:text-amber" x-bind:href="'/stashes/' + broadcast.stash_id" x-text="broadcast.name"></a>
+								<span class="text-[12px] text-muted" x-text="broadcast.type.replace(/_/g, ' ')"></span>
+							</li>
+						</template>
+					</ul>
+					<p class="px-4 py-3 text-[13px] text-muted" x-show="broadcasts.length === 0">Not included in any broadcast.</p>
 				</section>
 			</div>
 		</template>

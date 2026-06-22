@@ -565,10 +565,15 @@ interface MediaItemSummary {
 	provider_item_id: string
 	canonical_uri: string
 	title: string
+	description: string | null
 	state: string
+	upstream_state: string
+	content_type: string | null
+	creator_name: string | null
 	duration_seconds: number | null
 	published_at: string | null
 	thumbnail_uri: string | null
+	last_seen_upstream_at: string | null
 	created_at: string
 	updated_at: string
 }
@@ -1394,6 +1399,8 @@ function vaultDetailComponent(itemId: string) {
 		error: null as string | null,
 		item: null as MediaItemSummary | null,
 		assets: [] as AssetSummary[],
+		stashes: [] as StashSummary[],
+		broadcasts: [] as BroadcastSummary[],
 		statusBadge,
 		formatBytes,
 		formatDuration,
@@ -1402,16 +1409,27 @@ function vaultDetailComponent(itemId: string) {
 		async init() {
 			await this.refresh()
 			this.loading = false
+
+			if ('EventSource' in window) {
+				const source = new EventSource('/api/v1/events')
+				for (const type of EVENT_TYPES) {
+					source.addEventListener(type, () => void this.refresh())
+				}
+			}
 		},
 
 		async refresh() {
 			try {
-				const [itemResponse, assetsResponse] = await Promise.all([
+				const [itemResponse, assetsResponse, stashesResponse, broadcastsResponse] = await Promise.all([
 					apiFetch(`/api/v1/items/${itemId}`),
 					apiFetch(`/api/v1/items/${itemId}/assets`),
+					apiFetch(`/api/v1/items/${itemId}/stashes`),
+					apiFetch(`/api/v1/items/${itemId}/broadcasts`),
 				])
 				this.item = (await itemResponse.json()).item
 				this.assets = (await assetsResponse.json()).assets
+				this.stashes = (await stashesResponse.json()).stashes
+				this.broadcasts = (await broadcastsResponse.json()).broadcasts
 				this.error = null
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
