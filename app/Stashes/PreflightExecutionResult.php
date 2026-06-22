@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace App\Stashes;
 
+use App\Providers\InputOption;
 use App\Providers\ResolvedInput;
 
 final readonly class PreflightExecutionResult
 {
-    /** @param list<array<string, mixed>> $discoveredItems */
+    /**
+     * @param list<array<string, mixed>> $discoveredItems
+     * @param list<InputOption> $inputOptions provider-declared filter toggles for this resolved input
+     */
     public function __construct(
         public string $sourceUri,
         public ?string $sourceTitle,
@@ -18,6 +22,7 @@ final readonly class PreflightExecutionResult
         public int $estimatedItemCount,
         public int $estimatedTotalDurationSeconds,
         public array $discoveredItems,
+        public array $inputOptions = [],
     ) {
     }
 
@@ -51,6 +56,34 @@ final readonly class PreflightExecutionResult
                 'estimated_total_duration_seconds' => $this->estimatedTotalDurationSeconds,
                 'discovered_items' => $this->discoveredItems,
                 'sample_items' => $this->sampleItems(),
+            ],
+            'universal_filters' => self::universalFilters(),
+            'input_options' => array_map(
+                static fn (InputOption $option): array => $option->toArray(),
+                $this->inputOptions,
+            ),
+        ];
+    }
+
+    /**
+     * Declared once here, applied to every input regardless of provider —
+     * the review card renders these for every source, not just ones with
+     * provider-declared options.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function universalFilters(): array
+    {
+        return [
+            [
+                'key' => 'title_regex_include',
+                'label' => 'Only include titles matching (regex)',
+                'type' => 'string',
+            ],
+            [
+                'key' => 'title_regex_exclude',
+                'label' => 'Exclude titles matching (regex)',
+                'type' => 'string',
             ],
         ];
     }

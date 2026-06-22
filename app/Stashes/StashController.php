@@ -156,7 +156,10 @@ final readonly class StashController
         $options = [
             'stash_id' => $id,
             'preflight_command_id' => trim((string) ($body['preflightCommandId'] ?? '')),
-            'options' => is_array($body['options'] ?? null) ? $body['options'] : [],
+            // Sourced from the raw, un-normalized body: provider-option keys (e.g.
+            // 'include_shorts') are opaque identifiers, not DTO field names, so
+            // ApiJson's snake/camel key transform must not touch them.
+            'options' => is_array($request->body['options'] ?? null) ? $request->body['options'] : [],
         ];
 
         try {

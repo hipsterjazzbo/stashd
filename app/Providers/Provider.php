@@ -29,4 +29,7 @@ interface Provider
     public function discover(ResolvedInput $input, ProviderStrategy $strategy): array;
 
     public function isStrategyAvailable(ProviderStrategy $strategy): bool;
+
+    /** @return list<InputOption> */
+    public function inputOptions(ResolvedInput $input): array;
 }

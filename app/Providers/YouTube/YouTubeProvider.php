@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Providers\YouTube;
 
 use App\Providers\Core\DiscoveredItem;
+use App\Providers\InputOption;
+use App\Providers\InputOptionType;
 use App\Providers\Provider;
 use App\Providers\ProviderException;
 use App\Providers\ProviderStrategy;
@@ -132,6 +134,32 @@ final readonly class YouTubeProvider implements Provider
             YouTubeYtdlpDownloadStrategy::STRATEGY_KEY => $this->downloadAdapter->isAvailable(),
             default => false,
         };
+    }
+
+    public function inputOptions(ResolvedInput $input): array
+    {
+        if ($input->inputType !== YouTubeInputType::Channel->value) {
+            return [];
+        }
+
+        return [
+            new InputOption(
+                key: 'include_shorts',
+                label: 'Include Shorts',
+                type: InputOptionType::Bool,
+                default: true,
+                applicableInputTypes: [YouTubeInputType::Channel->value],
+                excludesContentTypes: ['short'],
+            ),
+            new InputOption(
+                key: 'include_live',
+                label: 'Include live broadcasts and premieres',
+                type: InputOptionType::Bool,
+                default: true,
+                applicableInputTypes: [YouTubeInputType::Channel->value],
+                excludesContentTypes: ['live', 'premiere'],
+            ),
+        ];
     }
 
     public function enrichMetadata(ResolvedInput $input, DiscoveredItem $item, ProviderStrategy $strategy): DiscoveredItem

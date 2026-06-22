@@ -61,6 +61,20 @@ final readonly class StashAddInputCommandHandler implements CommandHandler
         if (! is_array($result) || trim((string) ($result['source_uri'] ?? '')) === '') {
             throw InvalidCommandPayload::withErrors(['Preflight result is missing its resolved source.']);
         }
+
+        $rawOptions = is_array($options['options'] ?? null) ? $options['options'] : [];
+        $inputOptions = StashInputOptions::fromArray($rawOptions);
+        $errors = [];
+
+        foreach ([$inputOptions?->titleRegexInclude, $inputOptions?->titleRegexExclude] as $pattern) {
+            if ($pattern !== null && ! StashInputOptions::isValidTitleRegex($pattern)) {
+                $errors[] = "Invalid title filter pattern: {$pattern}";
+            }
+        }
+
+        if ($errors !== []) {
+            throw InvalidCommandPayload::withErrors($errors);
+        }
     }
 
     public function createJobs(CommandRecord $command, array $options): array

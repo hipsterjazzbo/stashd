@@ -28,6 +28,7 @@ final class StashItemRepository
         ?PrefixedUlid $stashInputId = null,
         StashItemState $state = StashItemState::Active,
         ?int $position = null,
+        ?string $ignoredReason = null,
     ): StashItemRecord {
         $id = $this->ids->generate('item')->toString();
         $record = new StashItemRecord(
@@ -36,6 +37,7 @@ final class StashItemRepository
             state: $state,
             stashInputId: $stashInputId?->toString(),
             position: $position,
+            ignoredReason: $ignoredReason,
             firstSeenAt: DateTime::now(Timezone::UTC),
             lastSeenAt: DateTime::now(Timezone::UTC),
         );

@@ -71,6 +71,7 @@ final readonly class DiscoverStashInput
             estimatedItemCount: $estimatedItemCount,
             estimatedTotalDurationSeconds: $estimatedDuration,
             discoveredItems: $discoveredItems,
+            inputOptions: $provider->inputOptions($resolved),
         );
     }
 }

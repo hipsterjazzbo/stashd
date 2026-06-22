@@ -310,6 +310,27 @@
 							</template>
 						</ul>
 
+						<div class="mt-3 space-y-2" x-show="addInputUniversalFilters.length > 0">
+							<template x-for="filter in addInputUniversalFilters" x-bind:key="filter.key">
+								<label class="block">
+									<span class="mb-1 block text-[12px] text-muted" x-text="filter.label"></span>
+									<input type="text" x-show="filter.key === 'title_regex_include'" x-model="addInputTitleRegexInclude"
+										class="w-full rounded border border-line bg-espresso px-3 py-2 text-[12px] text-cream outline-none focus:border-amber"/>
+									<input type="text" x-show="filter.key === 'title_regex_exclude'" x-model="addInputTitleRegexExclude"
+										class="w-full rounded border border-line bg-espresso px-3 py-2 text-[12px] text-cream outline-none focus:border-amber"/>
+								</label>
+							</template>
+						</div>
+
+						<div class="mt-3 space-y-1" x-show="addInputInputOptions.length > 0">
+							<template x-for="option in addInputInputOptions" x-bind:key="option.key">
+								<label class="flex items-center gap-2 text-[12px] text-muted" x-show="option.type === 'bool'">
+									<input type="checkbox" x-model="addInputProviderOptions[option.key]" class="rounded border-line"/>
+									<span x-text="option.label"></span>
+								</label>
+							</template>
+						</div>
+
 						<p class="mt-3 text-[12px] text-muted">Will download: <span x-text="stash?.download_policy.replace(/_/g, ' ')"></span> (per this stash's download policy).</p>
 
 						<div class="mt-4 flex justify-end gap-2">

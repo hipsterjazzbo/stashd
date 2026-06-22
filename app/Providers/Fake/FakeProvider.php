@@ -205,6 +205,11 @@ final class FakeProvider implements Provider
         $this->syncGenerations[$providerInputId] = ($this->syncGenerations[$providerInputId] ?? 1) + 1;
     }
 
+    public function inputOptions(ResolvedInput $input): array
+    {
+        return [];
+    }
+
     public function resetSyncGenerations(): void
     {
         $this->syncGenerations = [];

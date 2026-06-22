@@ -322,6 +322,21 @@ interface DiscoveredItemSummary {
 	thumbnail_uri: string | null
 }
 
+interface UniversalFilterDeclaration {
+	key: string
+	label: string
+	type: string
+}
+
+interface InputOptionDeclaration {
+	key: string
+	label: string
+	type: 'bool' | 'enum'
+	default: boolean | string
+	choices: string[] | null
+	applicable_input_types: string[]
+}
+
 interface PreflightReview {
 	command_id: string
 	state: string
@@ -338,6 +353,8 @@ interface PreflightReview {
 			discovered_items: DiscoveredItemSummary[]
 			sample_items: DiscoveredItemSummary[]
 		} | null
+		universal_filters: UniversalFilterDeclaration[]
+		input_options: InputOptionDeclaration[]
 	} | null
 	ui_note: string
 }
@@ -792,6 +809,11 @@ function stashDetailComponent(stashId: string) {
 		addInputSampleItems: [] as DiscoveredItemSummary[],
 		addInputFailureMessage: null as string | null,
 		addInputUnsupported: false,
+		addInputUniversalFilters: [] as UniversalFilterDeclaration[],
+		addInputInputOptions: [] as InputOptionDeclaration[],
+		addInputTitleRegexInclude: '',
+		addInputTitleRegexExclude: '',
+		addInputProviderOptions: {} as Record<string, boolean | string>,
 
 		async init() {
 			await this.refresh()
@@ -974,6 +996,11 @@ function stashDetailComponent(stashId: string) {
 			this.addInputSampleItems = []
 			this.addInputFailureMessage = null
 			this.addInputUnsupported = false
+			this.addInputUniversalFilters = []
+			this.addInputInputOptions = []
+			this.addInputTitleRegexInclude = ''
+			this.addInputTitleRegexExclude = ''
+			this.addInputProviderOptions = {}
 		},
 
 		cancelAddInput() {
@@ -1026,6 +1053,11 @@ function stashDetailComponent(stashId: string) {
 					this.addInputEstimatedItemCount = discovery?.estimated_item_count ?? null
 					this.addInputEstimatedTotalDurationSeconds = discovery?.estimated_total_duration_seconds ?? null
 					this.addInputSampleItems = discovery?.sample_items ?? []
+					this.addInputUniversalFilters = reviewBody.preflight?.universal_filters ?? []
+					this.addInputInputOptions = reviewBody.preflight?.input_options ?? []
+					this.addInputProviderOptions = Object.fromEntries(
+						this.addInputInputOptions.map((option) => [option.key, option.default]),
+					)
 					this.addInputStep = 'review'
 					return true
 				}
@@ -1054,7 +1086,14 @@ function stashDetailComponent(stashId: string) {
 				const response = await apiFetch(`/api/v1/stashes/${stashId}/inputs`, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ preflight_command_id: this.addInputPreflightCommandId }),
+					body: JSON.stringify({
+						preflight_command_id: this.addInputPreflightCommandId,
+						options: {
+							title_regex_include: this.addInputTitleRegexInclude.trim() || undefined,
+							title_regex_exclude: this.addInputTitleRegexExclude.trim() || undefined,
+							provider: this.addInputProviderOptions,
+						},
+					}),
 				})
 				if (!response.ok) {
 					const body = (await response.json()) as { error?: { message?: string } }

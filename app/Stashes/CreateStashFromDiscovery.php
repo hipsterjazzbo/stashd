@@ -11,6 +11,8 @@ use App\Commands\CommandState;
 use App\Commands\CommandType;
 use App\Downloads\DownloadPolicyEvaluator;
 use App\Jobs\JobIntent;
+use App\Providers\InputOption;
+use App\Providers\InputOptionType;
 use App\Providers\ProviderDates;
 use App\Providers\StashdUri;
 use App\Support\PrefixedUlid;
@@ -68,6 +70,8 @@ final readonly class CreateStashFromDiscovery
 
         $resolved = $discovered->resolvedInput;
         $discoveredItems = $discovered->discoveredItems;
+        $inputOptions = StashInputOptions::fromArray($options);
+        $excludedContentTypes = $this->excludedContentTypes($discovered->inputOptions, $inputOptions);
 
         $stashId = PrefixedUlid::parse((string) $stash->id);
         $inputType = StashInputTypeMapper::fromProviderInputType($resolved->inputType);
@@ -82,6 +86,7 @@ final readonly class CreateStashFromDiscovery
             providerInputId: $resolved->providerInputId,
             title: $resolved->title,
             syncMode: $syncMode,
+            optionsJson: $inputOptions,
         );
 
         if ($stash->iconUri === null && $resolved->sourceAvatarUri !== null) {
@@ -151,11 +156,16 @@ final readonly class CreateStashFromDiscovery
             }
 
             if ($this->stashItems->findByStashAndMediaItem($stashId, $mediaItemId) === null) {
+                $contentType = is_string($item['content_type'] ?? null) ? $item['content_type'] : null;
+                $ignoredReason = $this->ignoredReason($title, $contentType, $inputOptions, $excludedContentTypes);
+
                 $stashItem = $this->stashItems->create(
                     stashId: $stashId,
                     mediaItemId: $mediaItemId,
                     stashInputId: $stashInputId,
                     position: $index + 1,
+                    ignoredReason: $ignoredReason,
+                    state: $ignoredReason !== null ? StashItemState::Ignored : StashItemState::Active,
                 );
                 $stashItemsCreated++;
 
@@ -185,6 +195,56 @@ final readonly class CreateStashFromDiscovery
             stashItemsReused: $stashItemsReused,
             preflightCommandId: (string) $preflight->id,
         );
+    }
+
+    /**
+     * @param list<InputOption> $declaredOptions
+     *
+     * @return list<string>
+     */
+    private function excludedContentTypes(array $declaredOptions, ?StashInputOptions $inputOptions): array
+    {
+        $excluded = [];
+
+        foreach ($declaredOptions as $option) {
+            if ($option->type !== InputOptionType::Bool || $option->excludesContentTypes === []) {
+                continue;
+            }
+
+            $effectiveValue = $inputOptions?->providerValue($option) ?? $option->default;
+
+            if ($effectiveValue === false) {
+                array_push($excluded, ...$option->excludesContentTypes);
+            }
+        }
+
+        return $excluded;
+    }
+
+    /** @param list<string> $excludedContentTypes */
+    private function ignoredReason(
+        string $title,
+        ?string $contentType,
+        ?StashInputOptions $inputOptions,
+        array $excludedContentTypes,
+    ): ?string {
+        if ($inputOptions !== null) {
+            if ($inputOptions->titleRegexInclude !== null
+                && StashInputOptions::matches($inputOptions->titleRegexInclude, $title) === false) {
+                return 'filter_title_regex';
+            }
+
+            if ($inputOptions->titleRegexExclude !== null
+                && StashInputOptions::matches($inputOptions->titleRegexExclude, $title) === true) {
+                return 'filter_title_regex';
+            }
+        }
+
+        if ($contentType !== null && in_array($contentType, $excludedContentTypes, true)) {
+            return 'filter_video_type';
+        }
+
+        return null;
     }
 
     private function requireCompletedPreflight(PrefixedUlid $preflightCommandId): CommandRecord

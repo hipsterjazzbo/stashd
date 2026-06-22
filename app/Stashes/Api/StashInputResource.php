@@ -33,6 +33,7 @@ final readonly class StashInputResource implements Arrayable
             'consecutiveFailures' => $this->input->consecutiveFailures,
             'title' => $this->input->title,
             'syncMode' => $this->input->syncMode?->value,
+            'options' => $this->input->optionsJson?->toArray(),
             'lastCheckedAt' => $this->input->lastCheckedAt,
             'nextCheckAt' => $this->input->nextCheckAt,
             'lastSuccessAt' => $this->input->lastSuccessAt,
