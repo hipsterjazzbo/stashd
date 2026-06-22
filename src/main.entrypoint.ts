@@ -591,6 +591,7 @@ interface MediaItemSummary {
 interface AssetSummary {
 	id: string
 	media_item_id: string
+	broadcast_id: string | null
 	role: string
 	kind: string
 	state: string
@@ -607,6 +608,9 @@ interface AssetSummary {
 	missing_reason: string | null
 	created_at: string
 	updated_at: string
+	generated_by: string | null
+	can_regenerate: boolean | null
+	safe_to_delete: boolean | null
 }
 
 interface ApiTokenSummary {

@@ -7,17 +7,19 @@ namespace App\Vault\Api;
 use App\Http\Api\ApiJson;
 use App\Support\Arrayable;
 use App\Vault\AssetRecord;
+use App\Vault\AssetRegenerationGuidance;
 
 final readonly class AssetResource implements Arrayable
 {
     public function __construct(
         private AssetRecord $asset,
+        private ?AssetRegenerationGuidance $guidance = null,
     ) {
     }
 
-    public static function fromRecord(AssetRecord $asset): self
+    public static function fromRecord(AssetRecord $asset, ?AssetRegenerationGuidance $guidance = null): self
     {
-        return new self($asset);
+        return new self($asset, $guidance);
     }
 
     public function toArray(): array
@@ -25,6 +27,7 @@ final readonly class AssetResource implements Arrayable
         return ApiJson::encode([
             'id' => (string) $this->asset->id,
             'mediaItemId' => $this->asset->mediaItemId,
+            'broadcastId' => $this->asset->broadcastId,
             'role' => $this->asset->role->value,
             'kind' => $this->asset->kind->value,
             'state' => $this->asset->state->value,
@@ -41,6 +44,9 @@ final readonly class AssetResource implements Arrayable
             'missingReason' => $this->asset->missingReason,
             'createdAt' => $this->asset->createdAt,
             'updatedAt' => $this->asset->updatedAt,
+            'generatedBy' => $this->guidance?->generatedBy,
+            'canRegenerate' => $this->guidance?->canRegenerate,
+            'safeToDelete' => $this->guidance?->safeToDelete,
         ]);
     }
 }

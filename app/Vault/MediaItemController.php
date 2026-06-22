@@ -62,14 +62,39 @@ final readonly class MediaItemController
     #[Get('/api/v1/items/{id}/assets')]
     public function assets(string $id): Json
     {
-        if ($this->mediaItems->find(PrefixedUlid::parse($id)) === null) {
+        $mediaItemId = PrefixedUlid::parse($id);
+        $mediaItem = $this->mediaItems->find($mediaItemId);
+
+        if ($mediaItem === null) {
             return $this->notFound();
+        }
+
+        $assets = $this->assets->listForMediaItem($mediaItemId);
+
+        $vaultOriginal = $this->assets->findByMediaItemAndRole($mediaItemId, AssetRole::VaultOriginal);
+        $vaultOriginalReady = $vaultOriginal?->state === AssetState::Ready;
+
+        $broadcastNamesById = [];
+        foreach ($assets as $asset) {
+            if ($asset->broadcastId === null || array_key_exists($asset->broadcastId, $broadcastNamesById)) {
+                continue;
+            }
+
+            $broadcastNamesById[$asset->broadcastId] = $this->broadcasts->find(PrefixedUlid::parse($asset->broadcastId))?->name;
         }
 
         return new Json([
             'assets' => array_map(
-                static fn ($asset): array => AssetResource::fromRecord($asset)->toArray(),
-                $this->assets->listForMediaItem(PrefixedUlid::parse($id)),
+                fn ($asset): array => AssetResource::fromRecord(
+                    $asset,
+                    AssetRegenerationGuidance::forAsset(
+                        asset: $asset,
+                        broadcastName: $asset->broadcastId === null ? null : $broadcastNamesById[$asset->broadcastId],
+                        vaultOriginalReady: $vaultOriginalReady,
+                        mediaItemUpstreamState: $mediaItem->upstreamState,
+                    ),
+                )->toArray(),
+                $assets,
             ),
         ]);
     }
