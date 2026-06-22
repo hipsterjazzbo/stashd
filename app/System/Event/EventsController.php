@@ -7,6 +7,7 @@ namespace App\System\Event;
 use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
+use Tempest\DateTime\Duration;
 use Tempest\Http\Responses\EventStream;
 use Tempest\Http\ServerSentMessage;
 use Tempest\Router\Get;
@@ -18,19 +19,33 @@ final readonly class EventsController
 {
     private const int POLL_INTERVAL_MS = 1000;
 
-    // RoadRunner drains this whole generator before writing a response, so a
-    // worker is held for the full duration regardless of client disconnects
+    // A worker is held for this whole window regardless of client disconnects
     // (confirmed via a "broken pipe" log entry with elapsed: 30148ms for the
-    // old 30-iteration loop). With only a handful of HTTP workers, every page
-    // that subscribes to this stream ties one up for that whole window, on
-    // a tight ~POLL_INTERVAL_MS-spaced reconnect cycle for as long as the
-    // page stays open — multiple such pages open at once can starve the pool
-    // and make unrelated requests (including auth checks) wait or fail. Keep
-    // this short; pair any increase with more `pool.num_workers` in .rr.yaml.
+    // old 30-iteration loop) — RoadRunner PHP workers are one-process-one-
+    // request, so even with App\System\RoadRunner\GeneratorEventStream's
+    // incremental flushing (T18), the worker running this loop can't serve
+    // any other request until it ends. With only a handful of HTTP workers,
+    // every page that subscribes to this stream ties one up on a tight
+    // ~POLL_INTERVAL_MS-spaced reconnect cycle for as long as the page stays
+    // open. Keep this short; pair any increase with more `pool.num_workers`
+    // in .rr.yaml and MAX_CONCURRENT_CONNECTIONS below.
     private const int MAX_ITERATIONS = 10;
+
+    // Out of .rr.yaml's 8 workers, reserve at most half for SSE so unrelated
+    // requests (including auth checks) always have workers free — the
+    // starvation this fixes is exactly what forced num_workers 2 -> 4 -> 8
+    // historically. A rejected connection gets a single retry-after message
+    // instead of an error, so EventSource's own reconnect just waits and
+    // retries — no special frontend handling needed.
+    private const int MAX_CONCURRENT_CONNECTIONS = 4;
+
+    private const int STALE_AFTER_SECONDS = 15;
+
+    private const int REJECTED_RETRY_AFTER_SECONDS = 5;
 
     public function __construct(
         private EventNotificationRepository $notifications,
+        private SseConnectionRepository $connections,
     ) {
     }
 
@@ -38,27 +53,40 @@ final readonly class EventsController
     public function stream(): EventStream
     {
         return new EventStream(function (): \Generator {
-            $lastId = null;
-            $iterations = 0;
+            $slot = $this->connections->tryAcquireSlot(self::MAX_CONCURRENT_CONNECTIONS, self::STALE_AFTER_SECONDS);
 
-            while ($iterations < self::MAX_ITERATIONS) {
-                foreach ($this->notifications->listSinceId($lastId) as $notification) {
-                    $lastId = (string) $notification->id;
-                    $payload = json_decode($notification->payloadJson, true, flags: JSON_THROW_ON_ERROR);
+            if ($slot === null) {
+                yield new ServerSentMessage(data: '', retryAfter: Duration::seconds(self::REJECTED_RETRY_AFTER_SECONDS));
 
-                    yield new ServerSentMessage(
-                        data: ApiJson::encode([
-                            'id' => $lastId,
-                            'event' => $notification->eventType,
-                            'payload' => is_array($payload) ? $payload : [],
-                            'created_at' => $notification->createdAt?->toRfc3339(useZ: true),
-                        ]),
-                        event: $notification->eventType,
-                    );
+                return;
+            }
+
+            try {
+                $lastId = null;
+                $iterations = 0;
+
+                while ($iterations < self::MAX_ITERATIONS) {
+                    foreach ($this->notifications->listSinceId($lastId) as $notification) {
+                        $lastId = (string) $notification->id;
+                        $payload = json_decode($notification->payloadJson, true, flags: JSON_THROW_ON_ERROR);
+
+                        yield new ServerSentMessage(
+                            data: ApiJson::encode([
+                                'id' => $lastId,
+                                'event' => $notification->eventType,
+                                'payload' => is_array($payload) ? $payload : [],
+                                'created_at' => $notification->createdAt?->toRfc3339(useZ: true),
+                            ]),
+                            event: $notification->eventType,
+                        );
+                    }
+
+                    $iterations++;
+                    $this->connections->heartbeat($slot);
+                    usleep(self::POLL_INTERVAL_MS * 1000);
                 }
-
-                $iterations++;
-                usleep(self::POLL_INTERVAL_MS * 1000);
+            } finally {
+                $this->connections->release($slot);
             }
         }, sleep: self::POLL_INTERVAL_MS);
     }

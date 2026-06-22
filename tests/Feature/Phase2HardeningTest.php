@@ -92,6 +92,28 @@ test('authenticated events endpoint returns an event stream response', function 
     $response->assertHasHeader('content-type');
 });
 
+test('events stream rejects a new connection once at capacity with a retry-after message', function (): void {
+    $connections = $this->container->get(\App\System\Event\SseConnectionRepository::class);
+
+    for ($i = 0; $i < 4; $i++) {
+        expect($connections->tryAcquireSlot(4, 15))->not->toBeNull();
+    }
+
+    $controller = $this->container->get(\App\System\Event\EventsController::class);
+    $generator = $controller->stream()->body;
+
+    // The rejection path yields exactly one message and returns immediately —
+    // safe to iterate fully in a test, unlike the accepted path's ~10s poll loop.
+    expect($generator)->toBeInstanceOf(\Generator::class);
+
+    $message = $generator->current();
+    expect($message)->toBeInstanceOf(\Tempest\Http\ServerSentMessage::class)
+        ->and($message->retryAfter)->not->toBeNull();
+
+    $generator->next();
+    expect($generator->valid())->toBeFalse();
+});
+
 test('sse job failed notifications redact secrets in last_error', function (): void {
     $publisher = $this->container->get(EventPublisher::class);
     $job = JobRecord::select()->first();

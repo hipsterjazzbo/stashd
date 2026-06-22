@@ -22,8 +22,11 @@ http:
     # (EventsController). Four still wasn't enough once a third page started
     # subscribing to /api/v1/events (each open page ties up one worker for
     # the stream's whole iteration window, on repeat via EventSource
-    # auto-reconnect) — bumped to 8 alongside shortening that window. Revisit
-    # both together if another SSE-subscribing page gets added.
+    # auto-reconnect) — bumped to 8 alongside shortening that window.
+    # EventsController now also caps concurrent /api/v1/events connections at
+    # 4 (rejecting the rest with a retry-after SSE message rather than
+    # starving the pool), so num_workers and that cap are the two knobs to
+    # revisit together if another SSE-subscribing page gets added.
     num_workers: 8
     supervisor:
       max_worker_memory: 128

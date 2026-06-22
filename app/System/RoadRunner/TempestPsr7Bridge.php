@@ -11,11 +11,9 @@ use Nyholm\Psr7\Factory\Psr17Factory;
 use Spiral\RoadRunner\Http\PSR7Worker;
 use Spiral\RoadRunner\Worker;
 use Tempest\Database\Config\SQLiteConfig;
-use Tempest\DateTime\Duration;
 use Tempest\Http\HttpRequestFailed;
 use Tempest\Http\Response;
-use Tempest\Http\ServerSentEvent;
-use Tempest\Http\ServerSentMessage;
+use Tempest\Http\Responses\EventStream;
 use Tempest\Http\Status;
 use Tempest\Router\Router;
 use Tempest\View\View;
@@ -36,6 +34,15 @@ use Tempest\View\ViewRenderer;
  */
 final class TempestPsr7Bridge
 {
+    // PSR7Worker::chunkSize is global to the worker (read once per respond()
+    // call), but only EventStream responses need true incremental flushing —
+    // run() sets this only immediately before responding to one, and resets
+    // to 0 (disabled) for every other request, so the change is scoped to SSE
+    // and every other response stays byte-for-byte on the non-chunked path.
+    // The value just needs to comfortably fit one formatted SSE message;
+    // read() never waits to fill it (see GeneratorEventStream).
+    private const int SSE_CHUNK_SIZE = 4096;
+
     public function __construct(
         private Router $router,
         private AuthContext $authContext,
@@ -81,9 +88,11 @@ final class TempestPsr7Bridge
             // session cookie is readable; reset in finally to avoid leaking
             // cookies between requests in this long-lived worker.
             $_COOKIE = $request->getCookieParams();
+            $psr7->chunkSize = 0;
 
             try {
                 $response = $this->router->dispatch($request);
+                $psr7->chunkSize = $response instanceof EventStream ? self::SSE_CHUNK_SIZE : 0;
                 $psr7->respond($this->toPsr7($factory, $response));
             } catch (HttpRequestFailed $failed) {
                 if ($failed->cause instanceof Response) {
@@ -144,11 +153,14 @@ final class TempestPsr7Bridge
             $psr = $psr->withBody($factory->createStream(json_encode($body, JSON_THROW_ON_ERROR)));
         } elseif ($body instanceof Generator) {
             // EventStream (app/System/Event/EventsController.php) yields ServerSentMessage
-            // instances from a sleep-and-poll loop. RoadRunner's PSR7Worker reads the whole
-            // body string up front (no true chunked flushing without enabling its streaming
-            // mode), so the generator is drained here and the formatted SSE text is sent as
-            // one response once it naturally completes (~MAX_ITERATIONS * POLL_INTERVAL_MS).
-            $psr = $psr->withBody($factory->createStream($this->renderEventStream($body)));
+            // instances from a sleep-and-poll loop. GeneratorEventStream pulls from it one
+            // message at a time; paired with chunkSize > 0 set in run(), PSR7Worker::respond()
+            // flushes each message to the client as it's produced instead of draining the
+            // whole generator into one string first. This is purely a delivery-latency fix —
+            // the worker running the loop still can't serve another request meanwhile, since
+            // RoadRunner PHP workers are one-process-one-request regardless of chunking; see
+            // EventsController's connection cap for the actual worker-pool-exhaustion fix.
+            $psr = $psr->withBody(new GeneratorEventStream($body));
         }
 
         if ($psr->getBody()->getSize() === 0 && $response->status !== Status::NO_CONTENT) {
@@ -156,40 +168,5 @@ final class TempestPsr7Bridge
         }
 
         return $psr;
-    }
-
-    private function renderEventStream(Generator $messages): string
-    {
-        $output = '';
-
-        foreach ($messages as $message) {
-            if (! $message instanceof ServerSentEvent) {
-                $message = new ServerSentMessage(data: $message);
-            }
-
-            if ($message->id !== null) {
-                $output .= "id: {$message->id}\n";
-            }
-
-            if ($message->retryAfter !== null) {
-                $retry = $message->retryAfter instanceof Duration
-                    ? $message->retryAfter->getTotalMilliseconds()
-                    : $message->retryAfter;
-
-                $output .= "retry: {$retry}\n";
-            }
-
-            if ($message->event !== '') {
-                $output .= "event: {$message->event}\n";
-            }
-
-            foreach (explode("\n", (string) $message->data) as $line) {
-                $output .= "data: {$line}\n";
-            }
-
-            $output .= "\n";
-        }
-
-        return $output;
     }
 }
