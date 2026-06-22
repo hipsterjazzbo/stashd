@@ -21,7 +21,8 @@
 								<span class="shrink-0 text-[12px] text-muted" x-text="formatRelativeTime(event.created_at)"></span>
 							</div>
 							<p class="mt-0.5 text-[13px] text-cream" x-text="summarize(event)"></p>
-							<details class="mt-1">
+							<details class="mt-1" x-bind:open="expandedEventIds.has(event.id)"
+								x-on:toggle="toggleEventDisclosure(event.id, $event.target.open)">
 								<summary class="cursor-pointer text-[11px] text-muted transition-colors hover:text-cream">payload</summary>
 								<pre class="mt-1 overflow-x-auto rounded border border-line bg-espresso p-2 text-[11px] text-muted" x-text="JSON.stringify(event.payload, null, 2)"></pre>
 							</details>

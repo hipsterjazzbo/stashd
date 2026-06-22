@@ -621,9 +621,22 @@ function activityComponent() {
 	return {
 		events: [] as ActivityEvent[],
 		connected: false,
+		// SSE replaces `events` wholesale on every notification; tracking
+		// open-state here (rather than relying on <details>'s own DOM state)
+		// is what survives that, since x-bind:open re-derives it from this
+		// set every render instead of trusting whatever the browser kept.
+		expandedEventIds: new Set<string>(),
 		formatRelativeTime,
 		eventBadge,
 		summarize: summarizeEvent,
+
+		toggleEventDisclosure(id: string, open: boolean) {
+			if (open) {
+				this.expandedEventIds.add(id)
+			} else {
+				this.expandedEventIds.delete(id)
+			}
+		},
 
 		init() {
 			if (!('EventSource' in window)) return
