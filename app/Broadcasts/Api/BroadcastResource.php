@@ -44,7 +44,19 @@ final readonly class BroadcastResource implements Arrayable
             $payload['tokenPreview'] = $this->broadcast->tokenPreview;
         }
 
-        return ApiJson::encode($payload);
+        // season_mapping is keyed by opaque stash_input_id strings, not DTO
+        // field names — ApiJson::encode()'s snake/camel key transform must not
+        // touch them, so it's pulled out before encoding and reattached
+        // verbatim. See SeasonMapping and BroadcastController::updateSeasonMapping().
+        $seasonMapping = is_array($payload['settings']) ? ($payload['settings']['season_mapping'] ?? null) : null;
+
+        $encoded = ApiJson::encode($payload);
+
+        if (is_array($seasonMapping) && is_array($encoded['settings'] ?? null)) {
+            $encoded['settings']['season_mapping'] = $seasonMapping;
+        }
+
+        return $encoded;
     }
 
     /** @return array<string, mixed>|null */
@@ -56,6 +68,6 @@ final readonly class BroadcastResource implements Arrayable
 
         $decoded = json_decode($json, true);
 
-        return is_array($decoded) ? ApiJson::encode($decoded) : null;
+        return is_array($decoded) ? $decoded : null;
     }
 }

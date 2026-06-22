@@ -37,4 +37,9 @@ final readonly class BroadcastContext
 
         return is_array($decoded) ? $decoded : [];
     }
+
+    public function seasonMapping(): SeasonMapping
+    {
+        return SeasonMapping::fromBroadcastSettings($this->settings());
+    }
 }

@@ -12,9 +12,9 @@ use function Tempest\Support\str;
 
 final class BroadcastFilenameBuilder
 {
-    public function seasonFolder(StashItemRecord $stashItem): string
+    public function seasonFolder(StashItemRecord $stashItem, ?int $seasonOverride = null): string
     {
-        $season = $stashItem->seasonNumber ?? 1;
+        $season = $seasonOverride ?? $stashItem->seasonNumber ?? 1;
 
         return sprintf('Season %02d', max(1, $season));
     }
@@ -24,8 +24,9 @@ final class BroadcastFilenameBuilder
         MediaItemRecord $mediaItem,
         string $sourcePath,
         int $position,
+        ?int $seasonOverride = null,
     ): string {
-        $season = max(1, $stashItem->seasonNumber ?? 1);
+        $season = max(1, $seasonOverride ?? $stashItem->seasonNumber ?? 1);
         $episode = max(1, $stashItem->episodeNumber ?? $position);
         $title = $stashItem->displayTitle ?? $mediaItem->title;
         $safeTitle = $this->sanitizeTitle($title);

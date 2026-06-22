@@ -59,6 +59,7 @@ abstract readonly class AbstractSeriesBroadcastType implements BroadcastFormat
         $skipped = [];
         $position = 0;
         $tvShowNfoAdded = false;
+        $seasonMapping = $context->seasonMapping();
 
         foreach ($this->contextFactory->publishableStashItems($context) as $stashItem) {
             $vault = $context->vaultOriginals[$stashItem->mediaItemId] ?? null;
@@ -71,9 +72,10 @@ abstract readonly class AbstractSeriesBroadcastType implements BroadcastFormat
             }
 
             $position++;
-            $season = $this->filenames->seasonFolder($stashItem);
+            $seasonOverride = $seasonMapping->seasonFor($stashItem->stashInputId);
+            $season = $this->filenames->seasonFolder($stashItem, $seasonOverride);
             $filename = $profile->mediaServerEpisodeNaming
-                ? $this->filenames->mediaServerEpisodeFilename($stashItem, $mediaItem, $vault->path, $position)
+                ? $this->filenames->mediaServerEpisodeFilename($stashItem, $mediaItem, $vault->path, $position, $seasonOverride)
                 : $this->filenames->episodeFilename($stashItem, $mediaItem, $vault->path, $position);
             $relative = $this->paths->relativeFile($season, $filename);
             $absolute = $this->paths->broadcastFile($broadcastId, $season, $filename);
@@ -100,7 +102,7 @@ abstract readonly class AbstractSeriesBroadcastType implements BroadcastFormat
                     $tvShowNfoAdded = true;
                 }
 
-                $seasonNumber = max(1, $stashItem->seasonNumber ?? 1);
+                $seasonNumber = max(1, $seasonOverride ?? $stashItem->seasonNumber ?? 1);
                 $episodeNumber = max(1, $stashItem->episodeNumber ?? $position);
                 $episodeNfoName = $this->nfos->episodeNfoFilename($filename);
                 $sidecars[] = new BroadcastPlannedSidecar(

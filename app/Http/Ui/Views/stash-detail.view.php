@@ -152,6 +152,28 @@
 									</div>
 									<p class="mt-1 text-[12px] text-warn">Anyone with this link can listen — treat it like a password.</p>
 								</div>
+
+								<div class="mt-3 rounded border border-line bg-espresso p-2"
+									x-show="isSeriesBroadcastType(broadcast.type) && inputs.length > 0"
+									x-init="ensureSeasonMappingDraft(broadcast)">
+									<p class="text-[11px] uppercase tracking-wide text-muted">Season mapping</p>
+									<p class="mt-1 text-[12px] text-muted">Assign each input to a season. Leave blank for the default (Season 01).</p>
+									<div class="mt-2 space-y-1">
+										<template x-for="input in inputs" x-bind:key="input.id">
+											<div class="flex items-center gap-2">
+												<span class="flex-1 truncate text-[12px] text-cream" x-text="input.title ?? input.provider_input_id"></span>
+												<input type="number" min="1" placeholder="default"
+													x-model="seasonMappingDrafts[broadcast.id][input.id]"
+													class="w-20 rounded border border-line bg-panel px-2 py-1 text-[12px] text-cream outline-none focus:border-amber"/>
+											</div>
+										</template>
+									</div>
+									<button type="button" x-on:click="saveSeasonMapping(broadcast.id)"
+										x-bind:disabled="savingSeasonMapping === broadcast.id"
+										class="mt-2 rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-60">
+										Save season mapping
+									</button>
+								</div>
 							</li>
 						</template>
 					</ul>

@@ -32,4 +32,13 @@ enum BroadcastType: string
             DownloadPolicy::Video, DownloadPolicy::ManualDownload => true,
         };
     }
+
+    /** Whether this type generates a media-server library layout (seasons/episodes), as opposed to a podcast feed. */
+    public function isSeries(): bool
+    {
+        return match ($this) {
+            self::FilesystemSeries, self::JellyfinSeries, self::PlexSeries => true,
+            self::AudioPodcast, self::VideoPodcast => false,
+        };
+    }
 }

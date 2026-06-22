@@ -132,6 +132,13 @@ function compatibleDownloadPolicies(broadcastType: string): string[] {
 	return ALL_DOWNLOAD_POLICIES.filter((policy) => downloadPolicySatisfiesBroadcastType(policy, broadcastType))
 }
 
+const SERIES_BROADCAST_TYPES = ['filesystem_series', 'jellyfin_series', 'plex_series']
+
+/** Mirrors App\Broadcasts\BroadcastType::isSeries(). */
+function isSeriesBroadcastType(type: string): boolean {
+	return SERIES_BROADCAST_TYPES.includes(type)
+}
+
 function formatRelativeTime(iso: string | null | undefined): string {
 	if (!iso) return '—'
 
@@ -802,6 +809,9 @@ function stashDetailComponent(stashId: string) {
 		creatingBroadcast: false,
 		compatibleDownloadPolicyChoice: 'video',
 		updatingDownloadPolicy: false,
+		seasonMappingDrafts: {} as Record<string, Record<string, string>>,
+		savingSeasonMapping: null as string | null,
+		isSeriesBroadcastType,
 		statusBadge,
 		formatRelativeTime,
 		formatDuration,
@@ -1047,6 +1057,59 @@ function stashDetailComponent(stashId: string) {
 				this.error = 'Could not reach the server.'
 			} finally {
 				this.creatingBroadcast = false
+			}
+		},
+
+		// Initializes a broadcast's season-mapping draft from its current
+		// settings the first time it's rendered — never on refresh, so an
+		// in-progress edit isn't clobbered by a background SSE-triggered refresh.
+		ensureSeasonMappingDraft(broadcast: BroadcastSummary) {
+			if (!this.isSeriesBroadcastType(broadcast.type)) return
+
+			const existing = (broadcast.settings?.season_mapping ?? {}) as Record<string, number>
+			const draft = this.seasonMappingDrafts[broadcast.id] ?? {}
+
+			for (const input of this.inputs) {
+				if (!(input.id in draft)) {
+					draft[input.id] = existing[input.id] !== undefined ? String(existing[input.id]) : ''
+				}
+			}
+
+			this.seasonMappingDrafts[broadcast.id] = draft
+		},
+
+		async saveSeasonMapping(broadcastId: string) {
+			this.savingSeasonMapping = broadcastId
+			try {
+				const draft = this.seasonMappingDrafts[broadcastId] ?? {}
+				const mapping: Record<string, number> = {}
+
+				for (const [inputId, value] of Object.entries(draft)) {
+					const trimmed = value.trim()
+					if (trimmed === '') continue
+					const season = Number.parseInt(trimmed, 10)
+					if (Number.isFinite(season) && season >= 1) {
+						mapping[inputId] = season
+					}
+				}
+
+				const response = await apiFetch(`/api/v1/broadcasts/${broadcastId}/season-mapping`, {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ mapping }),
+				})
+				if (!response.ok) {
+					const body = (await response.json()) as { error?: { message?: string } }
+					this.error = body.error?.message ?? 'Could not update the season mapping.'
+					return
+				}
+				this.error = null
+				await this.refresh()
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not reach the server.'
+			} finally {
+				this.savingSeasonMapping = null
 			}
 		},
 

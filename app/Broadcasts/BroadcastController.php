@@ -12,6 +12,7 @@ use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
 use App\Stashes\DownloadPolicy;
+use App\Stashes\StashInputRepository;
 use App\Stashes\StashRepository;
 use App\Support\PrefixedUlid;
 use App\System\Storage\PathSanitizer;
@@ -19,6 +20,7 @@ use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
 use Tempest\Router\Get;
+use Tempest\Router\Patch;
 use Tempest\Router\Post;
 use Tempest\Router\WithMiddleware;
 
@@ -30,6 +32,7 @@ final readonly class BroadcastController
 {
     public function __construct(
         private StashRepository $stashes,
+        private StashInputRepository $stashInputs,
         private BroadcastRepository $broadcasts,
         private BroadcastItemRepository $broadcastItems,
         private PodcastTokenService $podcastTokens,
@@ -161,6 +164,85 @@ final readonly class BroadcastController
                 $this->broadcastItems->listForBroadcast(PrefixedUlid::parse($id)),
             ),
         ]);
+    }
+
+    #[Patch('/api/v1/broadcasts/{id}/season-mapping')]
+    public function updateSeasonMapping(string $id, Request $request): Json
+    {
+        $broadcast = $this->broadcasts->find(PrefixedUlid::parse($id));
+
+        if ($broadcast === null) {
+            return $this->notFound('Broadcast not found.');
+        }
+
+        if (! $broadcast->type->isSeries()) {
+            return $this->validationError('Season mapping only applies to filesystem/Jellyfin/Plex series broadcasts.');
+        }
+
+        // Read 'mapping' from the raw body, not ApiJson::normalizeRequest()'s
+        // output: its keys are opaque stash_input_id strings, not DTO field
+        // names, and the snake/camel transform would corrupt them.
+        $rawMapping = $request->body['mapping'] ?? null;
+
+        if (! is_array($rawMapping)) {
+            return $this->validationError('mapping is required.');
+        }
+
+        $validInputIds = array_map(
+            static fn ($input): string => (string) $input->id,
+            $this->stashInputs->listForStash(PrefixedUlid::parse($broadcast->stashId)),
+        );
+
+        $mapping = [];
+
+        foreach ($rawMapping as $stashInputId => $season) {
+            if (! is_string($stashInputId) || ! in_array($stashInputId, $validInputIds, true)) {
+                return $this->validationError("Unknown stash input for this broadcast's stash: {$stashInputId}");
+            }
+
+            if (! is_int($season) || $season < 1) {
+                return $this->validationError("Season for input {$stashInputId} must be a positive integer.");
+            }
+
+            $mapping[$stashInputId] = $season;
+        }
+
+        $settings = $this->decodeSettings($broadcast);
+
+        if ($mapping === []) {
+            unset($settings['season_mapping']);
+        } else {
+            $settings['season_mapping'] = $mapping;
+        }
+
+        $broadcast->settingsJson = $settings === [] ? null : json_encode($settings, JSON_THROW_ON_ERROR);
+        $this->broadcasts->save($broadcast);
+
+        return new Json([
+            'broadcast' => $this->mapBroadcast($broadcast),
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function decodeSettings(BroadcastRecord $broadcast): array
+    {
+        if ($broadcast->settingsJson === null) {
+            return [];
+        }
+
+        $decoded = json_decode($broadcast->settingsJson, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function validationError(string $message): Json
+    {
+        return new Json([
+            'error' => [
+                'code' => 'validation_error',
+                'message' => $message,
+            ],
+        ], Status::BAD_REQUEST);
     }
 
     /** @return array<string, mixed>|null */

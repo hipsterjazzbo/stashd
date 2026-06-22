@@ -22,7 +22,16 @@ final readonly class StashInputResource implements Arrayable
 
     public function toArray(): array
     {
-        return ApiJson::encode([
+        // options.provider is keyed by opaque provider option strings (e.g.
+        // 'include_shorts'), not DTO field names — ApiJson::encode()'s
+        // snake/camel key transform must not touch them (it would corrupt any
+        // future option key containing an uppercase letter), so it's pulled
+        // out before encoding and reattached verbatim. See StashInputOptions
+        // and the equivalent fix in BroadcastResource::toArray().
+        $options = $this->input->optionsJson?->toArray();
+        $provider = is_array($options) ? ($options['provider'] ?? null) : null;
+
+        $encoded = ApiJson::encode([
             'id' => (string) $this->input->id,
             'stashId' => $this->input->stashId,
             'providerKey' => $this->input->providerKey,
@@ -33,7 +42,7 @@ final readonly class StashInputResource implements Arrayable
             'consecutiveFailures' => $this->input->consecutiveFailures,
             'title' => $this->input->title,
             'syncMode' => $this->input->syncMode?->value,
-            'options' => $this->input->optionsJson?->toArray(),
+            'options' => $options,
             'lastCheckedAt' => $this->input->lastCheckedAt,
             'nextCheckAt' => $this->input->nextCheckAt,
             'lastSuccessAt' => $this->input->lastSuccessAt,
@@ -41,5 +50,11 @@ final readonly class StashInputResource implements Arrayable
             'createdAt' => $this->input->createdAt,
             'updatedAt' => $this->input->updatedAt,
         ]);
+
+        if (is_array($provider) && is_array($encoded['options'] ?? null)) {
+            $encoded['options']['provider'] = $provider;
+        }
+
+        return $encoded;
     }
 }
