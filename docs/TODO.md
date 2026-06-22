@@ -296,3 +296,55 @@ Full task breakdown (T1-T20) in `docs/plans/phase-6-slice-6/plan.md`; `docs/plan
 - [ ] Tech debt: unused `JobIntent`/`CommandType` enum cases (`RoutineDiscovery`, `MetadataCapture`, `MetadataRefresh`, `Repair`, `Enrich` / `StashSync`, `StashBackfill`, `ItemRefreshMetadata`, `SystemPruneTemp`) — scaffolding from an earlier design pass; the underlying capabilities already work via other plumbing (scheduler + `Preflight` job, provider strategy pattern). `JobIntent::InitialBackfill` is no longer in this list — Phase 6 Slice 6's add-input pipeline wired it up to drive full-channel discovery at commit (`eae9171`). Revisit the rest: remove or wire up.
 - [ ] Tech debt: `RawMetadataSnapshotRecord` table/record exists but is never instantiated — scaffolding for a not-yet-scoped provenance feature.
 - [ ] Max concurrent downloads is not explicitly enforced in code — naturally satisfied today by the single serial `worker` process; revisit if workers are ever scaled beyond one.
+
+## Phase 8 — Stronger typing & Tempest-native refactor (ongoing, not gating v1)
+
+Driven by AGENTS.md's "use Tempest-native facilities by default" preference. Full ready-to-run
+prompts for each unstarted slice below live in `docs/plans/stronger-record-types.md`; the relations
+spike is `docs/plans/tempest-relations-review.md`. Both docs stay as deep reference — this section is
+the live status tracker, so "what's left" never again needs a tour of `docs/plans/`.
+
+- [x] Timestamp properties → `Tempest\DateTime\DateTime` — `RecordTimestamps` removed entirely;
+  callers (auth expiry, NFO dates, job stale checks, scheduler `nextCheckAt`, podcast feed dates)
+  converted off `strtotime()`/`substr()`/`gmdate()` arithmetic (`379f607`)
+- [x] Stable JSON properties (first batch) — `ApiTokenRecord::$scopesJson` → `ApiTokenScopes`
+  (`a1c16c7`); `MediaServerConnectionRecord::$settingsJson` → `MediaServerLibrarySelection`
+  (`1591102`); `BroadcastTriggerRecord::$settingsJson` → `MediaServerScanTriggerSettings`
+  (`36980eb`)
+  - Intentionally deferred, not outstanding (polymorphic by type, not a stable shape):
+    `CommandRecord::$optionsJson`/`$resultJson`, `JobRecord::$payloadJson`,
+    `ActivityEventRecord::$metadataJson`, `EventNotificationRecord::$payloadJson`,
+    `RawMetadataSnapshotRecord::$rawJson`, `SecretRecord::$metadataJson`
+- [ ] Entity Identity References — typed ID value objects (`StashId`, `MediaItemId`, `BroadcastId`, …)
+  replacing raw `PrefixedUlid`/string at boundaries; pass loaded records instead of IDs where the
+  caller already has them, keep raw strings only at HTTP/DB/serialization boundaries. Split by
+  domain (auth / stashes-vault / broadcasts / jobs-commands / system-storage-activity) if too large
+  for one pass.
+- [ ] URL & Filesystem Path Values — rename `StashdUri` → `StashdUrl`, move `fake://` support out of
+  production URL handling into fake-provider-only URL classes, add YouTube-specific URL classes
+  (`YouTubeChannelUrl`/`YouTubeVideoUrl`/`YouTubePlaylistUrl`) behind a marshaller, and introduce
+  filesystem path value objects kept separate from URLs (vault/broadcast/storage/temp-download paths)
+- [ ] Sensitive Record Properties — `#[Hidden]` guardrails on `UserRecord::$passwordHash`,
+  `ApiTokenRecord::$tokenHash`, `SecretRecord::$encryptedValue`/`$nonce`, `*::$tokenSecretId`
+  columns, etc. — a guardrail against accidental leaks, not a replacement for explicit Resource DTOs
+- [ ] Semantic Scalar Values — `Tempest\DateTime\Duration` for `durationSeconds`/`progressEtaSeconds`,
+  a `ByteSize` value object for `sizeBytes`/`freeBytes`/`totalBytes`, enums for bounded strings like
+  `StorageLocationRecord::$role`
+- [ ] Later Encryption Annotation Review — investigate `#[Encrypted]` as a future `SecretsService`
+  simplification; deliberately not combined with the `#[Hidden]` slice above
+- [ ] Later Naming Review — audit whether `*Record` should remain the persistence-marker suffix
+  everywhere, after the stronger-typing slices land
+- [ ] Later Discovery Review — investigate Tempest custom discovery for provider / command-handler /
+  job-handler / broadcast-format / media-server-client registries, replacing today's manually-curated
+  initializer registries
+- [ ] Tempest relations audit (`docs/plans/tempest-relations-review.md`) — spike on whether
+  `BelongsTo`/`HasMany`/`with(...)`/`$record->query('relation')` should replace explicit repository
+  loading anywhere (stash/stash-item, broadcast/broadcast-item, vault assets, jobs/commands,
+  auth/tokens); audit and recommendation only, no relations adopted yet
+
+## Future companion apps (not started, not part of this v1 roadmap)
+
+- [ ] Browser extension — full draft spec at `docs/Stashd-Browser-Extension-Spec.md` ("click Stashd
+  → preflight/create against the same public API the web UI uses"); no code exists yet, no v1
+  roadmap phase assigned. Slice 6 confirmed the web UI deliberately dogfoods the same `/api/v1`
+  endpoints this spec calls for, so the API side is unintentionally ready whenever this gets picked up.
