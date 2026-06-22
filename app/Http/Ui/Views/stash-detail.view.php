@@ -156,22 +156,42 @@
 						</template>
 					</ul>
 
-					<div class="flex items-center gap-2 border-t border-line p-4">
-						<select x-model="newBroadcastType"
-							class="rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber">
-							<option value="filesystem_series">Filesystem series</option>
-							<option value="jellyfin_series">Jellyfin series</option>
-							<option value="plex_series">Plex series</option>
-							<option value="audio_podcast">Audio podcast</option>
-							<option value="video_podcast">Video podcast</option>
-						</select>
-						<input type="text" x-model="newBroadcastName" placeholder="Broadcast name"
-							class="flex-1 rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
-						<button type="button" x-on:click="createBroadcast()"
-							x-bind:disabled="creatingBroadcast || newBroadcastName.trim() === ''"
-							class="shrink-0 rounded bg-amber px-3 py-2 text-[13px] font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-60">
-							Add broadcast
-						</button>
+					<div class="border-t border-line p-4">
+						<div class="flex items-center gap-2">
+							<select x-model="newBroadcastType" x-on:change="onBroadcastTypeChanged()"
+								class="rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber">
+								<option value="filesystem_series">Filesystem series</option>
+								<option value="jellyfin_series">Jellyfin series</option>
+								<option value="plex_series">Plex series</option>
+								<option value="audio_podcast">Audio podcast</option>
+								<option value="video_podcast">Video podcast</option>
+							</select>
+							<input type="text" x-model="newBroadcastName" placeholder="Broadcast name"
+								class="flex-1 rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
+							<button type="button" x-on:click="createBroadcast()"
+								x-bind:disabled="creatingBroadcast || newBroadcastName.trim() === ''"
+								class="shrink-0 rounded bg-amber px-3 py-2 text-[13px] font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-60">
+								Add broadcast
+							</button>
+						</div>
+
+						<div class="mt-3 rounded border border-warn/40 bg-warn/10 p-3" x-show="broadcastPolicyMismatchMessage()">
+							<p class="text-[12px] text-warn" x-text="broadcastPolicyMismatchMessage()"></p>
+							<p class="mt-1 text-[12px] text-muted">It'll still be created — there just won't be anything to publish yet.</p>
+							<div class="mt-2 flex items-center gap-2">
+								<select x-model="compatibleDownloadPolicyChoice"
+									class="rounded border border-line bg-espresso px-2 py-1 text-[12px] text-cream outline-none focus:border-amber">
+									<template x-for="policy in compatibleDownloadPolicies()" x-bind:key="policy">
+										<option x-bind:value="policy" x-text="policy.replace(/_/g, ' ')"></option>
+									</template>
+								</select>
+								<button type="button" x-on:click="updateStashDownloadPolicyTo(compatibleDownloadPolicyChoice)"
+									x-bind:disabled="updatingDownloadPolicy"
+									class="rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-60">
+									Update download policy
+								</button>
+							</div>
+						</div>
 					</div>
 				</section>
 			</div>

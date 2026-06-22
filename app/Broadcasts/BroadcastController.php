@@ -11,6 +11,7 @@ use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
+use App\Stashes\DownloadPolicy;
 use App\Stashes\StashRepository;
 use App\Support\PrefixedUlid;
 use App\System\Storage\PathSanitizer;
@@ -127,6 +128,7 @@ final readonly class BroadcastController
 
         return new Json([
             'broadcast' => $this->mapBroadcast($broadcast),
+            'policy_mismatch' => $this->policyMismatch($stash->downloadPolicy, $type),
         ], Status::CREATED);
     }
 
@@ -159,6 +161,27 @@ final readonly class BroadcastController
                 $this->broadcastItems->listForBroadcast(PrefixedUlid::parse($id)),
             ),
         ]);
+    }
+
+    /** @return array<string, mixed>|null */
+    private function policyMismatch(DownloadPolicy $policy, BroadcastType $type): ?array
+    {
+        if ($type->isSatisfiedByDownloadPolicy($policy)) {
+            return null;
+        }
+
+        return [
+            'download_policy' => $policy->value,
+            'broadcast_type' => $type->value,
+            'message' => "This stash's \"{$policy->value}\" download policy won't produce media for a \"{$type->value}\" broadcast.",
+            'compatible_download_policies' => array_values(array_map(
+                static fn (DownloadPolicy $candidate): string => $candidate->value,
+                array_filter(
+                    DownloadPolicy::cases(),
+                    static fn (DownloadPolicy $candidate): bool => $type->isSatisfiedByDownloadPolicy($candidate),
+                ),
+            )),
+        ];
     }
 
     private function notFound(string $message): Json

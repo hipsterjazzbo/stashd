@@ -115,6 +115,23 @@ function formatDuration(seconds: number | null | undefined): string {
 	return `${hours}h ${minutes % 60}m`
 }
 
+const ALL_DOWNLOAD_POLICIES = ['video', 'audio_only', 'metadata_only', 'manual_download']
+
+/**
+ * Mirrors App\Broadcasts\BroadcastType::isSatisfiedByDownloadPolicy() — kept
+ * here only for instant reactive feedback as the user picks a broadcast type;
+ * the server-side check in BroadcastController::create() is authoritative.
+ */
+function downloadPolicySatisfiesBroadcastType(policy: string, broadcastType: string): boolean {
+	if (policy === 'metadata_only') return false
+	if (policy === 'audio_only') return broadcastType !== 'video_podcast'
+	return true
+}
+
+function compatibleDownloadPolicies(broadcastType: string): string[] {
+	return ALL_DOWNLOAD_POLICIES.filter((policy) => downloadPolicySatisfiesBroadcastType(policy, broadcastType))
+}
+
 function formatRelativeTime(iso: string | null | undefined): string {
 	if (!iso) return '—'
 
@@ -783,6 +800,8 @@ function stashDetailComponent(stashId: string) {
 		newBroadcastType: 'filesystem_series',
 		newBroadcastName: '',
 		creatingBroadcast: false,
+		compatibleDownloadPolicyChoice: 'video',
+		updatingDownloadPolicy: false,
 		statusBadge,
 		formatRelativeTime,
 		formatDuration,
@@ -818,6 +837,8 @@ function stashDetailComponent(stashId: string) {
 		async init() {
 			await this.refresh()
 			this.loading = false
+
+			this.onBroadcastTypeChanged()
 
 			const link = new URLSearchParams(window.location.search).get('link')
 			if (link) {
@@ -954,6 +975,50 @@ function stashDetailComponent(stashId: string) {
 				if (cause instanceof UnauthenticatedError) return
 				this.error = 'Could not delete that stash.'
 				this.deletingBusy = false
+			}
+		},
+
+		broadcastPolicyMismatchMessage(): string | null {
+			if (!this.stash || downloadPolicySatisfiesBroadcastType(this.stash.download_policy, this.newBroadcastType)) {
+				return null
+			}
+
+			const policy = this.stash.download_policy.replace(/_/g, ' ')
+			const type = this.newBroadcastType.replace(/_/g, ' ')
+			return `This stash's "${policy}" download policy won't produce media for a "${type}" broadcast.`
+		},
+
+		compatibleDownloadPolicies(): string[] {
+			return compatibleDownloadPolicies(this.newBroadcastType)
+		},
+
+		onBroadcastTypeChanged() {
+			const compatible = compatibleDownloadPolicies(this.newBroadcastType)
+			if (!compatible.includes(this.compatibleDownloadPolicyChoice)) {
+				this.compatibleDownloadPolicyChoice = compatible[0] ?? 'video'
+			}
+		},
+
+		async updateStashDownloadPolicyTo(policy: string) {
+			this.updatingDownloadPolicy = true
+			try {
+				const response = await apiFetch(`/api/v1/stashes/${stashId}`, {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ download_policy: policy }),
+				})
+				if (!response.ok) {
+					const body = (await response.json()) as { error?: { message?: string } }
+					this.error = body.error?.message ?? 'Could not update the download policy.'
+					return
+				}
+				this.error = null
+				await this.refresh()
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not reach the server.'
+			} finally {
+				this.updatingDownloadPolicy = false
 			}
 		},
 
