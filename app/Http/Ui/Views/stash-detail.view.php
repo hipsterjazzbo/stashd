@@ -39,7 +39,11 @@
 				</section>
 
 				<section class="rounded-lg border border-line bg-panel/60">
-					<h2 class="border-b border-line px-4 py-3 text-[13px] font-semibold text-cream">Inputs</h2>
+					<div class="flex items-center justify-between border-b border-line px-4 py-3">
+						<h2 class="text-[13px] font-semibold text-cream">Inputs</h2>
+						<button type="button" x-on:click="openAddInput()"
+							class="rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream">+ Add input</button>
+					</div>
 					<table class="w-full text-left text-[13px]" x-show="inputs.length > 0">
 						<thead>
 							<tr class="text-[11px] uppercase tracking-wide text-muted">
@@ -65,7 +69,10 @@
 							</template>
 						</tbody>
 					</table>
-					<p class="px-4 py-3 text-[13px] text-muted" x-show="inputs.length === 0">No inputs yet.</p>
+					<div class="px-4 py-3 text-[13px] text-muted" x-show="inputs.length === 0">
+						No inputs configured.
+						<button type="button" x-on:click="openAddInput()" class="text-amber transition-colors hover:text-amber-dim">+ Add input</button>
+					</div>
 				</section>
 
 				<section class="rounded-lg border border-line bg-panel/60">
@@ -254,6 +261,87 @@
 						x-bind:disabled="deletingBusy || loadingDeleteImpact"
 						class="rounded bg-error px-3 py-2 text-[13px] font-semibold text-cream transition-colors hover:opacity-90 disabled:opacity-60">Delete stash</button>
 				</div>
+			</div>
+		</div>
+
+		<div class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4" x-show="addInputOpen" x-cloak>
+			<div class="w-full max-w-md rounded-lg border border-line bg-panel p-4">
+				<h2 class="text-sm font-semibold text-cream">Add input</h2>
+				<p class="mt-1 text-[12px] text-error" x-show="addInputError" x-text="addInputError"></p>
+
+				<template x-if="addInputStep === 'paste'">
+					<div class="mt-3">
+						<label class="block">
+							<span class="mb-1 block text-[12px] text-muted">Channel, playlist, or video URL</span>
+							<input type="text" x-model="addInputSourceUri" placeholder="https://www.youtube.com/@..."
+								class="w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
+						</label>
+						<div class="mt-4 flex justify-end gap-2">
+							<button type="button" x-on:click="cancelAddInput()"
+								class="rounded border border-line px-3 py-2 text-[13px] text-muted transition-colors hover:text-cream">Cancel</button>
+							<button type="button" x-on:click="submitAddInputPreflight()"
+								x-bind:disabled="addInputSubmitting || addInputSourceUri.trim() === ''"
+								class="rounded bg-amber px-3 py-2 text-[13px] font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-60">Continue</button>
+						</div>
+					</div>
+				</template>
+
+				<template x-if="addInputStep === 'reviewing'">
+					<p class="mt-3 text-[13px] text-muted">Looking up that source…</p>
+				</template>
+
+				<template x-if="addInputStep === 'review'">
+					<div class="mt-3">
+						<div class="flex items-center gap-2">
+							<img x-show="addInputResolved?.source_avatar_uri" x-bind:src="addInputResolved?.source_avatar_uri"
+								class="h-8 w-8 rounded-full" alt=""/>
+							<div>
+								<p class="text-[13px] font-semibold text-cream" x-text="addInputResolved?.source_title ?? addInputResolved?.title ?? 'Unknown source'"></p>
+								<p class="text-[12px] text-muted">
+									<span x-show="addInputEstimatedItemCount !== null">approx. <span x-text="addInputEstimatedItemCount"></span> items</span>
+									<span x-show="addInputEstimatedTotalDurationSeconds"> · <span x-text="formatDuration(addInputEstimatedTotalDurationSeconds)"></span></span>
+								</p>
+							</div>
+						</div>
+
+						<ul class="mt-3 max-h-40 space-y-1 overflow-y-auto text-[12px] text-muted" x-show="addInputSampleItems.length > 0">
+							<template x-for="item in addInputSampleItems" x-bind:key="item.provider_item_id">
+								<li class="truncate" x-text="item.title"></li>
+							</template>
+						</ul>
+
+						<p class="mt-3 text-[12px] text-muted">Will download: <span x-text="stash?.download_policy.replace(/_/g, ' ')"></span> (per this stash's download policy).</p>
+
+						<div class="mt-4 flex justify-end gap-2">
+							<button type="button" x-on:click="cancelAddInput()"
+								class="rounded border border-line px-3 py-2 text-[13px] text-muted transition-colors hover:text-cream">Cancel</button>
+							<button type="button" x-on:click="confirmAddInput()"
+								x-bind:disabled="addInputSubmitting"
+								class="rounded bg-amber px-3 py-2 text-[13px] font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-60">Add input</button>
+						</div>
+					</div>
+				</template>
+
+				<template x-if="addInputStep === 'committing'">
+					<p class="mt-3 text-[13px] text-muted">Adding input and discovering items…</p>
+				</template>
+
+				<template x-if="addInputStep === 'failed'">
+					<div class="mt-3">
+						<template x-if="addInputUnsupported">
+							<p class="text-[13px] text-warn">That source isn't supported yet.
+								<a href="https://github.com/hipsterjazzbo/stashd/issues/new" target="_blank" rel="noopener"
+									class="text-amber transition-colors hover:text-amber-dim">Request support</a>.</p>
+						</template>
+						<template x-if="!addInputUnsupported">
+							<p class="text-[13px] text-error" x-text="addInputFailureMessage"></p>
+						</template>
+						<div class="mt-4 flex justify-end gap-2">
+							<button type="button" x-on:click="cancelAddInput()"
+								class="rounded border border-line px-3 py-2 text-[13px] text-muted transition-colors hover:text-cream">Close</button>
+						</div>
+					</div>
+				</template>
 			</div>
 		</div>
 	</div>

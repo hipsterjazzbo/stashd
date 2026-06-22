@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Stashes;
 
-final readonly class StashFromPreflightResult
+final readonly class StashInputCommitResult
 {
     public function __construct(
         public string $stashId,

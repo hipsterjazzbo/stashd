@@ -16,7 +16,7 @@ enum CommandType: string
     case BroadcastTrigger = 'broadcast.trigger';
     case BroadcastRotateToken = 'broadcast.rotate_token';
     case StashPreflight = 'stash.preflight';
-    case StashCreateFromPreflight = 'stash.create_from_preflight';
+    case StashAddInput = 'stash.add_input';
     case SystemPruneTemp = 'system.prune_temp';
     case SystemBoot = 'system.boot';
     case SystemStorageCheck = 'system.storage_check';

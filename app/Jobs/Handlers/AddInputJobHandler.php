@@ -14,17 +14,20 @@ use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
 use App\Stashes\CreateStashFromDiscovery;
+use App\Stashes\StashRepository;
 use App\Support\PrefixedUlid;
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
 use App\System\State\StateTransitionService;
+use RuntimeException;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
-final readonly class CreateFromPreflightJobHandler implements JobHandler
+final readonly class AddInputJobHandler implements JobHandler
 {
     public function __construct(
         private CreateStashFromDiscovery $stashFromPreflight,
+        private StashRepository $stashes,
         private CommandRepository $commands,
         private JobRepository $jobs,
         private StateTransitionService $transitions,
@@ -35,7 +38,7 @@ final readonly class CreateFromPreflightJobHandler implements JobHandler
 
     public function intent(): JobIntent
     {
-        return JobIntent::CreateFromPreflight;
+        return JobIntent::AddInput;
     }
 
     public function handle(JobRecord $job, JobHandlerContext $context): void
@@ -43,14 +46,19 @@ final readonly class CreateFromPreflightJobHandler implements JobHandler
         $command = $this->requireCommand($job);
         $this->transitions->transitionCommand($command, CommandState::Running);
         $context->heartbeat($job);
-        $context->progress($job, 0, 1, 'Creating stash from preflight');
+        $context->progress($job, 0, 1, 'Adding input to stash');
 
         $payload = $job->payloadJson === null
             ? []
             : json_decode($job->payloadJson, true, flags: JSON_THROW_ON_ERROR);
 
+        $stashId = PrefixedUlid::parse((string) ($payload['stash_id'] ?? ''));
+        $stash = $this->stashes->find($stashId)
+            ?? throw new RuntimeException('Add-input job targets a stash that no longer exists.');
+
         $preflightCommandId = PrefixedUlid::parse((string) ($payload['preflight_command_id'] ?? ''));
-        $result = $this->stashFromPreflight->commit($preflightCommandId, $payload);
+        $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
+        $result = $this->stashFromPreflight->commitInput($stash, $preflightCommandId, $options);
 
         $command->resultJson = json_encode($result->toArray(), JSON_THROW_ON_ERROR);
         $command->targetType = 'stash';
@@ -60,14 +68,14 @@ final readonly class CreateFromPreflightJobHandler implements JobHandler
         $job->progressCurrent = 1;
         $job->progressTotal = 1;
         $job->progressPercent = 100.0;
-        $job->progressLabel = 'Stash created from preflight';
+        $job->progressLabel = 'Input added to stash';
         $job->finishedAt = DateTime::now(Timezone::UTC);
         $this->jobs->save($job);
         $context->progress($job, 1, 1, $job->progressLabel);
 
         $this->transitions->transitionJob($job, JobState::Ready);
         $this->transitions->transitionCommand($command, CommandState::Completed);
-        $this->activity->stashCreatedFromPreflight($command, $job, $result);
+        $this->activity->stashInputCommitted($command, $job, $result);
         $this->publisher->jobCompleted($job);
         $this->activity->commandCompleted($command);
     }
@@ -75,10 +83,10 @@ final readonly class CreateFromPreflightJobHandler implements JobHandler
     private function requireCommand(JobRecord $job): CommandRecord
     {
         if ($job->commandId === null) {
-            throw new \RuntimeException('Create-from-preflight job is missing commandId.');
+            throw new RuntimeException('Add-input job is missing commandId.');
         }
 
         return $this->commands->find(PrefixedUlid::parse($job->commandId))
-            ?? throw new \RuntimeException('Create-from-preflight command not found.');
+            ?? throw new RuntimeException('Add-input command not found.');
     }
 }

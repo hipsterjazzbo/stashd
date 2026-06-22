@@ -10,6 +10,7 @@ use App\Commands\CommandRepository;
 use App\Commands\CommandState;
 use App\Commands\CommandType;
 use App\Downloads\DownloadPolicyEvaluator;
+use App\Jobs\JobIntent;
 use App\Providers\ProviderDates;
 use App\Providers\StashdUri;
 use App\Support\PrefixedUlid;
@@ -19,6 +20,15 @@ use InvalidArgumentException;
 
 use function Tempest\Support\str;
 
+/**
+ * Commits a completed preflight into a stash input on an existing stash.
+ *
+ * Preflight only resolves identity and takes a cheap sample; this class re-runs
+ * full discovery (the best available strategy, e.g. the YouTube Data API once
+ * keyed) rather than replaying preflight's frozen sample, then persists the
+ * stash input, media items, sources, and stash items, deduplicating against
+ * whatever the stash (and the wider Vault) already has.
+ */
 final readonly class CreateStashFromDiscovery
 {
     public function __construct(
@@ -30,55 +40,53 @@ final readonly class CreateStashFromDiscovery
         private StashItemRepository $stashItems,
         private CommandDispatchService $commandDispatch,
         private DownloadPolicyEvaluator $downloadPolicy,
+        private DiscoverStashInput $discovery,
     ) {
     }
 
     /**
      * @param array<string, mixed> $options
      */
-    public function commit(PrefixedUlid $preflightCommandId, array $options = []): StashFromPreflightResult
+    public function commitInput(StashRecord $stash, PrefixedUlid $preflightCommandId, array $options = []): StashInputCommitResult
     {
         $preflight = $this->requireCompletedPreflight($preflightCommandId);
         $preflightResult = $this->decodePreflightResult($preflight);
 
-        $resolved = $preflightResult['resolved_input'] ?? [];
-        $discovery = $preflightResult['discovery'] ?? [];
-        $discoveredItems = $discovery['discovered_items'] ?? [];
+        $sourceUri = str((string) ($preflightResult['source_uri'] ?? ''))->trim()->toString();
+        $sourceTitle = is_string($preflightResult['source_title'] ?? null) ? $preflightResult['source_title'] : null;
+        $origin = is_string($preflightResult['origin'] ?? null) ? $preflightResult['origin'] : PreflightOrigin::Api->value;
 
-        if (! is_array($discoveredItems) || $discoveredItems === []) {
-            throw new InvalidArgumentException('Preflight result is missing discovered items.');
+        if ($sourceUri === '') {
+            throw new InvalidArgumentException('Preflight result is missing its source_uri.');
         }
 
-        $name = str((string) ($options['name'] ?? $resolved['title'] ?? 'New Stash'))->trim()->toString();
-        $requestedSlug = str((string) ($options['slug'] ?? $this->stashes->slugify($name)))->trim()->toString();
-        $slug = $this->stashes->nextAvailableSlug($requestedSlug);
+        $discovered = $this->discovery->execute([
+            'source_uri' => $sourceUri,
+            'source_title' => $sourceTitle,
+            'origin' => $origin,
+        ], JobIntent::InitialBackfill);
 
-        $syncMode = SyncMode::tryFrom((string) ($options['sync_mode'] ?? SyncMode::Automatic->value)) ?? SyncMode::Automatic;
-        $downloadPolicy = DownloadPolicy::tryFrom((string) ($options['download_policy'] ?? DownloadPolicy::Video->value)) ?? DownloadPolicy::Video;
-        $organizationMode = OrganizationMode::tryFrom((string) ($options['organization_mode'] ?? OrganizationMode::Flat->value)) ?? OrganizationMode::Flat;
-
-        $stash = $this->stashes->create(
-            name: $name,
-            slug: $slug,
-            syncMode: $syncMode,
-            downloadPolicy: $downloadPolicy,
-            organizationMode: $organizationMode,
-            description: is_string($options['description'] ?? null) ? $options['description'] : null,
-            iconUri: is_string($resolved['source_avatar_uri'] ?? null) ? $resolved['source_avatar_uri'] : null,
-        );
+        $resolved = $discovered->resolvedInput;
+        $discoveredItems = $discovered->discoveredItems;
 
         $stashId = PrefixedUlid::parse((string) $stash->id);
-        $inputType = StashInputTypeMapper::fromProviderInputType((string) ($resolved['input_type'] ?? 'video'));
+        $inputType = StashInputTypeMapper::fromProviderInputType($resolved->inputType);
+
+        $syncMode = SyncMode::tryFrom((string) ($options['sync_mode'] ?? SyncMode::Automatic->value)) ?? SyncMode::Automatic;
 
         $stashInput = $this->stashInputs->create(
             stashId: $stashId,
-            providerKey: (string) ($resolved['provider_key'] ?? 'fake'),
+            providerKey: $resolved->providerKey,
             inputType: $inputType,
-            sourceUri: (string) ($resolved['source_uri'] ?? $preflightResult['source_uri'] ?? ''),
-            providerInputId: (string) ($resolved['provider_input_id'] ?? ''),
-            title: is_string($resolved['title'] ?? null) ? $resolved['title'] : null,
+            sourceUri: $resolved->sourceUri->toString(),
+            providerInputId: $resolved->providerInputId,
+            title: $resolved->title,
             syncMode: $syncMode,
         );
+
+        if ($stash->iconUri === null && $resolved->sourceAvatarUri !== null) {
+            $this->stashes->update($stash, iconUri: $resolved->sourceAvatarUri->toString());
+        }
 
         $stashInputId = PrefixedUlid::parse((string) $stashInput->id);
         $mediaItemsCreated = 0;
@@ -107,14 +115,11 @@ final readonly class CreateStashFromDiscovery
 
             $canonicalUri = StashdUri::parse($canonicalUriRaw);
 
-            $existingMedia = $this->mediaItems->findByProviderIdentity(
-                (string) ($resolved['provider_key'] ?? 'fake'),
-                $providerItemId,
-            );
+            $existingMedia = $this->mediaItems->findByProviderIdentity($resolved->providerKey, $providerItemId);
 
             if ($existingMedia === null) {
                 $mediaItem = $this->mediaItems->create(
-                    providerKey: (string) ($resolved['provider_key'] ?? 'fake'),
+                    providerKey: $resolved->providerKey,
                     providerItemId: $providerItemId,
                     canonicalUri: $canonicalUri,
                     title: $title,
@@ -137,8 +142,8 @@ final readonly class CreateStashFromDiscovery
             if ($this->mediaItemSources->findForMediaItemAndInput($mediaItemId, $stashInputId) === null) {
                 $this->mediaItemSources->create(
                     mediaItemId: $mediaItemId,
-                    providerKey: (string) ($resolved['provider_key'] ?? 'fake'),
-                    providerInputId: (string) ($resolved['provider_input_id'] ?? ''),
+                    providerKey: $resolved->providerKey,
+                    providerInputId: $resolved->providerInputId,
                     discoveredUri: $canonicalUri->toString(),
                     stashInputId: $stashInputId,
                     position: $index + 1,
@@ -171,7 +176,7 @@ final readonly class CreateStashFromDiscovery
             }
         }
 
-        return new StashFromPreflightResult(
+        return new StashInputCommitResult(
             stashId: (string) $stash->id,
             stashInputId: (string) $stashInput->id,
             mediaItemsCreated: $mediaItemsCreated,
@@ -191,7 +196,7 @@ final readonly class CreateStashFromDiscovery
         }
 
         if ($command->state !== CommandState::Completed) {
-            throw new InvalidArgumentException('Preflight command must be completed before creating a stash.');
+            throw new InvalidArgumentException('Preflight command must be completed before adding an input.');
         }
 
         if ($command->resultJson === null) {

@@ -300,10 +300,22 @@ case "$review_body" in
         ;;
 esac
 
-create_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/commands" \
+stash_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/stashes" \
     -H 'Content-Type: application/json' \
     -H "Authorization: Bearer ${token}" \
-    -d "{\"type\":\"stash.create_from_preflight\",\"options\":{\"preflight_command_id\":\"${preflight_command_id}\",\"slug\":\"smoke-e2e-stash\"}}")"
+    -d '{"name":"smoke-e2e-stash"}')"
+echo "$stash_body"
+
+stash_id="$(printf '%s' "$stash_body" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
+if [ -z "$stash_id" ]; then
+    echo "smoke failed: could not create empty stash" >&2
+    exit 1
+fi
+
+create_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/stashes/${stash_id}/inputs" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer ${token}" \
+    -d "{\"preflight_command_id\":\"${preflight_command_id}\"}")"
 echo "$create_body"
 
 create_command_id="$(printf '%s' "$create_body" | sed -n 's/.*"command_id":"\([^"]*\)".*/\1/p')"
@@ -321,7 +333,7 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
 done
 
 if [ "$create_state" != "completed" ]; then
-    echo "smoke failed: create-from-preflight command did not complete (state=${create_state})" >&2
+    echo "smoke failed: add-input command did not complete (state=${create_state})" >&2
     echo "$create_show" >&2
     exit 1
 fi
@@ -329,12 +341,10 @@ fi
 case "$create_show" in
     *'"stash_id"'*) ;;
     *)
-        echo "smoke failed: create-from-preflight missing stash_id in result" >&2
+        echo "smoke failed: add-input missing stash_id in result" >&2
         exit 1
         ;;
 esac
-
-stash_id="$(printf '%s' "$create_show" | sed -n 's/.*"stash_id":"\([^"]*\)".*/\1/p')"
 media_item_id="$($CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite \
     "SELECT mediaItemId FROM stash_items WHERE stashId = '${stash_id}' ORDER BY position ASC LIMIT 1;")"
 

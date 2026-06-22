@@ -143,16 +143,16 @@ final readonly class ActivityEventService
         return $record;
     }
 
-    public function stashCreatedFromPreflight(
-        CommandRecord $command,
-        JobRecord $job,
-        \App\Stashes\StashFromPreflightResult $result,
+    public function stashInputCommitted(
+        CommandRecord                       $command,
+        JobRecord                           $job,
+        \App\Stashes\StashInputCommitResult $result,
     ): ActivityEventRecord {
         $record = $this->events->create(
             level: ActivityLevel::Success,
-            type: 'stash.created_from_preflight',
+            type: 'stash.input_added',
             message: sprintf(
-                'Stash created from preflight with %d new media items.',
+                'Input added to stash with %d new media items.',
                 $result->mediaItemsCreated,
             ),
             entityType: 'stash',

@@ -226,6 +226,42 @@ function summarizeEvent(event: ActivityEvent): string {
 // listener, so every name has to be wired up individually.
 const EVENT_TYPES = ['job.created', 'job.progress', 'job.completed', 'job.failed', 'activity.created'] as const
 
+/**
+ * Opens one EventSource, re-running `checkTerminal` on every relevant SSE
+ * event (and once immediately, in case the thing it's waiting on already
+ * finished before this connection opened), and closes the connection as soon
+ * as it returns true.
+ *
+ * Only for short, one-shot waits (preflight/add-input steps) — never held
+ * open for a page's whole lifetime like Dashboard/Activity/Stash detail.
+ * EventsController holds a RoadRunner worker for its full poll-loop duration
+ * regardless of how soon the client closes (see docs/TODO.md's SSE note), so
+ * this is used once or twice per input added, not perpetually.
+ */
+function awaitSseTerminal(checkTerminal: () => Promise<boolean>): void {
+	if (!('EventSource' in window)) {
+		void checkTerminal()
+		return
+	}
+
+	const source = new EventSource('/api/v1/events')
+	let closed = false
+
+	const tick = async () => {
+		if (closed) return
+		if (await checkTerminal()) {
+			closed = true
+			source.close()
+		}
+	}
+
+	for (const type of EVENT_TYPES) {
+		source.addEventListener(type, () => void tick())
+	}
+
+	void tick()
+}
+
 interface StorageLocation {
 	key: string
 	path: string
@@ -263,6 +299,65 @@ interface JobSummary {
 	heartbeat_at: string | null
 	created_at: string
 	updated_at: string
+}
+
+interface ResolvedInputSummary {
+	provider_key: string
+	input_type: string
+	source_uri: string
+	provider_input_id: string
+	title: string | null
+	source_title: string | null
+	source_avatar_uri: string | null
+	estimated_item_count: number | null
+}
+
+interface DiscoveredItemSummary {
+	provider_item_id: string
+	canonical_uri: string
+	title: string
+	description: string | null
+	duration_seconds: number | null
+	published_at: string | null
+	thumbnail_uri: string | null
+}
+
+interface PreflightReview {
+	command_id: string
+	state: string
+	review_url: string | null
+	preflight: {
+		source_uri: string
+		source_title: string | null
+		origin: string
+		resolved_input: ResolvedInputSummary | null
+		discovery: {
+			strategy_key: string
+			estimated_item_count: number
+			estimated_total_duration_seconds: number
+			discovered_items: DiscoveredItemSummary[]
+			sample_items: DiscoveredItemSummary[]
+		} | null
+	} | null
+	ui_note: string
+}
+
+interface CommandSummary {
+	id: string
+	type: string
+	state: string
+	target_type: string | null
+	target_id: string | null
+	options: Record<string, unknown> | null
+	result: Record<string, unknown> | null
+	created_by_user_id: string | null
+	created_at: string
+	updated_at: string
+}
+
+interface CommandShowResponse {
+	command: CommandSummary
+	jobs: JobSummary[]
 }
 
 interface StashSummary {
@@ -673,6 +768,7 @@ function stashDetailComponent(stashId: string) {
 		creatingBroadcast: false,
 		statusBadge,
 		formatRelativeTime,
+		formatDuration,
 
 		editingOpen: false,
 		editForm: { name: '', description: '', syncMode: 'automatic', downloadPolicy: 'video', organizationMode: 'flat' } as StashEditForm,
@@ -683,9 +779,31 @@ function stashDetailComponent(stashId: string) {
 		loadingDeleteImpact: false,
 		deletingBusy: false,
 
+		addInputOpen: false,
+		addInputStep: 'paste' as 'paste' | 'reviewing' | 'review' | 'committing' | 'failed',
+		addInputSourceUri: '',
+		addInputSubmitting: false,
+		addInputError: null as string | null,
+		addInputPreflightCommandId: null as string | null,
+		addInputCommitCommandId: null as string | null,
+		addInputResolved: null as ResolvedInputSummary | null,
+		addInputEstimatedItemCount: null as number | null,
+		addInputEstimatedTotalDurationSeconds: null as number | null,
+		addInputSampleItems: [] as DiscoveredItemSummary[],
+		addInputFailureMessage: null as string | null,
+		addInputUnsupported: false,
+
 		async init() {
 			await this.refresh()
 			this.loading = false
+
+			const link = new URLSearchParams(window.location.search).get('link')
+			if (link) {
+				window.history.replaceState({}, '', window.location.pathname)
+				this.openAddInput()
+				this.addInputSourceUri = link
+				void this.submitAddInputPreflight()
+			}
 
 			if ('EventSource' in window) {
 				const source = new EventSource('/api/v1/events')
@@ -842,6 +960,146 @@ function stashDetailComponent(stashId: string) {
 				this.error = 'Could not reach the server.'
 			} finally {
 				this.creatingBroadcast = false
+			}
+		},
+
+		openAddInput() {
+			this.addInputOpen = true
+			this.addInputStep = 'paste'
+			this.addInputSourceUri = ''
+			this.addInputError = null
+			this.addInputResolved = null
+			this.addInputEstimatedItemCount = null
+			this.addInputEstimatedTotalDurationSeconds = null
+			this.addInputSampleItems = []
+			this.addInputFailureMessage = null
+			this.addInputUnsupported = false
+		},
+
+		cancelAddInput() {
+			this.addInputOpen = false
+			this.addInputStep = 'paste'
+			this.addInputPreflightCommandId = null
+			this.addInputCommitCommandId = null
+		},
+
+		async submitAddInputPreflight() {
+			if (this.addInputSourceUri.trim() === '') return
+			this.addInputSubmitting = true
+			try {
+				const response = await apiFetch('/api/v1/stashes/preflight', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						source_uri: this.addInputSourceUri.trim(),
+						origin: 'web_ui',
+					}),
+				})
+				if (!response.ok) {
+					const body = (await response.json()) as { error?: { message?: string } }
+					this.addInputError = body.error?.message ?? 'Could not start discovery.'
+					return
+				}
+				const body = (await response.json()) as { command_id: string }
+				this.addInputPreflightCommandId = body.command_id
+				this.addInputError = null
+				this.addInputStep = 'reviewing'
+				awaitSseTerminal(() => this.checkAddInputPreflightTerminal())
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.addInputError = 'Could not reach the server.'
+			} finally {
+				this.addInputSubmitting = false
+			}
+		},
+
+		async checkAddInputPreflightTerminal(): Promise<boolean> {
+			try {
+				const response = await apiFetch(`/api/v1/commands/${this.addInputPreflightCommandId}`)
+				const body = (await response.json()) as CommandShowResponse
+
+				if (body.command.state === 'completed') {
+					const review = await apiFetch(`/api/v1/stashes/preflight/${this.addInputPreflightCommandId}/review`)
+					const reviewBody = (await review.json()) as PreflightReview
+					const discovery = reviewBody.preflight?.discovery ?? null
+					this.addInputResolved = reviewBody.preflight?.resolved_input ?? null
+					this.addInputEstimatedItemCount = discovery?.estimated_item_count ?? null
+					this.addInputEstimatedTotalDurationSeconds = discovery?.estimated_total_duration_seconds ?? null
+					this.addInputSampleItems = discovery?.sample_items ?? []
+					this.addInputStep = 'review'
+					return true
+				}
+
+				if (body.command.state === 'failed' || body.command.state === 'rejected') {
+					const lastError = body.jobs[0]?.last_error ?? 'Discovery failed.'
+					this.addInputUnsupported = lastError.startsWith('unsupported_provider_url:')
+					this.addInputFailureMessage = lastError
+					this.addInputStep = 'failed'
+					return true
+				}
+
+				return false
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return true
+				this.addInputFailureMessage = 'Could not reach the server.'
+				this.addInputStep = 'failed'
+				return true
+			}
+		},
+
+		async confirmAddInput() {
+			if (!this.addInputPreflightCommandId) return
+			this.addInputSubmitting = true
+			try {
+				const response = await apiFetch(`/api/v1/stashes/${stashId}/inputs`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ preflight_command_id: this.addInputPreflightCommandId }),
+				})
+				if (!response.ok) {
+					const body = (await response.json()) as { error?: { message?: string } }
+					this.addInputError = body.error?.message ?? 'Could not add that input.'
+					return
+				}
+				const body = (await response.json()) as { command_id: string }
+				this.addInputCommitCommandId = body.command_id
+				this.addInputError = null
+				this.addInputStep = 'committing'
+				awaitSseTerminal(() => this.checkAddInputCommitTerminal())
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.addInputError = 'Could not reach the server.'
+			} finally {
+				this.addInputSubmitting = false
+			}
+		},
+
+		async checkAddInputCommitTerminal(): Promise<boolean> {
+			try {
+				const response = await apiFetch(`/api/v1/commands/${this.addInputCommitCommandId}`)
+				const body = (await response.json()) as CommandShowResponse
+
+				if (body.command.state === 'completed') {
+					this.addInputOpen = false
+					this.addInputStep = 'paste'
+					this.addInputPreflightCommandId = null
+					this.addInputCommitCommandId = null
+					await this.refresh()
+					return true
+				}
+
+				if (body.command.state === 'failed' || body.command.state === 'rejected') {
+					this.addInputFailureMessage = body.jobs[0]?.last_error ?? 'Adding the input failed.'
+					this.addInputStep = 'failed'
+					return true
+				}
+
+				return false
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return true
+				this.addInputFailureMessage = 'Could not reach the server.'
+				this.addInputStep = 'failed'
+				return true
 			}
 		},
 	}

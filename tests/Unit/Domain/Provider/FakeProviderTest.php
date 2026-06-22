@@ -19,12 +19,24 @@ test('fake provider discovers three channel items initially', function (): void 
         ->and($items[0]->description)->toBe('Fake episode 1 description.');
 });
 
-test('fake provider adds a fourth item on subsequent sync', function (): void {
+test('fake provider keeps three items across repeated discovery calls', function (): void {
     $provider = new FakeProvider();
     $input = $provider->resolveInput(StashdUri::parse('fake://channel/demo'));
     $strategy = $provider->discoveryStrategies()[0];
 
     $provider->discover($input, $strategy);
+    $items = $provider->discover($input, $strategy);
+
+    expect($items)->toHaveCount(3);
+});
+
+test('fake provider adds a fourth item once the sync generation is advanced', function (): void {
+    $provider = new FakeProvider();
+    $input = $provider->resolveInput(StashdUri::parse('fake://channel/demo'));
+    $strategy = $provider->discoveryStrategies()[0];
+
+    $provider->discover($input, $strategy);
+    $provider->advanceSyncGeneration($input->providerInputId);
     $items = $provider->discover($input, $strategy);
 
     expect($items)->toHaveCount(4);

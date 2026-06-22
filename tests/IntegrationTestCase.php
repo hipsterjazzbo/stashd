@@ -45,36 +45,42 @@ abstract class IntegrationTestCase extends IntegrationTest
     {
         $headers = $this->authHeaders();
 
+        $stash = $this->http->post('/api/v1/stashes', [
+            'name' => $channel . '-' . bin2hex(random_bytes(3)),
+            'download_policy' => 'manual_download',
+        ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
+        $stashId = $stash->body['stash']['id'];
+
         $preflight = $this->http->post('/api/v1/commands', [
             'type' => 'stash.preflight',
             'options' => ['source_uri' => 'fake://channel/' . $channel],
         ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
         $this->processAllJobs();
 
-        $create = $this->http->post('/api/v1/commands', [
-            'type' => 'stash.create_from_preflight',
-            'options' => [
-                'preflight_command_id' => $preflight->body['command_id'],
-                'slug' => $channel . '-' . bin2hex(random_bytes(3)),
-                'download_policy' => 'manual_download',
-            ],
+        $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
+            'preflight_command_id' => $preflight->body['command_id'],
         ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
         $this->processAllJobs();
 
-        $stash = \App\Stashes\StashRecord::select()->orderBy('createdAt', \Tempest\Database\Direction::DESC)->first();
         $stashItem = \App\Stashes\StashItemRecord::select()
-            ->where('stashId = ?', (string) $stash->id)
+            ->where('stashId = ?', $stashId)
             ->orderBy('position', \Tempest\Database\Direction::ASC)
             ->first();
         $media = \App\Vault\MediaItemRecord::findById(new \Tempest\Database\PrimaryKey((string) $stashItem->mediaItemId));
 
-        return [$headers, (string) $stash->id, (string) $media->id];
+        return [$headers, $stashId, (string) $media->id];
     }
 
     /** @return array{0: array{Authorization: string}, 1: string, 2: string} */
     public function bootstrapYouTubeDownloadStash(string $slug = 'youtube-download-demo'): array
     {
         $headers = $this->authHeaders();
+
+        $stash = $this->http->post('/api/v1/stashes', [
+            'name' => $slug . '-' . bin2hex(random_bytes(3)),
+            'download_policy' => 'manual_download',
+        ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
+        $stashId = $stash->body['stash']['id'];
 
         $preflight = $this->http->post('/api/v1/commands', [
             'type' => 'stash.preflight',
@@ -85,24 +91,18 @@ abstract class IntegrationTestCase extends IntegrationTest
         ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
         $this->processAllJobs();
 
-        $create = $this->http->post('/api/v1/commands', [
-            'type' => 'stash.create_from_preflight',
-            'options' => [
-                'preflight_command_id' => $preflight->body['command_id'],
-                'slug' => $slug . '-' . bin2hex(random_bytes(3)),
-                'download_policy' => 'manual_download',
-            ],
+        $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
+            'preflight_command_id' => $preflight->body['command_id'],
         ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
         $this->processAllJobs();
 
-        $stash = \App\Stashes\StashRecord::select()->orderBy('createdAt', \Tempest\Database\Direction::DESC)->first();
         $stashItem = \App\Stashes\StashItemRecord::select()
-            ->where('stashId = ?', (string) $stash->id)
+            ->where('stashId = ?', $stashId)
             ->orderBy('position', \Tempest\Database\Direction::ASC)
             ->first();
         $media = \App\Vault\MediaItemRecord::findById(new \Tempest\Database\PrimaryKey((string) $stashItem->mediaItemId));
 
-        return [$headers, (string) $stash->id, (string) $media->id];
+        return [$headers, $stashId, (string) $media->id];
     }
 
     /**

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\System\Wiring;
 
+use App\Jobs\Handlers\AddInputJobHandler;
 use App\Jobs\Handlers\BootJobHandler;
 use App\Jobs\Handlers\BroadcastJobHandler;
-use App\Jobs\Handlers\CreateFromPreflightJobHandler;
 use App\Jobs\Handlers\DownloadJobHandler;
 use App\Jobs\Handlers\MediaServerJobHandler;
 use App\Jobs\Handlers\PreflightJobHandler;
@@ -23,7 +23,7 @@ final class JobHandlerRegistryInitializer implements Initializer
         return new JobHandlerRegistry([
             $container->get(BootJobHandler::class),
             $container->get(PreflightJobHandler::class),
-            $container->get(CreateFromPreflightJobHandler::class),
+            $container->get(AddInputJobHandler::class),
             $container->get(DownloadJobHandler::class),
             $container->get(StorageCheckJobHandler::class),
             $container->get(VerifyVaultJobHandler::class),

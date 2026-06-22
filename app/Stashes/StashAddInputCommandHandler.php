@@ -14,7 +14,7 @@ use App\Jobs\JobIntent;
 use App\Jobs\JobRepository;
 use App\Support\PrefixedUlid;
 
-final readonly class StashCreateFromPreflightCommandHandler implements CommandHandler
+final readonly class StashAddInputCommandHandler implements CommandHandler
 {
     public function __construct(
         private CommandRepository $commands,
@@ -25,11 +25,21 @@ final readonly class StashCreateFromPreflightCommandHandler implements CommandHa
 
     public function type(): CommandType
     {
-        return CommandType::StashCreateFromPreflight;
+        return CommandType::StashAddInput;
     }
 
     public function validate(array $options): void
     {
+        $stashId = trim((string) ($options['stashId'] ?? $options['stash_id'] ?? ''));
+
+        if ($stashId === '') {
+            throw InvalidCommandPayload::withErrors(['stash_id is required.']);
+        }
+
+        if ($this->stashes->find(PrefixedUlid::parse($stashId)) === null) {
+            throw InvalidCommandPayload::withErrors(['Stash not found.']);
+        }
+
         $preflightCommandId = trim((string) ($options['preflightCommandId'] ?? $options['preflight_command_id'] ?? ''));
 
         if ($preflightCommandId === '') {
@@ -48,35 +58,33 @@ final readonly class StashCreateFromPreflightCommandHandler implements CommandHa
 
         $result = json_decode($command->resultJson, true);
 
-        if (! is_array($result) || ! is_array($result['discovery']['discovered_items'] ?? null) || $result['discovery']['discovered_items'] === []) {
-            throw InvalidCommandPayload::withErrors(['Preflight result is missing discovered items.']);
-        }
-
-        $slug = trim((string) ($options['slug'] ?? ''));
-
-        if ($slug !== '' && $this->stashes->findBySlug($slug) !== null) {
-            throw InvalidCommandPayload::withErrors(["Stash slug already exists: {$slug}"]);
+        if (! is_array($result) || trim((string) ($result['source_uri'] ?? '')) === '') {
+            throw InvalidCommandPayload::withErrors(['Preflight result is missing its resolved source.']);
         }
     }
 
     public function createJobs(CommandRecord $command, array $options): array
     {
+        $stashId = trim((string) ($options['stashId'] ?? $options['stash_id'] ?? ''));
         $preflightCommandId = trim((string) ($options['preflightCommandId'] ?? $options['preflight_command_id'] ?? ''));
         $commandId = PrefixedUlid::parse((string) $command->id);
         $payload = [
+            'stash_id' => $stashId,
             'preflight_command_id' => $preflightCommandId,
-            ...$this->normalizedStashOptions($options),
+            'options' => is_array($options['options'] ?? null) ? $options['options'] : [],
         ];
 
         $command->optionsJson = json_encode($payload, JSON_THROW_ON_ERROR);
+        $command->targetType = 'stash';
+        $command->targetId = $stashId;
         $this->commands->save($command);
 
         return [
             $this->jobs->create(
-                intent: JobIntent::CreateFromPreflight,
+                intent: JobIntent::AddInput,
                 commandId: $commandId,
                 entityType: 'stash',
-                entityId: $commandId,
+                entityId: PrefixedUlid::parse($stashId),
                 payload: $payload,
             ),
         ];
@@ -85,22 +93,5 @@ final readonly class StashCreateFromPreflightCommandHandler implements CommandHa
     public function extras(CommandRecord $command, array $options): array
     {
         return [];
-    }
-
-    /** @return array<string, mixed> */
-    private function normalizedStashOptions(array $options): array
-    {
-        $normalized = [];
-
-        foreach (['name', 'slug', 'description', 'sync_mode', 'download_policy', 'organization_mode'] as $key) {
-            $camel = lcfirst(str_replace('_', '', ucwords($key, '_')));
-            $value = $options[$camel] ?? $options[$key] ?? null;
-
-            if (is_string($value) && $value !== '') {
-                $normalized[$key] = $value;
-            }
-        }
-
-        return $normalized;
     }
 }

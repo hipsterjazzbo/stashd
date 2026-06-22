@@ -124,6 +124,7 @@ final class StashRepository
         ?SyncMode $syncMode = null,
         ?DownloadPolicy $downloadPolicy = null,
         ?OrganizationMode $organizationMode = null,
+        ?string $iconUri = null,
     ): StashRecord {
         if ($name !== null) {
             $stash->name = $name;
@@ -143,6 +144,10 @@ final class StashRepository
 
         if ($organizationMode !== null) {
             $stash->organizationMode = $organizationMode;
+        }
+
+        if ($iconUri !== null) {
+            $stash->iconUri = $iconUri;
         }
 
         $stash->updatedAt = DateTime::now(Timezone::UTC);

@@ -98,25 +98,23 @@ test('delete-impact reports media items shared with other stashes', function ():
     $headers = $this->authHeaders();
 
     $createStashForChannel = function (string $channel) use ($headers): string {
+        $stash = $this->http->post('/api/v1/stashes', [
+            'name' => $channel . '-' . bin2hex(random_bytes(3)),
+        ], headers: $headers)->assertStatus(Status::CREATED);
+        $stashId = $stash->body['stash']['id'];
+
         $preflight = $this->http->post('/api/v1/commands', [
             'type' => 'stash.preflight',
             'options' => ['source_uri' => 'fake://channel/' . $channel],
         ], headers: $headers)->assertStatus(Status::CREATED);
         $this->processAllJobs();
 
-        $create = $this->http->post('/api/v1/commands', [
-            'type' => 'stash.create_from_preflight',
-            'options' => [
-                'preflight_command_id' => $preflight->body['command_id'],
-                'slug' => $channel . '-' . bin2hex(random_bytes(3)),
-            ],
+        $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
+            'preflight_command_id' => $preflight->body['command_id'],
         ], headers: $headers)->assertStatus(Status::CREATED);
         $this->processAllJobs();
 
-        $result = $this->http->get('/api/v1/commands/' . $create->body['command_id'], headers: $headers);
-        $result->assertOk();
-
-        return $result->body['command']['result']['stash_id'];
+        return $stashId;
     };
 
     $stashIdA = $createStashForChannel('shared-channel');

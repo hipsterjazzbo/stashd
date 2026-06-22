@@ -38,8 +38,12 @@ test('youtube preflight command completes asynchronously using fixtures', functi
     expect($review->body['preflight']['discovery']['discovered_items'][0]['provider_item_id'])->toBe('demoVideo01');
 });
 
-test('youtube create from preflight creates domain records without downloading', function (): void {
+test('youtube add input creates domain records without downloading', function (): void {
     $headers = $this->authHeaders();
+
+    $stash = $this->http->post('/api/v1/stashes', [
+        'name' => 'YouTube Demo Stash',
+    ], headers: $headers)->assertStatus(Status::CREATED);
 
     $preflight = $this->http->post('/api/v1/commands', [
         'type' => 'stash.preflight',
@@ -49,17 +53,12 @@ test('youtube create from preflight creates domain records without downloading',
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    $create = $this->http->post('/api/v1/commands', [
-        'type' => 'stash.create_from_preflight',
-        'options' => [
-            'preflight_command_id' => $preflight->body['command_id'],
-            'name' => 'YouTube Demo Stash',
-            'slug' => 'youtube-demo-stash',
-        ],
+    $add = $this->http->post('/api/v1/stashes/' . $stash->body['stash']['id'] . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    $command = $this->http->get('/api/v1/commands/' . $create->body['command_id'], headers: $headers);
+    $command = $this->http->get('/api/v1/commands/' . $add->body['command_id'], headers: $headers);
     $command->assertOk();
 
     expect($command->body['command']['state'])->toBe('completed')
@@ -82,6 +81,10 @@ test('youtube media items deduplicate across multiple stashes', function (): voi
         title: 'Existing YouTube Item',
     );
 
+    $stash = $this->http->post('/api/v1/stashes', [
+        'name' => 'YouTube Dedupe Stash',
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
     $preflight = $this->http->post('/api/v1/commands', [
         'type' => 'stash.preflight',
         'options' => [
@@ -90,16 +93,12 @@ test('youtube media items deduplicate across multiple stashes', function (): voi
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    $create = $this->http->post('/api/v1/commands', [
-        'type' => 'stash.create_from_preflight',
-        'options' => [
-            'preflight_command_id' => $preflight->body['command_id'],
-            'slug' => 'youtube-dedupe-stash',
-        ],
+    $add = $this->http->post('/api/v1/stashes/' . $stash->body['stash']['id'] . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    $result = $this->http->get('/api/v1/commands/' . $create->body['command_id'], headers: $headers);
+    $result = $this->http->get('/api/v1/commands/' . $add->body['command_id'], headers: $headers);
     $result->assertOk();
 
     expect($result->body['command']['result']['media_items_created'])->toBe(2)
@@ -132,8 +131,13 @@ test('youtube preflight review exposes resolved channel identity for a handle so
         ->and($review->body['preflight']['resolved_input']['estimated_item_count'])->toBe(217);
 });
 
-test('youtube create from preflight populates stash icon_uri from the resolved channel avatar', function (): void {
+test('youtube add input populates stash icon_uri from the resolved channel avatar when unset', function (): void {
     $headers = $this->authHeaders();
+
+    $stash = $this->http->post('/api/v1/stashes', [
+        'name' => 'YouTube Handle Icon Stash',
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    expect(StashRecord::findById(new \Tempest\Database\PrimaryKey($stash->body['stash']['id']))->iconUri)->toBeNull();
 
     $preflight = $this->http->post('/api/v1/commands', [
         'type' => 'stash.preflight',
@@ -143,22 +147,18 @@ test('youtube create from preflight populates stash icon_uri from the resolved c
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    $create = $this->http->post('/api/v1/commands', [
-        'type' => 'stash.create_from_preflight',
-        'options' => [
-            'preflight_command_id' => $preflight->body['command_id'],
-            'slug' => 'youtube-handle-icon-stash',
-        ],
+    $add = $this->http->post('/api/v1/stashes/' . $stash->body['stash']['id'] . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    $command = $this->http->get('/api/v1/commands/' . $create->body['command_id'], headers: $headers);
+    $command = $this->http->get('/api/v1/commands/' . $add->body['command_id'], headers: $headers);
     $command->assertOk();
     expect($command->body['command']['state'])->toBe('completed');
 
-    $stash = StashRecord::findById(new \Tempest\Database\PrimaryKey($command->body['command']['result']['stash_id']));
-    expect($stash)->not->toBeNull()
-        ->and($stash->iconUri)->toBe('https://yt3.googleusercontent.com/stashd-demo-avatar.jpg');
+    $updatedStash = StashRecord::findById(new \Tempest\Database\PrimaryKey($stash->body['stash']['id']));
+    expect($updatedStash)->not->toBeNull()
+        ->and($updatedStash->iconUri)->toBe('https://yt3.googleusercontent.com/stashd-demo-avatar.jpg');
 });
 
 test('unsupported youtube url fails preflight job with stable error', function (): void {

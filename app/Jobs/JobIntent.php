@@ -16,7 +16,7 @@ enum JobIntent: string
     case Repair = 'repair';
     case StorageCheck = 'storage_check';
     case Preflight = 'preflight';
-    case CreateFromPreflight = 'create_from_preflight';
+    case AddInput = 'add_input';
     case Boot = 'boot';
     case VerifyVault = 'verify_vault';
     case MediaServer = 'media_server';

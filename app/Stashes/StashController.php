@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Stashes;
 
+use App\Auth\AuthContext;
+use App\Commands\CommandDispatchService;
+use App\Commands\CommandType;
+use App\Commands\InvalidCommandPayload;
 use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
@@ -28,6 +32,8 @@ final readonly class StashController
         private StashRepository $stashes,
         private StashItemRepository $stashItems,
         private StashInputRepository $stashInputs,
+        private CommandDispatchService $dispatch,
+        private AuthContext $context,
     ) {
     }
 
@@ -136,6 +142,34 @@ final readonly class StashController
                 $this->stashInputs->listForStash(PrefixedUlid::parse($id)),
             ),
         ]);
+    }
+
+    #[Post('/api/v1/stashes/{id}/inputs')]
+    public function addInput(string $id, Request $request): Json
+    {
+        if ($this->stashes->find(PrefixedUlid::parse($id)) === null) {
+            return $this->notFound('Stash not found.');
+        }
+
+        $body = ApiJson::normalizeRequest($request->body);
+
+        $options = [
+            'stash_id' => $id,
+            'preflight_command_id' => trim((string) ($body['preflightCommandId'] ?? '')),
+            'options' => is_array($body['options'] ?? null) ? $body['options'] : [],
+        ];
+
+        try {
+            $result = $this->dispatch->dispatch(
+                CommandType::StashAddInput,
+                $options,
+                $this->context->user(),
+            );
+        } catch (InvalidCommandPayload $exception) {
+            return $this->validationError($exception->getMessage());
+        }
+
+        return new Json(ApiJson::encode($result->toArray()), Status::CREATED);
     }
 
     #[Patch('/api/v1/stashes/{id}')]

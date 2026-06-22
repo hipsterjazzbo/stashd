@@ -27,6 +27,7 @@ test('fake provider matches committed fixture expectations', function (): void {
     expect($initial)->toHaveCount($fixture['discovery']['initial_item_count'])
         ->and($initial[0]->providerItemId)->toBe($fixture['discovery']['first_item_id']);
 
+    $provider->advanceSyncGeneration($input->providerInputId);
     $incremental = $provider->discover($input, $strategy);
     expect($incremental)->toHaveCount($fixture['discovery']['incremental_item_count']);
 });

@@ -13,7 +13,7 @@ use App\Downloads\ItemDownloadCommandHandler;
 use App\Jobs\JobRepository;
 use App\MediaServers\MediaServerCommandHandler;
 use App\MediaServers\MediaServerConnectionRepository;
-use App\Stashes\StashCreateFromPreflightCommandHandler;
+use App\Stashes\StashAddInputCommandHandler;
 use App\Stashes\StashPreflightCommandHandler;
 use App\System\SystemStorageCheckCommandHandler;
 use App\Vault\AssetVerifyCommandHandler;
@@ -32,7 +32,7 @@ final class CommandHandlerRegistryInitializer implements Initializer
 
         return new CommandHandlerRegistry([
             $container->get(StashPreflightCommandHandler::class),
-            $container->get(StashCreateFromPreflightCommandHandler::class),
+            $container->get(StashAddInputCommandHandler::class),
             $container->get(ItemDownloadCommandHandler::class),
             $container->get(SystemStorageCheckCommandHandler::class),
             $container->get(SystemVerifyVaultCommandHandler::class),

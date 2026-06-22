@@ -86,6 +86,8 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
             $this->failJob($job, $exception->errorCode . ': ' . $exception->getMessage());
         } catch (\App\MediaServers\MediaServerException $exception) {
             $this->failJob($job, $exception->errorCode . ': ' . $exception->getMessage());
+        } catch (\App\Providers\ProviderException $exception) {
+            $this->failJob($job, $exception->errorCode . ': ' . $exception->getMessage());
         } catch (\Throwable $throwable) {
             $this->failJob($job, $throwable->getMessage());
         }

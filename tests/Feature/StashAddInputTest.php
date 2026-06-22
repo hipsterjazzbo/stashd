@@ -6,7 +6,6 @@ namespace Tests\Feature;
 
 use App\Stashes\StashInputRecord;
 use App\Stashes\StashItemRecord;
-use App\Stashes\StashRecord;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
@@ -15,8 +14,13 @@ use App\Vault\MediaItemState;
 use Tempest\Database\PrimaryKey;
 use Tempest\Http\Status;
 
-test('create from preflight command creates stash domain records asynchronously', function (): void {
+test('add input command commits discovered items into an existing stash', function (): void {
     $headers = $this->authHeaders();
+
+    $stash = $this->http->post('/api/v1/stashes', [
+        'name' => 'Preflight Channel Stash',
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $stashId = $stash->body['stash']['id'];
 
     $preflight = $this->http->post('/api/v1/commands', [
         'type' => 'stash.preflight',
@@ -28,29 +32,20 @@ test('create from preflight command creates stash domain records asynchronously'
 
     $this->processAllJobs();
 
-    $create = $this->http->post('/api/v1/commands', [
-        'type' => 'stash.create_from_preflight',
-        'options' => [
-            'preflight_command_id' => $preflight->body['command_id'],
-            'name' => 'Preflight Channel Stash',
-            'slug' => 'preflight-channel-stash',
-        ],
+    $add = $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
     ], headers: $headers)->assertStatus(Status::CREATED);
 
     $this->processAllJobs();
 
-    $command = $this->http->get('/api/v1/commands/' . $create->body['command_id'], headers: $headers);
+    $command = $this->http->get('/api/v1/commands/' . $add->body['command_id'], headers: $headers);
     $command->assertOk();
     expect($command->body['command']['state'])->toBe('completed')
-        ->and($command->body['command']['result']['stash_id'])->toStartWith('stash_')
+        ->and($command->body['command']['result']['stash_id'])->toBe($stashId)
         ->and($command->body['command']['result']['media_items_created'])->toBe(3)
         ->and($command->body['command']['result']['stash_items_created'])->toBe(3);
 
-    $stash = StashRecord::findById(new \Tempest\Database\PrimaryKey($command->body['command']['result']['stash_id']));
-    expect($stash)->not->toBeNull()
-        ->and($stash->slug)->toBe('preflight-channel-stash');
-
-    $input = StashInputRecord::findById(new \Tempest\Database\PrimaryKey($command->body['command']['result']['stash_input_id']));
+    $input = StashInputRecord::findById(new PrimaryKey($command->body['command']['result']['stash_input_id']));
     expect($input)->not->toBeNull()
         ->and($input->sourceUri)->toBe('fake://channel/create-from-preflight');
 
@@ -58,7 +53,7 @@ test('create from preflight command creates stash domain records asynchronously'
         ->and(StashItemRecord::count()->execute())->toBe(3);
 });
 
-test('create from preflight reuses existing media items by provider identity', function (): void {
+test('add input reuses existing media items by provider identity', function (): void {
     $headers = $this->authHeaders();
     $mediaItems = $this->container->get(\App\Vault\MediaItemRepository::class);
 
@@ -69,50 +64,65 @@ test('create from preflight reuses existing media items by provider identity', f
         title: 'Existing Episode',
     );
 
+    $stash = $this->http->post('/api/v1/stashes', ['name' => 'Dedupe A'], headers: $headers)->assertStatus(Status::CREATED);
+
     $preflight = $this->http->post('/api/v1/commands', [
         'type' => 'stash.preflight',
         'options' => ['source_uri' => 'fake://channel/dedupe-a'],
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    $create = $this->http->post('/api/v1/commands', [
-        'type' => 'stash.create_from_preflight',
-        'options' => [
-            'preflight_command_id' => $preflight->body['command_id'],
-            'slug' => 'dedupe-a',
-        ],
+    $add = $this->http->post('/api/v1/stashes/' . $stash->body['stash']['id'] . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    $result = $this->http->get('/api/v1/commands/' . $create->body['command_id'], headers: $headers);
+    $result = $this->http->get('/api/v1/commands/' . $add->body['command_id'], headers: $headers);
     $result->assertOk();
     expect($result->body['command']['result']['media_items_created'])->toBe(2)
         ->and($result->body['command']['result']['media_items_reused'])->toBe(1)
         ->and(MediaItemRecord::count()->execute())->toBe(3);
 });
 
-test('create from preflight rejects incomplete preflight commands', function (): void {
+test('add input rejects incomplete preflight commands', function (): void {
     $headers = $this->authHeaders();
+
+    $stash = $this->http->post('/api/v1/stashes', ['name' => 'Should Not Add'], headers: $headers)->assertStatus(Status::CREATED);
 
     $preflight = $this->http->post('/api/v1/commands', [
         'type' => 'stash.preflight',
         'options' => ['source_uri' => 'fake://channel/incomplete'],
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $response = $this->http->post('/api/v1/commands', [
-        'type' => 'stash.create_from_preflight',
-        'options' => [
-            'preflight_command_id' => $preflight->body['command_id'],
-            'slug' => 'should-not-create',
-        ],
+    $response = $this->http->post('/api/v1/stashes/' . $stash->body['stash']['id'] . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
     ], headers: $headers);
 
     $response->assertStatus(Status::BAD_REQUEST);
     expect($response->body['error']['code'])->toBe('validation_error');
 });
 
-test('create from preflight persists discovered descriptions onto new media items', function (): void {
+test('add input returns 404 for an unknown stash', function (): void {
     $headers = $this->authHeaders();
+
+    $preflight = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.preflight',
+        'options' => ['source_uri' => 'fake://channel/no-such-stash'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $response = $this->http->post('/api/v1/stashes/stash_01ARZ3NDEKTSV4RRFFQ69G5FAV/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
+    ], headers: $headers);
+
+    $response->assertStatus(Status::NOT_FOUND);
+    expect($response->body['error']['code'])->toBe('not_found');
+});
+
+test('add input persists discovered descriptions onto new media items', function (): void {
+    $headers = $this->authHeaders();
+
+    $stash = $this->http->post('/api/v1/stashes', ['name' => 'With Descriptions'], headers: $headers)->assertStatus(Status::CREATED);
 
     $preflight = $this->http->post('/api/v1/commands', [
         'type' => 'stash.preflight',
@@ -120,12 +130,8 @@ test('create from preflight persists discovered descriptions onto new media item
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    $create = $this->http->post('/api/v1/commands', [
-        'type' => 'stash.create_from_preflight',
-        'options' => [
-            'preflight_command_id' => $preflight->body['command_id'],
-            'slug' => 'with-descriptions',
-        ],
+    $this->http->post('/api/v1/stashes/' . $stash->body['stash']['id'] . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
@@ -137,7 +143,7 @@ test('create from preflight persists discovered descriptions onto new media item
         ->and($media->description)->toBe('Fake episode 1 description.');
 });
 
-test('create from preflight leaves existing media item description unchanged when reused', function (): void {
+test('add input leaves existing media item description unchanged when reused', function (): void {
     $headers = $this->authHeaders();
     $mediaItems = $this->container->get(\App\Vault\MediaItemRepository::class);
 
@@ -149,18 +155,16 @@ test('create from preflight leaves existing media item description unchanged whe
         description: 'Manually curated description.',
     );
 
+    $stash = $this->http->post('/api/v1/stashes', ['name' => 'Dedupe Desc'], headers: $headers)->assertStatus(Status::CREATED);
+
     $preflight = $this->http->post('/api/v1/commands', [
         'type' => 'stash.preflight',
         'options' => ['source_uri' => 'fake://channel/dedupe-desc'],
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    $create = $this->http->post('/api/v1/commands', [
-        'type' => 'stash.create_from_preflight',
-        'options' => [
-            'preflight_command_id' => $preflight->body['command_id'],
-            'slug' => 'dedupe-desc',
-        ],
+    $this->http->post('/api/v1/stashes/' . $stash->body['stash']['id'] . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
@@ -171,8 +175,14 @@ test('create from preflight leaves existing media item description unchanged whe
     expect($media->description)->toBe('Manually curated description.');
 });
 
-test('create from preflight with video policy automatically downloads items without a manual command', function (): void {
+test('add input with video policy automatically downloads items without a manual command', function (): void {
     $headers = $this->authHeaders();
+
+    $stash = $this->http->post('/api/v1/stashes', [
+        'name' => 'Auto Download',
+        'download_policy' => 'video',
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $stashId = $stash->body['stash']['id'];
 
     $preflight = $this->http->post('/api/v1/commands', [
         'type' => 'stash.preflight',
@@ -180,21 +190,12 @@ test('create from preflight with video policy automatically downloads items with
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    $create = $this->http->post('/api/v1/commands', [
-        'type' => 'stash.create_from_preflight',
-        'options' => [
-            'preflight_command_id' => $preflight->body['command_id'],
-            'slug' => 'auto-download',
-            'download_policy' => 'video',
-        ],
+    $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    $result = $this->http->get('/api/v1/commands/' . $create->body['command_id'], headers: $headers);
-    $stashItems = StashItemRecord::select()
-        ->where('stashId = ?', $result->body['command']['result']['stash_id'])
-        ->all();
-
+    $stashItems = StashItemRecord::select()->where('stashId = ?', $stashId)->all();
     expect($stashItems)->toHaveCount(3);
 
     $assets = $this->container->get(AssetRepository::class);
@@ -211,8 +212,14 @@ test('create from preflight with video policy automatically downloads items with
     }
 });
 
-test('create from preflight with metadata_only policy enqueues no downloads', function (): void {
+test('add input with metadata_only policy enqueues no downloads', function (): void {
     $headers = $this->authHeaders();
+
+    $stash = $this->http->post('/api/v1/stashes', [
+        'name' => 'No Auto Download',
+        'download_policy' => 'metadata_only',
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $stashId = $stash->body['stash']['id'];
 
     $preflight = $this->http->post('/api/v1/commands', [
         'type' => 'stash.preflight',
@@ -220,21 +227,12 @@ test('create from preflight with metadata_only policy enqueues no downloads', fu
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    $create = $this->http->post('/api/v1/commands', [
-        'type' => 'stash.create_from_preflight',
-        'options' => [
-            'preflight_command_id' => $preflight->body['command_id'],
-            'slug' => 'no-auto-download',
-            'download_policy' => 'metadata_only',
-        ],
+    $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    $result = $this->http->get('/api/v1/commands/' . $create->body['command_id'], headers: $headers);
-    $stashItems = StashItemRecord::select()
-        ->where('stashId = ?', $result->body['command']['result']['stash_id'])
-        ->all();
-
+    $stashItems = StashItemRecord::select()->where('stashId = ?', $stashId)->all();
     expect($stashItems)->toHaveCount(3);
 
     foreach ($stashItems as $stashItem) {
@@ -245,36 +243,36 @@ test('create from preflight with metadata_only policy enqueues no downloads', fu
     expect(\App\Commands\CommandRecord::select()->where('type = ?', 'item.download')->all())->toHaveCount(0);
 });
 
-test('create from preflight assigns ordinal-suffixed slugs when names collide', function (): void {
+test('add input commits a second input from a different source into the same stash', function (): void {
     $headers = $this->authHeaders();
 
-    $createFromName = function (string $sourceUri) use ($headers): string {
+    $stash = $this->http->post('/api/v1/stashes', ['name' => 'Multi Input'], headers: $headers)->assertStatus(Status::CREATED);
+    $stashId = $stash->body['stash']['id'];
+
+    $addInput = function (string $sourceUri) use ($headers, $stashId): array {
         $preflight = $this->http->post('/api/v1/commands', [
             'type' => 'stash.preflight',
             'options' => ['source_uri' => $sourceUri],
         ], headers: $headers)->assertStatus(Status::CREATED);
         $this->processAllJobs();
 
-        $create = $this->http->post('/api/v1/commands', [
-            'type' => 'stash.create_from_preflight',
-            'options' => [
-                'preflight_command_id' => $preflight->body['command_id'],
-                'name' => 'Duplicate Name',
-            ],
+        $add = $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
+            'preflight_command_id' => $preflight->body['command_id'],
         ], headers: $headers)->assertStatus(Status::CREATED);
         $this->processAllJobs();
 
-        $result = $this->http->get('/api/v1/commands/' . $create->body['command_id'], headers: $headers);
-        $result->assertOk();
+        $command = $this->http->get('/api/v1/commands/' . $add->body['command_id'], headers: $headers);
+        $command->assertOk();
 
-        $stash = StashRecord::findById(new PrimaryKey($result->body['command']['result']['stash_id']));
-
-        return $stash->slug;
+        return $command->body['command']['result'];
     };
 
-    expect($createFromName('fake://channel/slug-collision-1'))->toBe('duplicate-name')
-        ->and($createFromName('fake://channel/slug-collision-2'))->toBe('duplicate-name-1')
-        ->and($createFromName('fake://channel/slug-collision-3'))->toBe('duplicate-name-2');
+    $first = $addInput('fake://channel/multi-input-a');
+    $second = $addInput('fake://playlist/multi-input-b');
+
+    expect($first['stash_input_id'])->not->toBe($second['stash_input_id'])
+        ->and(StashInputRecord::count()->execute())->toBe(2)
+        ->and(StashItemRecord::select()->where('stashId = ?', $stashId)->all())->toHaveCount(3 + 20);
 });
 
 test('next available slug fills gaps and accounts for literal ordinal-suffixed slugs', function (): void {

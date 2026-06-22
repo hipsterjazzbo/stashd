@@ -21,7 +21,12 @@ use function Tempest\Support\str;
  * Deterministic fake provider for tests and local development.
  *
  * URI patterns:
- *   fake://channel/{slug}   — 3 items, gains a 4th after sync generation 2+
+ *   fake://channel/{slug}   — 3 items, 4 once advanceSyncGeneration() bumps it
+ *                             to generation 2+ (simulates a routine resync
+ *                             discovering a new episode; calling discover()
+ *                             itself never advances the generation, so an
+ *                             unrelated extra call — e.g. a preview before a
+ *                             real commit — can't accidentally fabricate items)
  *   fake://playlist/{slug}  — 20 items
  *   fake://fail/metadata    — metadata failure simulation
  *   fake://fail/download    — download failure simulation
@@ -126,8 +131,7 @@ final class FakeProvider implements Provider
     private function discoverChannel(ResolvedInput $input): array
     {
         $slug = explode(':', $input->providerInputId)[1] ?? 'default';
-        $generation = ($this->syncGenerations[$input->providerInputId] ?? 0) + 1;
-        $this->syncGenerations[$input->providerInputId] = $generation;
+        $generation = $this->syncGenerations[$input->providerInputId] ?? 1;
         $count = $generation >= 2 ? 4 : 3;
 
         $items = [];
@@ -189,6 +193,16 @@ final class FakeProvider implements Provider
     public function isStrategyAvailable(ProviderStrategy $strategy): bool
     {
         return in_array($strategy->key, ['fake.feed', 'fake.metadata', 'fake.download'], true);
+    }
+
+    /**
+     * Advances a channel's simulated sync generation, so its next
+     * `discover()` call returns the grown item set. Test-only; production
+     * discovery never calls this.
+     */
+    public function advanceSyncGeneration(string $providerInputId): void
+    {
+        $this->syncGenerations[$providerInputId] = ($this->syncGenerations[$providerInputId] ?? 1) + 1;
     }
 
     public function resetSyncGenerations(): void

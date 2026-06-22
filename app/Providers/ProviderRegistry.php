@@ -46,6 +46,6 @@ final class ProviderRegistry
             }
         }
 
-        throw new InvalidArgumentException("No provider supports URI: {$uri}");
+        throw ProviderException::withUnsupportedUrl($uri->toString(), 'No provider supports this URL.');
     }
 }
