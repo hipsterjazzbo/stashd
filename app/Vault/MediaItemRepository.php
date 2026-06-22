@@ -87,4 +87,24 @@ final class MediaItemRepository
             ->orderBy('createdAt', Direction::DESC)
             ->all();
     }
+
+    /**
+     * @param list<string> $ids
+     *
+     * @return array<string, MediaItemRecord> keyed by id
+     */
+    public function listByIds(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $byId = [];
+
+        foreach (MediaItemRecord::select()->whereIn('id', $ids)->all() as $item) {
+            $byId[(string) $item->id] = $item;
+        }
+
+        return $byId;
+    }
 }

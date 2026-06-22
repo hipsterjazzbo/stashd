@@ -7,17 +7,23 @@ namespace App\Stashes\Api;
 use App\Http\Api\ApiJson;
 use App\Stashes\StashItemRecord;
 use App\Support\Arrayable;
+use App\Vault\MediaItemRecord;
 
 final readonly class StashItemResource implements Arrayable
 {
     public function __construct(
         private StashItemRecord $item,
+        private ?MediaItemRecord $mediaItem = null,
+        private ?int $totalAssetSizeBytes = null,
     ) {
     }
 
-    public static function fromRecord(StashItemRecord $item): self
-    {
-        return new self($item);
+    public static function fromRecord(
+        StashItemRecord $item,
+        ?MediaItemRecord $mediaItem = null,
+        ?int $totalAssetSizeBytes = null,
+    ): self {
+        return new self($item, $mediaItem, $totalAssetSizeBytes);
     }
 
     public function toArray(): array
@@ -41,6 +47,14 @@ final readonly class StashItemResource implements Arrayable
             'ignoredReason' => $this->item->ignoredReason,
             'createdAt' => $this->item->createdAt,
             'updatedAt' => $this->item->updatedAt,
+            'mediaItem' => $this->mediaItem === null ? null : [
+                'title' => $this->mediaItem->title,
+                'state' => $this->mediaItem->state->value,
+                'thumbnailUri' => $this->mediaItem->thumbnailUri,
+                'durationSeconds' => $this->mediaItem->durationSeconds,
+                'contentType' => $this->mediaItem->contentType,
+            ],
+            'totalAssetSizeBytes' => $this->totalAssetSizeBytes,
         ]);
     }
 }

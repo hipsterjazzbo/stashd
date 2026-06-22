@@ -99,6 +99,26 @@ test('jobs api lists recent jobs', function (): void {
     expect($jobs->body['jobs'])->not->toBeEmpty();
 });
 
+test('jobs api exposes entity_type and entity_id for a media item download job', function (): void {
+    [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('jobs-entity-link');
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'item.download',
+        'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    $jobs = $this->http->get('/api/v1/jobs', headers: $headers)->assertOk();
+
+    $downloadJobs = array_values(array_filter(
+        $jobs->body['jobs'],
+        static fn (array $job): bool => $job['entity_type'] === 'media_item' && $job['entity_id'] === $mediaItemId,
+    ));
+
+    expect($downloadJobs)->not->toBeEmpty();
+
+    $this->processAllJobs();
+});
+
 test('job worker records failure with last error', function (): void {
     $headers = $this->authHeaders();
     $jobs = $this->container->get(\App\Jobs\JobRepository::class);

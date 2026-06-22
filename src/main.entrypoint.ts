@@ -376,6 +376,8 @@ interface JobSummary {
 	id: string
 	command_id: string | null
 	intent: string
+	entity_type: string | null
+	entity_id: string | null
 	state: string
 	progress_current: number | null
 	progress_total: number | null
@@ -520,6 +522,14 @@ interface StashItemSummary {
 	ignored_reason: string | null
 	created_at: string
 	updated_at: string
+	media_item: {
+		title: string
+		state: string
+		thumbnail_uri: string | null
+		duration_seconds: number | null
+		content_type: string | null
+	} | null
+	total_asset_size_bytes: number | null
 }
 
 interface StashInputSummary {
@@ -895,6 +905,7 @@ function stashDetailComponent(stashId: string) {
 		error: null as string | null,
 		stash: null as StashSummary | null,
 		items: [] as StashItemSummary[],
+		jobs: [] as JobSummary[],
 		inputs: [] as StashInputSummary[],
 		broadcasts: [] as BroadcastSummary[],
 		actionPending: null as string | null,
@@ -962,21 +973,31 @@ function stashDetailComponent(stashId: string) {
 
 		async refresh() {
 			try {
-				const [stashResponse, itemsResponse, inputsResponse, broadcastsResponse] = await Promise.all([
+				const [stashResponse, itemsResponse, inputsResponse, broadcastsResponse, jobsResponse] = await Promise.all([
 					apiFetch(`/api/v1/stashes/${stashId}`),
 					apiFetch(`/api/v1/stashes/${stashId}/items`),
 					apiFetch(`/api/v1/stashes/${stashId}/inputs`),
 					apiFetch(`/api/v1/stashes/${stashId}/broadcasts`),
+					apiFetch('/api/v1/jobs'),
 				])
 				this.stash = (await stashResponse.json()).stash
 				this.items = (await itemsResponse.json()).items
 				this.inputs = (await inputsResponse.json()).inputs
 				this.broadcasts = (await broadcastsResponse.json()).broadcasts
+				this.jobs = (await jobsResponse.json()).jobs
 				this.error = null
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
 				this.error = 'Could not reach the server.'
 			}
+		},
+
+		// Download/metadata jobs record entity_type 'media_item' + entity_id on
+		// creation (ItemDownloadCommandHandler) — matching on that, rather than
+		// a per-item field, is what lets one items-list query (T11) show live
+		// progress without the backend needing to know about jobs at all.
+		activeJobFor(mediaItemId: string): JobSummary | null {
+			return this.jobs.find((job) => job.entity_type === 'media_item' && job.entity_id === mediaItemId && job.state === 'processing') ?? null
 		},
 
 		async runBroadcastAction(broadcastId: string, action: 'rebuild' | 'verify' | 'prune' | 'rotate_token') {

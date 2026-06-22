@@ -16,6 +16,8 @@ use App\Stashes\Api\StashItemResource;
 use App\Stashes\Api\StashResource;
 use App\Support\PrefixedUlid;
 use App\System\Activity\ActivityEventService;
+use App\Vault\AssetRepository;
+use App\Vault\MediaItemRepository;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
@@ -36,6 +38,8 @@ final readonly class StashController
         private CommandDispatchService $dispatch,
         private AuthContext $context,
         private ActivityEventService $activity,
+        private MediaItemRepository $mediaItems,
+        private AssetRepository $assets,
     ) {
     }
 
@@ -123,10 +127,23 @@ final readonly class StashController
             return $this->notFound('Stash not found.');
         }
 
+        $stashItems = $this->stashItems->listForStash(PrefixedUlid::parse($id));
+        $mediaItemIds = array_values(array_unique(array_map(
+            static fn ($item): string => $item->mediaItemId,
+            $stashItems,
+        )));
+
+        $mediaItemsById = $this->mediaItems->listByIds($mediaItemIds);
+        $totalSizeByMediaItem = $this->assets->totalSizeBytesByMediaItem($mediaItemIds);
+
         return new Json([
             'items' => array_map(
-                static fn ($item): array => StashItemResource::fromRecord($item)->toArray(),
-                $this->stashItems->listForStash(PrefixedUlid::parse($id)),
+                static fn ($item): array => StashItemResource::fromRecord(
+                    $item,
+                    $mediaItemsById[$item->mediaItemId] ?? null,
+                    $totalSizeByMediaItem[$item->mediaItemId] ?? null,
+                )->toArray(),
+                $stashItems,
             ),
         ]);
     }

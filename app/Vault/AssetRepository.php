@@ -94,4 +94,28 @@ final class AssetRepository
             ->where('state = ? AND path IS NOT NULL', AssetState::Ready)
             ->all();
     }
+
+    /**
+     * Total on-disk size across every asset for each of the given media
+     * items, in one query — avoids an N+1 per stash item on the items list.
+     *
+     * @param list<string> $mediaItemIds
+     *
+     * @return array<string, int> keyed by media item id
+     */
+    public function totalSizeBytesByMediaItem(array $mediaItemIds): array
+    {
+        if ($mediaItemIds === []) {
+            return [];
+        }
+
+        $totals = [];
+
+        foreach (AssetRecord::select()->whereIn('mediaItemId', $mediaItemIds)->all() as $asset) {
+            $key = (string) $asset->mediaItemId;
+            $totals[$key] = ($totals[$key] ?? 0) + ($asset->sizeBytes ?? 0);
+        }
+
+        return $totals;
+    }
 }
