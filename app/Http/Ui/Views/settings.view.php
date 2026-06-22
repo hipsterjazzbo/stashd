@@ -6,7 +6,10 @@
 		</div>
 
 		<template x-if="loading">
-			<p class="text-[13px] text-muted">Loading…</p>
+			<p class="flex items-center gap-2 text-[13px] text-muted">
+				<span class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
+				Loading…
+			</p>
 		</template>
 
 		<template x-if="!loading">
@@ -80,7 +83,7 @@
 										<p class="text-[12px] text-muted" x-text="server.type + ' · ' + server.base_uri"></p>
 									</div>
 									<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(server.state).text">
-										<span class="h-1.5 w-1.5 rounded-full" x-bind:class="statusBadge(server.state).dot"></span>
+										<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(server.state).dot, statusBadge(server.state).pulse ? 'pulse-dot' : '']"></span>
 										<span x-text="server.state"></span>
 									</span>
 								</div>
@@ -191,7 +194,7 @@
 									<td class="py-1.5 font-mono text-muted" x-text="location.path"></td>
 									<td class="py-1.5">
 										<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(location.state).text">
-											<span class="h-1.5 w-1.5 rounded-full" x-bind:class="statusBadge(location.state).dot"></span>
+											<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(location.state).dot, statusBadge(location.state).pulse ? 'pulse-dot' : '']"></span>
 											<span x-text="location.state"></span>
 										</span>
 									</td>

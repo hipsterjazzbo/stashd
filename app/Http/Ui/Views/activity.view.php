@@ -3,7 +3,7 @@
 		<div class="mb-6 flex items-center justify-between">
 			<h1 class="text-base font-semibold text-cream">Activity</h1>
 			<p class="flex items-center gap-2 text-[12px] text-muted">
-				<span class="h-1.5 w-1.5 rounded-full" x-bind:class="connected ? 'bg-success' : 'bg-muted'"></span>
+				<span class="h-1.5 w-1.5 rounded-full" x-bind:class="connected ? 'bg-success' : 'bg-amber pulse-dot'"></span>
 				<span x-text="connected ? 'live' : 'connecting…'"></span>
 			</p>
 		</div>

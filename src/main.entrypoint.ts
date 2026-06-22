@@ -160,6 +160,8 @@ interface Badge {
 	label: string
 	dot: string
 	text: string
+	/** Whether the dot should pulse (T14: only genuinely "happening right now" states). */
+	pulse?: boolean
 }
 
 // Tailwind's scanner needs every class name to appear as a literal string
@@ -185,9 +187,15 @@ const STATE_BADGES: Record<string, Badge> = {
 	downloading: { label: 'downloading', dot: 'bg-amber', text: 'text-amber' },
 }
 
+// States that mean "actively in progress right now", as opposed to queued
+// (pending, download_pending), settled (ready, failed, ignored…), or merely
+// descriptive (active = not-removed, not a live process). Only these pulse.
+const ACTIVELY_HAPPENING_STATES = new Set(['processing', 'downloading'])
+
 function statusBadge(state: string | null | undefined): Badge {
 	if (!state) return { label: '—', dot: 'bg-muted', text: 'text-muted' }
-	return STATE_BADGES[state] ?? { label: state, dot: 'bg-muted', text: 'text-muted' }
+	const badge = STATE_BADGES[state] ?? { label: state, dot: 'bg-muted', text: 'text-muted' }
+	return { ...badge, pulse: ACTIVELY_HAPPENING_STATES.has(state) }
 }
 
 const ACTIVITY_LEVEL_BADGES: Record<string, Badge> = {
@@ -410,6 +418,7 @@ interface StashSummary {
 	download_policy: string
 	organization_mode: string
 	state: string
+	icon_uri: string | null
 	created_at: string
 	updated_at: string
 }

@@ -12,7 +12,10 @@
 		</div>
 
 		<template x-if="loading">
-			<p class="text-[13px] text-muted">Loading…</p>
+			<p class="flex items-center gap-2 text-[13px] text-muted">
+				<span class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
+				Loading…
+			</p>
 		</template>
 
 		<template x-if="!loading">
@@ -33,12 +36,16 @@
 						<template x-for="stash in stashes" x-bind:key="stash.id">
 							<tr class="border-t border-line/60">
 								<td class="px-4 py-2">
-									<a class="text-cream transition-colors hover:text-amber" x-bind:href="'/stashes/' + stash.id" x-text="stash.name"></a>
+									<div class="flex items-center gap-2">
+										<img x-show="stash.icon_uri" x-bind:src="stash.icon_uri" class="h-6 w-6 rounded-full object-cover" alt=""/>
+										<span x-show="!stash.icon_uri" class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-espresso text-[11px] text-muted" x-text="stash.name.charAt(0).toUpperCase()"></span>
+										<a class="text-cream transition-colors hover:text-amber" x-bind:href="'/stashes/' + stash.id" x-text="stash.name"></a>
+									</div>
 								</td>
 								<td class="px-4 py-2 font-mono text-muted" x-text="stash.slug"></td>
 								<td class="px-4 py-2">
 									<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(stash.state).text">
-										<span class="h-1.5 w-1.5 rounded-full" x-bind:class="statusBadge(stash.state).dot"></span>
+										<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(stash.state).dot, statusBadge(stash.state).pulse ? 'pulse-dot' : '']"></span>
 										<span x-text="stash.state"></span>
 									</span>
 								</td>

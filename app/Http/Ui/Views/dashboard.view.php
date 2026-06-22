@@ -6,7 +6,10 @@
 		</div>
 
 		<template x-if="loading">
-			<p class="text-[13px] text-muted">Loading…</p>
+			<p class="flex items-center gap-2 text-[13px] text-muted">
+				<span class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
+				Loading…
+			</p>
 		</template>
 
 		<template x-if="!loading">
@@ -15,7 +18,7 @@
 					<div class="rounded-lg border border-line bg-panel/60 p-4">
 						<p class="text-[11px] uppercase tracking-wide text-muted">Status</p>
 						<p class="mt-1 flex items-center gap-2 text-sm font-semibold" x-bind:class="statusBadge(health?.status).text">
-							<span class="h-1.5 w-1.5 rounded-full" x-bind:class="statusBadge(health?.status).dot"></span>
+							<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(health?.status).dot, statusBadge(health?.status).pulse ? 'pulse-dot' : '']"></span>
 							<span x-text="health?.status ?? '—'"></span>
 						</p>
 					</div>
@@ -57,7 +60,7 @@
 									<td class="px-4 py-2 text-cream" x-text="location.path"></td>
 									<td class="px-4 py-2">
 										<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(location.state).text">
-											<span class="h-1.5 w-1.5 rounded-full" x-bind:class="statusBadge(location.state).dot"></span>
+											<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(location.state).dot, statusBadge(location.state).pulse ? 'pulse-dot' : '']"></span>
 											<span x-text="location.state"></span>
 										</span>
 									</td>
@@ -90,7 +93,7 @@
 									<td class="px-4 py-2 text-cream" x-text="job.intent.replace(/_/g, ' ')"></td>
 									<td class="px-4 py-2">
 										<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(job.state).text">
-											<span class="h-1.5 w-1.5 rounded-full" x-bind:class="statusBadge(job.state).dot"></span>
+											<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(job.state).dot, statusBadge(job.state).pulse ? 'pulse-dot' : '']"></span>
 											<span x-text="job.state"></span>
 										</span>
 										<p class="mt-1 text-[12px] text-error" x-show="job.last_error" x-text="job.last_error"></p>

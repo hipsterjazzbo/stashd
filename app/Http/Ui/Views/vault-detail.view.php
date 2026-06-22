@@ -9,7 +9,10 @@
 		</div>
 
 		<template x-if="loading">
-			<p class="text-[13px] text-muted">Loading…</p>
+			<p class="flex items-center gap-2 text-[13px] text-muted">
+				<span class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
+				Loading…
+			</p>
 		</template>
 
 		<template x-if="!loading">
@@ -18,7 +21,7 @@
 					<div class="flex items-center justify-between gap-3">
 						<h2 class="text-sm font-semibold text-cream" x-text="item?.title"></h2>
 						<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(item?.state).text">
-							<span class="h-1.5 w-1.5 rounded-full" x-bind:class="statusBadge(item?.state).dot"></span>
+							<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(item?.state).dot, statusBadge(item?.state).pulse ? 'pulse-dot' : '']"></span>
 							<span x-text="item?.state"></span>
 						</span>
 					</div>
@@ -48,7 +51,7 @@
 									<td class="px-4 py-2 text-muted" x-text="asset.kind"></td>
 									<td class="px-4 py-2">
 										<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(asset.state).text">
-											<span class="h-1.5 w-1.5 rounded-full" x-bind:class="statusBadge(asset.state).dot"></span>
+											<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(asset.state).dot, statusBadge(asset.state).pulse ? 'pulse-dot' : '']"></span>
 											<span x-text="asset.state"></span>
 										</span>
 										<p class="mt-1 text-[12px] text-muted" x-show="asset.derived_from_asset_id" x-text="'generated from ' + asset.derived_from_asset_id"></p>

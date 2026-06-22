@@ -48,3 +48,25 @@ body {
 [x-cloak] {
 	display: none !important;
 }
+
+/*
+ * "Something is happening right now" indicator — a small pulsing dot, used
+ * everywhere the UI needs to say "this is live/in-progress" (page loading,
+ * in-flight buttons, active job rows, discovering inputs, SSE connected).
+ * One shared pattern, deliberately low-animation: opacity only, no scale or
+ * color cycling. Colour comes from whatever background-color class the
+ * caller adds alongside (bg-amber for in-progress, bg-success/bg-error to
+ * match a terminal state if ever needed) — this class only supplies motion.
+ */
+@keyframes pulse-dot {
+	0%, 100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.35;
+	}
+}
+
+.pulse-dot {
+	animation: pulse-dot 1.6s ease-in-out infinite;
+}

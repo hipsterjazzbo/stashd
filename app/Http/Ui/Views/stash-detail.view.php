@@ -9,17 +9,24 @@
 		</div>
 
 		<template x-if="loading">
-			<p class="text-[13px] text-muted">Loading…</p>
+			<p class="flex items-center gap-2 text-[13px] text-muted">
+				<span class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
+				Loading…
+			</p>
 		</template>
 
 		<template x-if="!loading">
 			<div class="space-y-6">
 				<section class="rounded-lg border border-line bg-panel/60 p-4">
 					<div class="flex items-center justify-between gap-3">
-						<h2 class="text-sm font-semibold text-cream" x-text="stash?.name"></h2>
+						<div class="flex items-center gap-2">
+							<img x-show="stash?.icon_uri" x-bind:src="stash?.icon_uri" class="h-8 w-8 rounded-full object-cover" alt=""/>
+							<span x-show="!stash?.icon_uri" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-espresso text-[13px] text-muted" x-text="stash?.name?.charAt(0).toUpperCase()"></span>
+							<h2 class="text-sm font-semibold text-cream" x-text="stash?.name"></h2>
+						</div>
 						<div class="flex items-center gap-2">
 							<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(stash?.state).text">
-								<span class="h-1.5 w-1.5 rounded-full" x-bind:class="statusBadge(stash?.state).dot"></span>
+								<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(stash?.state).dot, statusBadge(stash?.state).pulse ? 'pulse-dot' : '']"></span>
 								<span x-text="stash?.state"></span>
 							</span>
 							<button type="button" x-on:click="startEdit()"
@@ -60,7 +67,7 @@
 									<td class="px-4 py-2 font-mono text-muted" x-text="input.source_uri"></td>
 									<td class="px-4 py-2">
 										<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(input.state).text">
-											<span class="h-1.5 w-1.5 rounded-full" x-bind:class="statusBadge(input.state).dot"></span>
+											<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(input.state).dot, statusBadge(input.state).pulse ? 'pulse-dot' : '']"></span>
 											<span x-text="input.state"></span>
 										</span>
 									</td>
@@ -92,7 +99,7 @@
 									</td>
 									<td class="px-4 py-2">
 										<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(item.state).text">
-											<span class="h-1.5 w-1.5 rounded-full" x-bind:class="statusBadge(item.state).dot"></span>
+											<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(item.state).dot, statusBadge(item.state).pulse ? 'pulse-dot' : '']"></span>
 											<span x-text="item.state"></span>
 										</span>
 									</td>
@@ -115,7 +122,7 @@
 										<p class="text-[12px] text-muted" x-text="broadcast.type.replace(/_/g, ' ')"></p>
 									</div>
 									<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(broadcast.state).text">
-										<span class="h-1.5 w-1.5 rounded-full" x-bind:class="statusBadge(broadcast.state).dot"></span>
+										<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(broadcast.state).dot, statusBadge(broadcast.state).pulse ? 'pulse-dot' : '']"></span>
 										<span x-text="broadcast.state"></span>
 									</span>
 								</div>
@@ -124,22 +131,34 @@
 
 								<div class="mt-2 flex flex-wrap gap-2">
 									<button type="button"
-										class="rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-50"
+										class="inline-flex items-center gap-1.5 rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-50"
 										x-bind:disabled="actionPending === broadcast.id + ':rebuild'"
-										x-on:click="runBroadcastAction(broadcast.id, 'rebuild')">rebuild</button>
+										x-on:click="runBroadcastAction(broadcast.id, 'rebuild')">
+										<span x-show="actionPending === broadcast.id + ':rebuild'" class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
+										rebuild
+									</button>
 									<button type="button"
-										class="rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-50"
+										class="inline-flex items-center gap-1.5 rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-50"
 										x-bind:disabled="actionPending === broadcast.id + ':verify'"
-										x-on:click="runBroadcastAction(broadcast.id, 'verify')">verify</button>
+										x-on:click="runBroadcastAction(broadcast.id, 'verify')">
+										<span x-show="actionPending === broadcast.id + ':verify'" class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
+										verify
+									</button>
 									<button type="button"
-										class="rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-50"
+										class="inline-flex items-center gap-1.5 rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-50"
 										x-bind:disabled="actionPending === broadcast.id + ':prune'"
-										x-on:click="runBroadcastAction(broadcast.id, 'prune')">prune</button>
+										x-on:click="runBroadcastAction(broadcast.id, 'prune')">
+										<span x-show="actionPending === broadcast.id + ':prune'" class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
+										prune
+									</button>
 									<button type="button"
-										class="rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-50"
+										class="inline-flex items-center gap-1.5 rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-50"
 										x-show="broadcast.feed_url"
 										x-bind:disabled="actionPending === broadcast.id + ':rotate_token'"
-										x-on:click="runBroadcastAction(broadcast.id, 'rotate_token')">rotate token</button>
+										x-on:click="runBroadcastAction(broadcast.id, 'rotate_token')">
+										<span x-show="actionPending === broadcast.id + ':rotate_token'" class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
+										rotate token
+									</button>
 								</div>
 
 								<div class="mt-3 rounded border border-line bg-espresso p-2" x-show="broadcast.feed_url">
@@ -329,7 +348,10 @@
 				</template>
 
 				<template x-if="addInputStep === 'reviewing'">
-					<p class="mt-3 text-[13px] text-muted">Looking up that source…</p>
+					<p class="mt-3 flex items-center gap-2 text-[13px] text-muted">
+						<span class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
+						Looking up that source…
+					</p>
 				</template>
 
 				<template x-if="addInputStep === 'review'">
@@ -386,7 +408,10 @@
 				</template>
 
 				<template x-if="addInputStep === 'committing'">
-					<p class="mt-3 text-[13px] text-muted">Adding input and discovering items…</p>
+					<p class="mt-3 flex items-center gap-2 text-[13px] text-muted">
+						<span class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
+						Adding input and discovering items…
+					</p>
 				</template>
 
 				<template x-if="addInputStep === 'failed'">

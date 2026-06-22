@@ -31,6 +31,7 @@ final readonly class StashResource implements Arrayable
             'downloadPolicy' => $this->stash->downloadPolicy->value,
             'organizationMode' => $this->stash->organizationMode->value,
             'state' => $this->stash->state->value,
+            'iconUri' => $this->stash->iconUri,
             'createdAt' => $this->stash->createdAt,
             'updatedAt' => $this->stash->updatedAt,
         ]);

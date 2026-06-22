@@ -159,6 +159,9 @@ test('youtube add input populates stash icon_uri from the resolved channel avata
     $updatedStash = StashRecord::findById(new \Tempest\Database\PrimaryKey($stash->body['stash']['id']));
     expect($updatedStash)->not->toBeNull()
         ->and($updatedStash->iconUri)->toBe('https://yt3.googleusercontent.com/stashd-demo-avatar.jpg');
+
+    $show = $this->http->get('/api/v1/stashes/' . $stash->body['stash']['id'], headers: $headers)->assertOk();
+    expect($show->body['stash']['icon_uri'])->toBe('https://yt3.googleusercontent.com/stashd-demo-avatar.jpg');
 });
 
 test('unsupported youtube url fails preflight job with stable error', function (): void {

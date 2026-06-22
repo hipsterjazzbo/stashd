@@ -6,7 +6,10 @@
 		</div>
 
 		<template x-if="loading">
-			<p class="text-[13px] text-muted">Loading…</p>
+			<p class="flex items-center gap-2 text-[13px] text-muted">
+				<span class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
+				Loading…
+			</p>
 		</template>
 
 		<template x-if="!loading">
@@ -34,7 +37,7 @@
 								</td>
 								<td class="px-4 py-2">
 									<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(item.state).text">
-										<span class="h-1.5 w-1.5 rounded-full" x-bind:class="statusBadge(item.state).dot"></span>
+										<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(item.state).dot, statusBadge(item.state).pulse ? 'pulse-dot' : '']"></span>
 										<span x-text="item.state"></span>
 									</span>
 								</td>
