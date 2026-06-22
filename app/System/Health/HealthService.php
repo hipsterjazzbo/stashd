@@ -80,6 +80,8 @@ final readonly class HealthService
                 'writable' => $location->writable,
                 'supports_hardlinks' => $location->supportsHardlinks,
                 'last_error' => $location->lastError,
+                'free_bytes' => $location->freeBytes,
+                'total_bytes' => $location->totalBytes,
             ];
 
             if ($location->state !== StorageLocationState::Ready) {

@@ -253,6 +253,60 @@ function summarizeEvent(event: ActivityEvent): string {
 	}
 }
 
+interface ActivityLogEntry {
+	id: string
+	level: string
+	type: string
+	message: string
+	entity_type: string | null
+	entity_id: string | null
+	stash_id: string | null
+	media_item_id: string | null
+	broadcast_id: string | null
+	job_id: string | null
+	command_id: string | null
+	created_at: string
+}
+
+interface ActivitySummaryGroup {
+	type: string
+	level: string
+	stash_id: string | null
+	message: string
+	count: number
+	created_at: string
+}
+
+/**
+ * Collapses consecutive (already-recency-ordered) log entries that share a
+ * type and stash into one summary line with a count — spec §29's grouping
+ * ("event type, stash, command/job, short time window"), approximated by
+ * "adjacent in an already-time-ordered recent list" rather than parsing
+ * timestamps. Shows the most recent message in the group; older ones in the
+ * same group are summarized as "+N more" rather than re-stated.
+ */
+function summarizeRecentActivity(events: ActivityLogEntry[], limit = 8): ActivitySummaryGroup[] {
+	const groups: ActivitySummaryGroup[] = []
+
+	for (const event of events) {
+		const last = groups[groups.length - 1]
+		if (last && last.type === event.type && last.stash_id === event.stash_id) {
+			last.count++
+		} else {
+			groups.push({
+				type: event.type,
+				level: event.level,
+				stash_id: event.stash_id,
+				message: event.message,
+				count: 1,
+				created_at: event.created_at,
+			})
+		}
+	}
+
+	return groups.slice(0, limit)
+}
+
 // The full, fixed set of named SSE events EventsController ever emits
 // (app/System/Event/EventPublisher.php) — EventSource has no "any event"
 // listener, so every name has to be wired up individually.
@@ -302,6 +356,8 @@ interface StorageLocation {
 	writable: boolean
 	supports_hardlinks: boolean
 	last_error: string | null
+	free_bytes: number | null
+	total_bytes: number | null
 }
 
 interface HealthReport {
@@ -576,14 +632,21 @@ function dashboardComponent() {
 		loading: true,
 		error: null as string | null,
 		health: null as HealthReport | null,
-		jobs: [] as JobSummary[],
+		stashCount: null as number | null,
+		vaultCount: null as number | null,
+		activitySummary: [] as ActivitySummaryGroup[],
 		formatRelativeTime,
+		formatBytes,
 		statusBadge,
 
-		jobElapsed(job: JobSummary): string {
-			const start = job.started_at ?? job.created_at
-			const end = job.finished_at ?? new Date().toISOString()
-			return formatDuration((new Date(end).getTime() - new Date(start).getTime()) / 1000)
+		totalFreeBytes(): number | null {
+			const locations = this.health?.storage?.locations ?? []
+			return locations.length === 0 ? null : locations.reduce((sum, location) => sum + (location.free_bytes ?? 0), 0)
+		},
+
+		totalDiskBytes(): number | null {
+			const locations = this.health?.storage?.locations ?? []
+			return locations.length === 0 ? null : locations.reduce((sum, location) => sum + (location.total_bytes ?? 0), 0)
 		},
 
 		async init() {
@@ -602,12 +665,16 @@ function dashboardComponent() {
 
 		async refresh() {
 			try {
-				const [healthResponse, jobsResponse] = await Promise.all([
+				const [healthResponse, stashesResponse, itemsResponse, activityResponse] = await Promise.all([
 					apiFetch('/api/v1/system/health'),
-					apiFetch('/api/v1/jobs'),
+					apiFetch('/api/v1/stashes'),
+					apiFetch('/api/v1/items'),
+					apiFetch('/api/v1/activity'),
 				])
 				this.health = await healthResponse.json()
-				this.jobs = (await jobsResponse.json()).jobs
+				this.stashCount = ((await stashesResponse.json()).stashes as unknown[]).length
+				this.vaultCount = ((await itemsResponse.json()).items as unknown[]).length
+				this.activitySummary = summarizeRecentActivity((await activityResponse.json()).events as ActivityLogEntry[])
 				this.error = null
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return

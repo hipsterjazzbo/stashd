@@ -164,4 +164,11 @@ test('detailed health reports vault broadcast hardlink status', function (): voi
     $response->assertOk();
     expect($response->body['storage']['vault_broadcast_hardlink'])->toBeTrue()
         ->and($response->body['status'])->toBe('ok');
+
+    $locations = $response->body['storage']['locations'];
+    expect($locations)->not->toBeEmpty();
+
+    foreach ($locations as $location) {
+        expect($location)->toHaveKeys(['free_bytes', 'total_bytes']);
+    }
 });

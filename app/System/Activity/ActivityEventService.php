@@ -6,6 +6,7 @@ namespace App\System\Activity;
 
 use App\Commands\CommandRecord;
 use App\Jobs\JobRecord;
+use App\Stashes\StashRecord;
 use App\Support\PrefixedUlid;
 use App\System\Event\EventPublisher;
 use App\System\Secret\SecretsService;
@@ -29,6 +30,22 @@ final readonly class ActivityEventService
             entityId: (string) $command->id,
             commandId: (string) $command->id,
             groupKey: 'command:' . (string) $command->id,
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    public function stashCreated(StashRecord $stash): ActivityEventRecord
+    {
+        $record = $this->events->create(
+            level: ActivityLevel::Info,
+            type: 'stash.created',
+            message: sprintf('Stash "%s" created.', $stash->name),
+            entityType: 'stash',
+            entityId: (string) $stash->id,
+            stashId: (string) $stash->id,
         );
 
         $this->publisher->activityCreated($record);

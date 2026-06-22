@@ -15,6 +15,7 @@ use App\Stashes\Api\StashInputResource;
 use App\Stashes\Api\StashItemResource;
 use App\Stashes\Api\StashResource;
 use App\Support\PrefixedUlid;
+use App\System\Activity\ActivityEventService;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
@@ -34,6 +35,7 @@ final readonly class StashController
         private StashInputRepository $stashInputs,
         private CommandDispatchService $dispatch,
         private AuthContext $context,
+        private ActivityEventService $activity,
     ) {
     }
 
@@ -90,6 +92,8 @@ final readonly class StashController
             organizationMode: $organizationMode,
             description: isset($body['description']) ? trim((string) $body['description']) : null,
         );
+
+        $this->activity->stashCreated($stash);
 
         return new Json([
             'stash' => StashResource::fromRecord($stash)->toArray(),
