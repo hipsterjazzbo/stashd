@@ -8,5 +8,5 @@ interface JobWorkerCallbacks
 {
     public function heartbeat(JobRecord $job): void;
 
-    public function progress(JobRecord $job, int $current, int $total, string $label): void;
+    public function progress(JobRecord $job, JobProgressUpdate $update): void;
 }

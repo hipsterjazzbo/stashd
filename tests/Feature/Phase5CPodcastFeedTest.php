@@ -7,8 +7,7 @@ namespace Tests\Feature;
 use App\Broadcasts\BroadcastItemRecord;
 use App\Broadcasts\BroadcastType;
 use App\Broadcasts\BroadcastTypeRegistry;
-use App\Broadcasts\Formats\AudioPodcastBroadcast;
-use App\Broadcasts\Formats\VideoPodcastBroadcast;
+use App\Broadcasts\Podcasts\PodcastBroadcastFormat;
 use App\Config\StashdConfig;
 use App\Stashes\StashItemRecord;
 use App\Stashes\StashItemState;
@@ -22,11 +21,10 @@ use App\Vault\MediaItemRecord;
 use Tempest\Database\PrimaryKey;
 use Tempest\Http\Status;
 
-test('podcast broadcast formats are registered', function (): void {
+test('the podcast broadcast format is registered', function (): void {
     $registry = $this->container->get(BroadcastTypeRegistry::class);
 
-    expect($registry->handlerFor(BroadcastType::AudioPodcast))->toBeInstanceOf(AudioPodcastBroadcast::class)
-        ->and($registry->handlerFor(BroadcastType::VideoPodcast))->toBeInstanceOf(VideoPodcastBroadcast::class);
+    expect($registry->handlerFor(BroadcastType::Podcast))->toBeInstanceOf(PodcastBroadcastFormat::class);
 });
 
 test('broadcast.rebuild writes deterministic audio podcast feed with tokenized enclosures', function (): void {
@@ -43,7 +41,7 @@ test('broadcast.rebuild writes deterministic audio podcast feed with tokenized e
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Audio Feed',
         'slug' => 'audio-feed-' . bin2hex(random_bytes(3)),
         'settings' => [
@@ -112,9 +110,10 @@ test('broadcast.rebuild writes video podcast feed for supported ready video asse
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'video_podcast',
+        'type' => 'podcast',
         'name' => 'Video Feed',
         'slug' => 'video-feed-' . bin2hex(random_bytes(3)),
+        'settings' => ['media_kind' => 'video'],
     ], headers: $headers)->assertStatus(Status::CREATED);
 
     $rebuild = $this->http->post('/api/v1/commands', [
@@ -130,7 +129,7 @@ test('broadcast.rebuild writes video podcast feed for supported ready video asse
         ->and((string) $xml->channel->item->enclosure['type'])->toBe('video/mp4');
 });
 
-test('audio podcast records stable error for video only assets', function (): void {
+test('audio podcast triggers a transcode fallback instead of failing for video only assets', function (): void {
     [$headers, $stashId, $mediaItemId] = podcastFeedReadyStash($this, 'podcast-audio-missing');
     podcastFeedCreateAsset(
         $this->container->get(StashdConfig::class),
@@ -143,23 +142,50 @@ test('audio podcast records stable error for video only assets', function (): vo
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Audio Missing',
         'slug' => 'audio-missing-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $rebuild = $this->http->post('/api/v1/commands', [
+    $this->http->post('/api/v1/commands', [
         'type' => 'broadcast.rebuild',
         'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
     ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-    $command = $this->http->get('/api/v1/commands/' . $rebuild->body['command_id'], headers: $headers)->body['command'];
+
+    // Process only the rebuild job itself -- processAllJobs() drains the
+    // whole queue including jobs created mid-loop, which would race straight
+    // through the transcode job and the rebuild it auto-retriggers on
+    // success, leaving nothing to observe at the intermediate "pending" step.
+    $worker = $this->container->get(\App\Jobs\JobWorkerService::class);
+    $worker->processNextJob();
+
     $item = BroadcastItemRecord::select()
         ->where('broadcastId = ?', $broadcast->body['broadcast']['id'])
         ->first();
 
-    expect($command['result']['verify']['ok'])->toBeFalse()
-        ->and($item->lastError)->toBe('podcast_audio_asset_unavailable');
+    // The episode is excluded and a transcode queued rather than the
+    // broadcast failing outright -- this is the audio-podcast-on-a-
+    // video-only-stash fallback this feature exists for, not a regression
+    // of the old immediate-failure behaviour (still exercised by the
+    // video-podcast "unsuitable asset" test below, which has no fallback
+    // pathway).
+    expect($item->lastError)->toBe('podcast_audio_transcode_pending');
+
+    // Draining the rest of the queue runs the transcode job and the
+    // automatically re-triggered rebuild it queues on success, which picks
+    // up the now-ready generated audio asset and publishes the episode --
+    // no manual second rebuild needed.
+    $this->processAllJobs();
+
+    $reloadedItem = BroadcastItemRecord::findById(new PrimaryKey((string) $item->id));
+    $audioAsset = $this->container->get(AssetRepository::class)
+        ->findByMediaItemAndRole(PrefixedUlid::parse($mediaItemId), AssetRole::PodcastAudio);
+
+    expect($reloadedItem?->lastError)->toBeNull()
+        ->and($reloadedItem?->state)->toBe(\App\Broadcasts\BroadcastItemState::Ready)
+        ->and($audioAsset)->not->toBeNull()
+        ->and($audioAsset->state)->toBe(AssetState::Ready)
+        ->and($audioAsset->derivedFromAssetId)->not->toBeNull();
 });
 
 test('video podcast records stable error for unsuitable video asset', function (): void {
@@ -175,9 +201,10 @@ test('video podcast records stable error for unsuitable video asset', function (
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'video_podcast',
+        'type' => 'podcast',
         'name' => 'Video Missing',
         'slug' => 'video-missing-' . bin2hex(random_bytes(3)),
+        'settings' => ['media_kind' => 'video'],
     ], headers: $headers)->assertStatus(Status::CREATED);
 
     $rebuild = $this->http->post('/api/v1/commands', [
@@ -208,7 +235,7 @@ test('podcast rebuild activity does not include raw enclosure tokens', function 
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Activity Feed',
         'slug' => 'activity-feed-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -245,7 +272,7 @@ test('manual funding url setting wins over a detected link in episode descriptio
     $media->save();
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Manual Funding Feed',
         'slug' => 'manual-funding-' . bin2hex(random_bytes(3)),
         'settings' => ['funding_url' => 'https://example.test/manual-support'],
@@ -282,7 +309,7 @@ test('detected funding link is used in the feed when no manual setting exists', 
     $media->save();
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Detected Funding Feed',
         'slug' => 'detected-funding-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -313,7 +340,7 @@ test('podcast feed omits funding tag when no manual or detected funding link exi
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'No Funding Feed',
         'slug' => 'no-funding-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -361,7 +388,7 @@ test('funding link detection only scans descriptions of items included in the fe
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Funding Excluded Feed',
         'slug' => 'funding-excluded-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);

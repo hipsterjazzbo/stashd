@@ -53,6 +53,7 @@ RUN chmod +x /usr/local/bin/stashd-entrypoint
 ENV STASHD_HTTP_PORT=8474 \
     STASHD_YTDLP_BINARY=yt-dlp \
     STASHD_REAL_DOWNLOADS_ENABLED=0 \
+    STASHD_FFMPEG_BINARY=ffmpeg \
     STASHD_DATA_PATH=/data \
     STASHD_MEDIA_PATH=/media \
     STASHD_PUBLIC_URL=http://localhost:8474

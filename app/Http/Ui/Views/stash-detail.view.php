@@ -138,7 +138,7 @@
 								<div class="flex items-center justify-between gap-3">
 									<div>
 										<p class="text-[13px] font-semibold text-cream" x-text="broadcast.name"></p>
-										<p class="text-[12px] text-muted" x-text="broadcast.type.replace(/_/g, ' ')"></p>
+										<p class="text-[12px] text-muted" x-text="broadcast.type === 'podcast' ? `podcast (${broadcast.settings?.media_kind ?? 'audio'})` : broadcast.type.replace(/_/g, ' ')"></p>
 									</div>
 									<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(broadcast.state).text">
 										<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(broadcast.state).dot, statusBadge(broadcast.state).pulse ? 'pulse-dot' : '']"></span>
@@ -223,8 +223,12 @@
 								<option value="filesystem_series">Filesystem series</option>
 								<option value="jellyfin_series">Jellyfin series</option>
 								<option value="plex_series">Plex series</option>
-								<option value="audio_podcast">Audio podcast</option>
-								<option value="video_podcast">Video podcast</option>
+								<option value="podcast">Podcast</option>
+							</select>
+							<select x-show="newBroadcastType === 'podcast'" x-model="newBroadcastMediaKind" x-on:change="onBroadcastTypeChanged()"
+								class="rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber">
+								<option value="audio">Audio episodes</option>
+								<option value="video">Video episodes</option>
 							</select>
 							<input type="text" x-model="newBroadcastName" placeholder="Broadcast name"
 								class="flex-1 rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>

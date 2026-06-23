@@ -143,7 +143,7 @@ test('broadcast rotate_token command dispatches end-to-end for a podcast broadca
     [$headers, $stashId] = $this->bootstrapFakeDownloadStash('phase6-broadcast-rotate-token');
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Phase 6 Rotate Token Podcast',
         'slug' => 'phase6-rotate-token-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);

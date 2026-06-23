@@ -523,4 +523,45 @@ final readonly class ActivityEventService
 
         return $record;
     }
+
+    public function podcastAudioTranscodeCompleted(
+        CommandRecord $command,
+        JobRecord $job,
+        \App\Transcoding\TranscodePodcastAudioResult $result,
+    ): ActivityEventRecord {
+        $record = $this->events->create(
+            level: ActivityLevel::Success,
+            type: 'asset.transcode_completed',
+            message: 'Podcast audio transcode completed.',
+            entityType: 'media_item',
+            entityId: $result->mediaItemId,
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+            metadata: $result->toArray(),
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
+
+    public function podcastAudioTranscodeFailed(JobRecord $job, string $code, string $error): ActivityEventRecord
+    {
+        $record = $this->events->create(
+            level: ActivityLevel::Error,
+            type: 'asset.transcode_failed',
+            message: $this->secrets->redact($error),
+            entityType: 'job',
+            entityId: (string) $job->id,
+            jobId: (string) $job->id,
+            commandId: $job->commandId,
+            groupKey: $job->commandId === null ? 'job:' . (string) $job->id : 'command:' . $job->commandId,
+            metadata: ['code' => $code],
+        );
+
+        $this->publisher->activityCreated($record);
+
+        return $record;
+    }
 }

@@ -57,6 +57,30 @@ final readonly class PodcastAssetSelector
         return null;
     }
 
+    /**
+     * The ready video VaultOriginal for `$mediaItemId`, if any — used only to
+     * decide whether a podcast configured for audio can fall back to
+     * transcoding audio out of an existing video original. Deliberately
+     * separate from {@see videoAsset()}, which is video-media-kind-specific
+     * and must not be touched/reused here.
+     */
+    public function videoOriginalForAudioFallback(string $mediaItemId): ?AssetRecord
+    {
+        foreach ($this->assets->listForMediaItem(PrefixedUlid::parse($mediaItemId)) as $asset) {
+            if (
+                $asset->role === AssetRole::VaultOriginal
+                && $asset->kind === AssetKind::Video
+                && $asset->state === AssetState::Ready
+                && $asset->path !== null
+                && is_file($asset->path)
+            ) {
+                return $asset;
+            }
+        }
+
+        return null;
+    }
+
     /** @return list<AssetRecord> */
     private function candidateAssets(string $mediaItemId): array
     {

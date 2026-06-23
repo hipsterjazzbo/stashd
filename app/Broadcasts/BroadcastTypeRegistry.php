@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
-use App\Broadcasts\Formats\AudioPodcastBroadcast;
 use App\Broadcasts\Formats\BroadcastFormat;
 use App\Broadcasts\Formats\FilesystemSeriesBroadcastType;
 use App\Broadcasts\Formats\JellyfinSeriesBroadcastType;
 use App\Broadcasts\Formats\PlexSeriesBroadcastType;
-use App\Broadcasts\Formats\VideoPodcastBroadcast;
+use App\Broadcasts\Podcasts\PodcastBroadcastFormat;
 
 final readonly class BroadcastTypeRegistry
 {
@@ -20,15 +19,13 @@ final readonly class BroadcastTypeRegistry
         FilesystemSeriesBroadcastType $filesystemSeries,
         JellyfinSeriesBroadcastType $jellyfinSeries,
         PlexSeriesBroadcastType $plexSeries,
-        AudioPodcastBroadcast $audioPodcast,
-        VideoPodcastBroadcast $videoPodcast,
+        PodcastBroadcastFormat $podcast,
     ) {
         $this->handlers = [
             $filesystemSeries->key() => $filesystemSeries,
             $jellyfinSeries->key() => $jellyfinSeries,
             $plexSeries->key() => $plexSeries,
-            $audioPodcast->key() => $audioPodcast,
-            $videoPodcast->key() => $videoPodcast,
+            $podcast->key() => $podcast,
         ];
     }
 

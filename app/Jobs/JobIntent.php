@@ -20,4 +20,5 @@ enum JobIntent: string
     case Boot = 'boot';
     case VerifyVault = 'verify_vault';
     case MediaServer = 'media_server';
+    case TranscodePodcastAudio = 'transcode_podcast_audio';
 }

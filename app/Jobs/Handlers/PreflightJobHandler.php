@@ -11,6 +11,7 @@ use App\Config\StashdConfig;
 use App\Jobs\JobHandler;
 use App\Jobs\JobHandlerContext;
 use App\Jobs\JobIntent;
+use App\Jobs\JobProgressUpdate;
 use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
@@ -45,7 +46,7 @@ final readonly class PreflightJobHandler implements JobHandler
         $command = $this->requireCommand($job);
         $this->transitions->transitionCommand($command, CommandState::Running);
         $context->heartbeat($job);
-        $context->progress($job, 0, 1, 'Running preflight');
+        $context->progress($job, JobProgressUpdate::ofSteps(0, 1, 'Running preflight'));
 
         $payload = $job->payloadJson === null
             ? []
@@ -64,7 +65,7 @@ final readonly class PreflightJobHandler implements JobHandler
         $job->progressLabel = 'Preflight complete';
         $job->finishedAt = DateTime::now(Timezone::UTC);
         $this->jobs->save($job);
-        $context->progress($job, $job->progressCurrent, $job->progressTotal, $job->progressLabel);
+        $context->progress($job, JobProgressUpdate::ofSteps($job->progressCurrent, $job->progressTotal, $job->progressLabel));
 
         $this->transitions->transitionJob($job, JobState::Ready);
         $this->transitions->transitionCommand($command, CommandState::Completed);

@@ -99,7 +99,7 @@ test('broadcast belongs to stash via foreign key', function (): void {
     $stash = $stashes->create('Broadcast Stash', 'broadcast-stash');
     $broadcast = $broadcasts->create(
         stashId: \App\Support\PrefixedUlid::parse((string) $stash->id),
-        type: BroadcastType::AudioPodcast,
+        type: BroadcastType::Podcast,
         name: 'Podcast',
         slug: 'podcast',
     );
@@ -108,7 +108,7 @@ test('broadcast belongs to stash via foreign key', function (): void {
 
     expect(fn () => $broadcasts->create(
         stashId: \App\Support\PrefixedUlid::parse('stash_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
-        type: BroadcastType::AudioPodcast,
+        type: BroadcastType::Podcast,
         name: 'Orphan',
         slug: 'orphan',
     ))->toThrow(\Tempest\Database\Exceptions\QueryWasInvalid::class);

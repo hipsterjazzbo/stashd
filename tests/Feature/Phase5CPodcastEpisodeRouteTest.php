@@ -35,7 +35,7 @@ test('valid audio podcast episode token returns the audio bytes with expected he
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Episode Audio',
         'slug' => 'episode-audio-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -77,9 +77,10 @@ test('valid video podcast episode token returns the video bytes with expected he
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'video_podcast',
+        'type' => 'podcast',
         'name' => 'Episode Video',
         'slug' => 'episode-video-' . bin2hex(random_bytes(3)),
+        'settings' => ['media_kind' => 'video'],
     ], headers: $headers)->assertStatus(Status::CREATED);
 
     $this->http->post('/api/v1/commands', [
@@ -118,7 +119,7 @@ test('episode route requires path tokens, not a query parameter', function (): v
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Path Token Episode',
         'slug' => 'episode-path-token-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -163,7 +164,7 @@ test('an unknown item token for a valid broadcast token returns a non-revealing 
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Bad Item Token',
         'slug' => 'episode-bad-item-token-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -193,12 +194,12 @@ test('an item token bound to a different broadcast does not resolve', function (
     podcastEpisodeCreateAsset($config, $assets, $mediaItemIdB, AssetKind::Audio, 'original.mp3', 'audio/mpeg', 'cross-b-bytes');
 
     $broadcastA = $this->http->post('/api/v1/stashes/' . $stashIdA . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Cross A',
         'slug' => 'episode-cross-a-' . bin2hex(random_bytes(3)),
     ], headers: $headersA)->assertStatus(Status::CREATED);
     $broadcastB = $this->http->post('/api/v1/stashes/' . $stashIdB . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Cross B',
         'slug' => 'episode-cross-b-' . bin2hex(random_bytes(3)),
     ], headers: $headersB)->assertStatus(Status::CREATED);
@@ -245,7 +246,7 @@ test('rotating the broadcast token invalidates old episode urls while the new to
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Rotate Episode',
         'slug' => 'episode-rotate-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -321,7 +322,7 @@ test('a missing vault asset after rebuild returns a safe 404 without leaking pat
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Missing Asset',
         'slug' => 'episode-missing-asset-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -363,7 +364,7 @@ test('a mismatched extension returns a non-revealing 404', function (): void {
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Bad Extension',
         'slug' => 'episode-bad-ext-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -400,7 +401,7 @@ test('podcast rebuild and episode requests do not leak raw tokens into activity'
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Activity Redaction',
         'slug' => 'episode-activity-redaction-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -438,7 +439,7 @@ test('a mid-file range request returns 206 with the exact partial bytes and head
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Range Mid',
         'slug' => 'episode-range-mid-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -480,7 +481,7 @@ test('a range covering the entire file returns 206, not 200', function (): void 
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Range Full',
         'slug' => 'episode-range-full-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -522,7 +523,7 @@ test('a suffix range request returns 206 with the trailing bytes', function (): 
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Range Suffix',
         'slug' => 'episode-range-suffix-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -563,7 +564,7 @@ test('an open-ended range request returns 206 with the trailing bytes', function
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Range Open',
         'slug' => 'episode-range-open-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -604,7 +605,7 @@ test('a range entirely beyond the end of the file returns 416 without leaking th
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Range Beyond EOF',
         'slug' => 'episode-range-beyond-eof-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -646,7 +647,7 @@ test('a malformed range header is ignored and the full file is served', function
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Range Malformed',
         'slug' => 'episode-range-malformed-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -686,7 +687,7 @@ test('a multi-range header is ignored and the full file is served', function ():
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Range Multi',
         'slug' => 'episode-range-multi-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -725,7 +726,7 @@ test('a range header attached to an invalid token still returns a non-revealing 
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Range Bad Token',
         'slug' => 'episode-range-bad-token-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);

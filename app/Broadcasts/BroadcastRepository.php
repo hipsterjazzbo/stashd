@@ -87,11 +87,7 @@ final class BroadcastRepository
     public function listPodcastBroadcastsWithFeedToken(): array
     {
         return BroadcastRecord::select()
-            ->where(
-                'tokenSecretId IS NOT NULL AND (type = ? OR type = ?)',
-                BroadcastType::AudioPodcast->value,
-                BroadcastType::VideoPodcast->value,
-            )
+            ->where('tokenSecretId IS NOT NULL AND type = ?', BroadcastType::Podcast->value)
             ->orderBy('createdAt', \Tempest\Database\Direction::ASC)
             ->all();
     }

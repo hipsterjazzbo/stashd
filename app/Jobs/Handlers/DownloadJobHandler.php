@@ -12,6 +12,7 @@ use App\Downloads\DownloadMediaItem;
 use App\Jobs\JobHandler;
 use App\Jobs\JobHandlerContext;
 use App\Jobs\JobIntent;
+use App\Jobs\JobProgressUpdate;
 use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
@@ -44,7 +45,7 @@ final readonly class DownloadJobHandler implements JobHandler
         $command = $this->requireCommand($job);
         $this->transitions->transitionCommand($command, CommandState::Running);
         $context->heartbeat($job);
-        $context->progress($job, 0, 4, 'Preparing download');
+        $context->progress($job, JobProgressUpdate::ofSteps(0, 4, 'Preparing download'));
 
         $payload = $job->payloadJson === null
             ? []
@@ -55,9 +56,9 @@ final readonly class DownloadJobHandler implements JobHandler
         $force = (bool) ($payload['force'] ?? false);
 
         try {
-            $context->progress($job, 1, 4, 'Downloading to temp');
+            $context->progress($job, JobProgressUpdate::ofSteps(1, 4, 'Downloading to temp'));
             $result = $this->executor->execute($mediaItemId, $stashId, PrefixedUlid::parse((string) $job->id), $force);
-            $context->progress($job, 3, 4, 'Vault ingest complete');
+            $context->progress($job, JobProgressUpdate::ofSteps(3, 4, 'Vault ingest complete'));
 
             $command->resultJson = json_encode($result->toArray(), JSON_THROW_ON_ERROR);
             $this->commands->save($command);
@@ -68,7 +69,7 @@ final readonly class DownloadJobHandler implements JobHandler
             $job->progressLabel = $result->skipped ? 'Download skipped (already in Vault)' : 'Download complete';
             $job->finishedAt = DateTime::now(Timezone::UTC);
             $this->jobs->save($job);
-            $context->progress($job, 4, 4, $job->progressLabel);
+            $context->progress($job, JobProgressUpdate::ofSteps(4, 4, $job->progressLabel));
 
             $this->transitions->transitionJob($job, JobState::Ready);
             $this->transitions->transitionCommand($command, CommandState::Completed);

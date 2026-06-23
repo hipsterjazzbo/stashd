@@ -31,7 +31,7 @@ test('podcast token migration adds broadcast item token columns', function (): v
 test('broadcast item record maps podcast token columns', function (): void {
     [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('podcast-item-record');
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Audio Podcast',
         'slug' => 'audio-podcast-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -59,13 +59,14 @@ test('broadcast item record maps podcast token columns', function (): void {
         ->and($reloaded?->tokenPreview)->toBe('abcd...uvwxyz');
 });
 
-test('creating podcast broadcasts exposes authenticated feed urls', function (string $type): void {
-    [$headers, $stashId] = array_slice($this->bootstrapFakeDownloadStash('podcast-create-' . $type), 0, 2);
+test('creating podcast broadcasts exposes authenticated feed urls', function (string $mediaKind): void {
+    [$headers, $stashId] = array_slice($this->bootstrapFakeDownloadStash('podcast-create-' . $mediaKind), 0, 2);
 
     $create = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => $type,
+        'type' => 'podcast',
         'name' => 'Private Podcast',
-        'slug' => $type . '-' . bin2hex(random_bytes(3)),
+        'slug' => 'podcast-' . $mediaKind . '-' . bin2hex(random_bytes(3)),
+        'settings' => ['media_kind' => $mediaKind],
     ], headers: $headers)->assertStatus(Status::CREATED);
 
     expect($create->body['broadcast']['feed_url'])->toStartWith('http://localhost:8474/b/')
@@ -77,13 +78,13 @@ test('creating podcast broadcasts exposes authenticated feed urls', function (st
 
     expect($show->body['broadcast']['feed_url'])->toBe($create->body['broadcast']['feed_url'])
         ->and($show->body['broadcast']['token_preview'])->toBe($create->body['broadcast']['token_preview']);
-})->with(['audio_podcast', 'video_podcast']);
+})->with(['audio', 'video']);
 
 test('podcast broadcast token is encrypted and reconstructed after database reload', function (): void {
     [$headers, $stashId] = array_slice($this->bootstrapFakeDownloadStash('podcast-secret'), 0, 2);
 
     $create = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Secret Podcast',
         'slug' => 'secret-podcast-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -107,7 +108,7 @@ test('podcast broadcast token is encrypted and reconstructed after database relo
 test('podcast item token is generated and stored encrypted', function (): void {
     [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('podcast-item-token');
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Item Token Podcast',
         'slug' => 'item-token-podcast-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -132,7 +133,7 @@ test('podcast item token is generated and stored encrypted', function (): void {
 test('broadcast rotate token changes feed url and stores only safe command metadata', function (): void {
     [$headers, $stashId] = array_slice($this->bootstrapFakeDownloadStash('podcast-rotate'), 0, 2);
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Rotating Podcast',
         'slug' => 'rotating-podcast-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);

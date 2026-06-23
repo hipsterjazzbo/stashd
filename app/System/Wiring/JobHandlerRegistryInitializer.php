@@ -11,6 +11,7 @@ use App\Jobs\Handlers\DownloadJobHandler;
 use App\Jobs\Handlers\MediaServerJobHandler;
 use App\Jobs\Handlers\PreflightJobHandler;
 use App\Jobs\Handlers\StorageCheckJobHandler;
+use App\Jobs\Handlers\TranscodePodcastAudioJobHandler;
 use App\Jobs\Handlers\VerifyVaultJobHandler;
 use App\Jobs\JobHandlerRegistry;
 use Tempest\Container\Container;
@@ -29,6 +30,7 @@ final class JobHandlerRegistryInitializer implements Initializer
             $container->get(VerifyVaultJobHandler::class),
             $container->get(BroadcastJobHandler::class),
             $container->get(MediaServerJobHandler::class),
+            $container->get(TranscodePodcastAudioJobHandler::class),
         ]);
     }
 }

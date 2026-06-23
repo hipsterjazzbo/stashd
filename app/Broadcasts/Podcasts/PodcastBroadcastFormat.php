@@ -16,6 +16,7 @@ use App\Broadcasts\BroadcastPlannedSidecar;
 use App\Broadcasts\BroadcastPruneResult;
 use App\Broadcasts\BroadcastPublishResult;
 use App\Broadcasts\BroadcastSidecarType;
+use App\Broadcasts\BroadcastType;
 use App\Broadcasts\BroadcastVerifyResult;
 use App\Broadcasts\Formats\BroadcastFormat;
 use App\Stashes\StashItemRecord;
@@ -26,7 +27,7 @@ use App\Vault\MediaItemRecord;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
-abstract readonly class PodcastBroadcastFormat implements BroadcastFormat
+final readonly class PodcastBroadcastFormat implements BroadcastFormat
 {
     public function __construct(
         private BroadcastContextFactory $contextFactory,
@@ -39,12 +40,35 @@ abstract readonly class PodcastBroadcastFormat implements BroadcastFormat
         private PodcastFeedBuilder $feedBuilder,
         private StateTransitionService $transitions,
         private PodcastFundingLinkDetector $fundingDetector,
+        private PodcastTranscodeFallback $transcodeFallback,
     ) {
     }
 
-    abstract protected function selectAsset(string $mediaItemId): ?PodcastAssetSelection;
+    public function key(): string
+    {
+        return BroadcastType::Podcast->value;
+    }
 
-    abstract protected function unavailableErrorCode(): string;
+    private function preferredMediaKind(BroadcastContext $context): PodcastMediaKind
+    {
+        return PodcastMediaKind::forBroadcast($context->broadcast);
+    }
+
+    private function selectAsset(BroadcastContext $context, string $mediaItemId): ?PodcastAssetSelection
+    {
+        return match ($this->preferredMediaKind($context)) {
+            PodcastMediaKind::Audio => $this->assets->audioAsset($mediaItemId),
+            PodcastMediaKind::Video => $this->assets->videoAsset($mediaItemId),
+        };
+    }
+
+    private function unavailableErrorCode(PodcastMediaKind $kind): string
+    {
+        return match ($kind) {
+            PodcastMediaKind::Audio => 'podcast_audio_asset_unavailable',
+            PodcastMediaKind::Video => 'podcast_video_asset_unavailable',
+        };
+    }
 
     public function plan(BroadcastContext $context): BroadcastPlan
     {
@@ -89,10 +113,12 @@ abstract readonly class PodcastBroadcastFormat implements BroadcastFormat
                 continue;
             }
 
-            $selection = $this->selectAsset($stashItem->mediaItemId);
+            $kind = $this->preferredMediaKind($context);
+            $selection = $this->selectAsset($context, $stashItem->mediaItemId);
 
             if ($selection === null) {
-                $this->markItemFailed($item, $this->unavailableErrorCode());
+                $fallbackCode = $this->transcodeFallback->triggerIfNeeded($stashItem->mediaItemId, $kind);
+                $this->markItemFailed($item, $fallbackCode ?? $this->unavailableErrorCode($kind));
                 $failed[] = (string) $stashItem->id;
 
                 continue;
@@ -143,8 +169,11 @@ abstract readonly class PodcastBroadcastFormat implements BroadcastFormat
                 continue;
             }
 
-            if ($this->selectAsset($stashItem->mediaItemId) === null) {
-                $this->markItemStale($item, $this->unavailableErrorCode());
+            $kind = $this->preferredMediaKind($context);
+
+            if ($this->selectAsset($context, $stashItem->mediaItemId) === null) {
+                $fallbackCode = $this->transcodeFallback->triggerIfNeeded($stashItem->mediaItemId, $kind);
+                $this->markItemStale($item, $fallbackCode ?? $this->unavailableErrorCode($kind));
                 $stale[] = (string) $item->id;
 
                 continue;
@@ -190,16 +219,6 @@ abstract readonly class PodcastBroadcastFormat implements BroadcastFormat
         }
 
         return new BroadcastPruneResult(removedCount: 0, removedPaths: []);
-    }
-
-    protected function audioAsset(string $mediaItemId): ?PodcastAssetSelection
-    {
-        return $this->assets->audioAsset($mediaItemId);
-    }
-
-    protected function videoAsset(string $mediaItemId): ?PodcastAssetSelection
-    {
-        return $this->assets->videoAsset($mediaItemId);
     }
 
     private function findOrCreateItem(BroadcastContext $context, StashItemRecord $stashItem): BroadcastItemRecord

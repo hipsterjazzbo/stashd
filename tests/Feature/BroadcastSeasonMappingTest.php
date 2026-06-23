@@ -12,7 +12,7 @@ test('season mapping is rejected for non-series broadcast types', function (): v
 
     $stash = $this->http->post('/api/v1/stashes', ['name' => 'Podcast Stash'], headers: $headers)->assertStatus(Status::CREATED);
     $broadcast = $this->http->post('/api/v1/stashes/' . $stash->body['stash']['id'] . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'My Podcast',
     ], headers: $headers)->assertStatus(Status::CREATED);
 

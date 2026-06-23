@@ -16,6 +16,7 @@ use App\MediaServers\MediaServerConnectionRepository;
 use App\Stashes\StashAddInputCommandHandler;
 use App\Stashes\StashPreflightCommandHandler;
 use App\System\SystemStorageCheckCommandHandler;
+use App\Transcoding\AssetTranscodePodcastAudioCommandHandler;
 use App\Vault\AssetVerifyCommandHandler;
 use App\Vault\SystemVerifyVaultCommandHandler;
 use Tempest\Container\Container;
@@ -37,6 +38,7 @@ final class CommandHandlerRegistryInitializer implements Initializer
             $container->get(SystemStorageCheckCommandHandler::class),
             $container->get(SystemVerifyVaultCommandHandler::class),
             $container->get(AssetVerifyCommandHandler::class),
+            $container->get(AssetTranscodePodcastAudioCommandHandler::class),
             new BroadcastCommandHandler($commands, $jobs, $broadcasts, CommandType::BroadcastPlan),
             new BroadcastCommandHandler($commands, $jobs, $broadcasts, CommandType::BroadcastRebuild),
             new BroadcastCommandHandler($commands, $jobs, $broadcasts, CommandType::BroadcastVerify),

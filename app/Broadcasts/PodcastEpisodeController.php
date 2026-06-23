@@ -6,6 +6,7 @@ namespace App\Broadcasts;
 
 use App\Broadcasts\Podcasts\PodcastAssetSelector;
 use App\Broadcasts\Podcasts\PodcastEpisodeByteRange;
+use App\Broadcasts\Podcasts\PodcastMediaKind;
 use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
@@ -70,10 +71,9 @@ final readonly class PodcastEpisodeController
             return $this->notRevealed();
         }
 
-        $selection = match ($broadcast->type) {
-            BroadcastType::AudioPodcast => $this->assets->audioAsset($item->mediaItemId),
-            BroadcastType::VideoPodcast => $this->assets->videoAsset($item->mediaItemId),
-            default => null,
+        $selection = match (PodcastMediaKind::forBroadcast($broadcast)) {
+            PodcastMediaKind::Audio => $this->assets->audioAsset($item->mediaItemId),
+            PodcastMediaKind::Video => $this->assets->videoAsset($item->mediaItemId),
         };
 
         // `{ext}` is a presentation hint only; the selected asset's own

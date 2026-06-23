@@ -122,14 +122,14 @@ const ALL_DOWNLOAD_POLICIES = ['video', 'audio_only', 'metadata_only', 'manual_d
  * here only for instant reactive feedback as the user picks a broadcast type;
  * the server-side check in BroadcastController::create() is authoritative.
  */
-function downloadPolicySatisfiesBroadcastType(policy: string, broadcastType: string): boolean {
+function downloadPolicySatisfiesBroadcastType(policy: string, broadcastType: string, mediaKind?: string): boolean {
 	if (policy === 'metadata_only') return false
-	if (policy === 'audio_only') return broadcastType !== 'video_podcast'
+	if (policy === 'audio_only') return !(broadcastType === 'podcast' && mediaKind === 'video')
 	return true
 }
 
-function compatibleDownloadPolicies(broadcastType: string): string[] {
-	return ALL_DOWNLOAD_POLICIES.filter((policy) => downloadPolicySatisfiesBroadcastType(policy, broadcastType))
+function compatibleDownloadPolicies(broadcastType: string, mediaKind?: string): string[] {
+	return ALL_DOWNLOAD_POLICIES.filter((policy) => downloadPolicySatisfiesBroadcastType(policy, broadcastType, mediaKind))
 }
 
 const SERIES_BROADCAST_TYPES = ['filesystem_series', 'jellyfin_series', 'plex_series']
@@ -914,6 +914,7 @@ function stashDetailComponent(stashId: string) {
 		broadcasts: [] as BroadcastSummary[],
 		actionPending: null as string | null,
 		newBroadcastType: 'filesystem_series',
+		newBroadcastMediaKind: 'audio',
 		newBroadcastName: '',
 		creatingBroadcast: false,
 		compatibleDownloadPolicyChoice: 'video',
@@ -1108,7 +1109,7 @@ function stashDetailComponent(stashId: string) {
 		},
 
 		broadcastPolicyMismatchMessage(): string | null {
-			if (!this.stash || downloadPolicySatisfiesBroadcastType(this.stash.download_policy, this.newBroadcastType)) {
+			if (!this.stash || downloadPolicySatisfiesBroadcastType(this.stash.download_policy, this.newBroadcastType, this.newBroadcastMediaKind)) {
 				return null
 			}
 
@@ -1118,11 +1119,11 @@ function stashDetailComponent(stashId: string) {
 		},
 
 		compatibleDownloadPolicies(): string[] {
-			return compatibleDownloadPolicies(this.newBroadcastType)
+			return compatibleDownloadPolicies(this.newBroadcastType, this.newBroadcastMediaKind)
 		},
 
 		onBroadcastTypeChanged() {
-			const compatible = compatibleDownloadPolicies(this.newBroadcastType)
+			const compatible = compatibleDownloadPolicies(this.newBroadcastType, this.newBroadcastMediaKind)
 			if (!compatible.includes(this.compatibleDownloadPolicyChoice)) {
 				this.compatibleDownloadPolicyChoice = compatible[0] ?? 'video'
 			}
@@ -1161,6 +1162,7 @@ function stashDetailComponent(stashId: string) {
 					body: JSON.stringify({
 						type: this.newBroadcastType,
 						name: this.newBroadcastName.trim(),
+						...(this.newBroadcastType === 'podcast' ? { settings: { media_kind: this.newBroadcastMediaKind } } : {}),
 					}),
 				})
 				if (!response.ok) {

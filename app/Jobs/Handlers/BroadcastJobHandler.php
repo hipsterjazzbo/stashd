@@ -14,6 +14,7 @@ use App\Commands\CommandState;
 use App\Jobs\JobHandler;
 use App\Jobs\JobHandlerContext;
 use App\Jobs\JobIntent;
+use App\Jobs\JobProgressUpdate;
 use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
@@ -83,7 +84,7 @@ final readonly class BroadcastJobHandler implements JobHandler
             $job->progressLabel = 'Broadcast ' . $action . ' complete';
             $job->finishedAt = DateTime::now(Timezone::UTC);
             $this->jobs->save($job);
-            $context->progress($job, $job->progressTotal, $job->progressTotal, $job->progressLabel);
+            $context->progress($job, JobProgressUpdate::ofSteps($job->progressTotal, $job->progressTotal, $job->progressLabel));
 
             $this->transitions->transitionJob($job, JobState::Ready);
             $this->transitions->transitionCommand($command, CommandState::Completed);
@@ -112,10 +113,10 @@ final readonly class BroadcastJobHandler implements JobHandler
         JobHandlerContext $context,
         PrefixedUlid $broadcastId,
     ): array {
-        $context->progress($job, 1, 2, 'Planning broadcast');
+        $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Planning broadcast'));
         $plan = $this->lifecycle->plan($broadcastId);
         $this->activity->broadcastPlanned($command, $job, $broadcastId, $plan->toArray());
-        $context->progress($job, 2, 2, 'Broadcast plan ready');
+        $context->progress($job, JobProgressUpdate::ofSteps(2, 2, 'Broadcast plan ready'));
 
         return ['plan' => $plan->toArray()];
     }
@@ -127,15 +128,15 @@ final readonly class BroadcastJobHandler implements JobHandler
         JobHandlerContext $context,
         PrefixedUlid $broadcastId,
     ): array {
-        $context->progress($job, 1, 4, 'Planning broadcast rebuild');
+        $context->progress($job, JobProgressUpdate::ofSteps(1, 4, 'Planning broadcast rebuild'));
         $this->activity->broadcastRebuildStarted($command, $job, $broadcastId);
 
         $result = $this->lifecycle->rebuild($broadcastId);
 
-        $context->progress($job, 3, 4, 'Broadcast published');
+        $context->progress($job, JobProgressUpdate::ofSteps(3, 4, 'Broadcast published'));
         $this->activity->broadcastPublished($command, $job, $broadcastId, $result->publish ?? []);
 
-        $context->progress($job, 4, 4, 'Broadcast verified');
+        $context->progress($job, JobProgressUpdate::ofSteps(4, 4, 'Broadcast verified'));
         $this->activity->broadcastVerified($command, $job, $broadcastId, $result->verify ?? []);
 
         if (($result->verify['stale_count'] ?? 0) > 0) {
@@ -156,10 +157,10 @@ final readonly class BroadcastJobHandler implements JobHandler
         JobHandlerContext $context,
         PrefixedUlid $broadcastId,
     ): array {
-        $context->progress($job, 1, 2, 'Triggering media server scan');
+        $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Triggering media server scan'));
         $trigger = $this->lifecycle->trigger($broadcastId);
         $this->recordTriggerActivity($command, $job, $broadcastId, $trigger->toArray());
-        $context->progress($job, 2, 2, 'Broadcast trigger complete');
+        $context->progress($job, JobProgressUpdate::ofSteps(2, 2, 'Broadcast trigger complete'));
 
         return ['trigger' => $trigger->toArray()];
     }
@@ -185,10 +186,10 @@ final readonly class BroadcastJobHandler implements JobHandler
         JobHandlerContext $context,
         PrefixedUlid $broadcastId,
     ): array {
-        $context->progress($job, 1, 2, 'Rotating podcast token');
+        $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Rotating podcast token'));
         $result = $this->lifecycle->rotateToken($broadcastId);
         $this->activity->broadcastTokenRotated($command, $job, $broadcastId, $result->toArray());
-        $context->progress($job, 2, 2, 'Podcast token rotated');
+        $context->progress($job, JobProgressUpdate::ofSteps(2, 2, 'Podcast token rotated'));
 
         return ['token' => $result->toArray()];
     }
@@ -200,7 +201,7 @@ final readonly class BroadcastJobHandler implements JobHandler
         JobHandlerContext $context,
         PrefixedUlid $broadcastId,
     ): array {
-        $context->progress($job, 1, 2, 'Verifying broadcast');
+        $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Verifying broadcast'));
         $verify = $this->lifecycle->verify($broadcastId);
         $this->activity->broadcastVerified($command, $job, $broadcastId, $verify->toArray());
 
@@ -208,7 +209,7 @@ final readonly class BroadcastJobHandler implements JobHandler
             $this->activity->broadcastStale($command, $job, $broadcastId, $verify->toArray());
         }
 
-        $context->progress($job, 2, 2, 'Broadcast verification complete');
+        $context->progress($job, JobProgressUpdate::ofSteps(2, 2, 'Broadcast verification complete'));
 
         return ['verify' => $verify->toArray()];
     }
@@ -220,10 +221,10 @@ final readonly class BroadcastJobHandler implements JobHandler
         JobHandlerContext $context,
         PrefixedUlid $broadcastId,
     ): array {
-        $context->progress($job, 1, 2, 'Pruning stale broadcast files');
+        $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Pruning stale broadcast files'));
         $prune = $this->lifecycle->prune($broadcastId);
         $this->activity->broadcastPruned($command, $job, $broadcastId, $prune->toArray());
-        $context->progress($job, 2, 2, 'Broadcast prune complete');
+        $context->progress($job, JobProgressUpdate::ofSteps(2, 2, 'Broadcast prune complete'));
 
         return ['prune' => $prune->toArray()];
     }

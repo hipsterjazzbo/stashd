@@ -586,16 +586,16 @@ podcast_asset_id="asset_smoke_podcast_$$"
 $CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite \
     "INSERT INTO assets (id, mediaItemId, role, kind, path, relativePath, mimeType, container, sizeBytes, state, createdAt, updatedAt) VALUES ('${podcast_asset_id}', '${media_item_id}', 'vault_original', 'audio', '${podcast_fixture_container_path}', 'podcast-smoke/${provider_item_id}/original.mp3', 'audio/mpeg', 'mp3', ${podcast_fixture_size}, 'ready', datetime('now'), datetime('now'));"
 
-echo "Creating audio_podcast broadcast and running broadcast.rebuild..."
+echo "Creating podcast broadcast and running broadcast.rebuild..."
 podcast_broadcast_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/stashes/${stash_id}/broadcasts" \
     -H 'Content-Type: application/json' \
     -H "Authorization: Bearer ${token}" \
-    -d '{"type":"audio_podcast","name":"Smoke Podcast","slug":"smoke-podcast"}')"
+    -d '{"type":"podcast","name":"Smoke Podcast","slug":"smoke-podcast"}')"
 echo "$podcast_broadcast_body"
 
 podcast_broadcast_id="$(printf '%s' "$podcast_broadcast_body" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
 if [ -z "$podcast_broadcast_id" ]; then
-    echo "smoke failed: could not parse audio_podcast broadcast id" >&2
+    echo "smoke failed: could not parse podcast broadcast id" >&2
     exit 1
 fi
 
@@ -620,7 +620,7 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
 done
 
 if [ "$podcast_rebuild_state" != "completed" ]; then
-    echo "smoke failed: audio_podcast broadcast.rebuild did not complete (state=${podcast_rebuild_state})" >&2
+    echo "smoke failed: podcast broadcast.rebuild did not complete (state=${podcast_rebuild_state})" >&2
     echo "$podcast_rebuild_show" >&2
     exit 1
 fi
@@ -762,4 +762,4 @@ $CONTAINER rm -f "$override_name" >/dev/null 2>&1 || true
 rm -rf "$override_tmp"
 echo "Operator-supplied SIGNING_KEY honored correctly."
 
-echo "docker smoke test passed (boot, health, storage layout, migrations, worker/scheduler, system health, restart persistence, SIGNING_KEY persisted across restart and container recreate, operator-supplied SIGNING_KEY override honored, fake preflight e2e, fake download → vault, filesystem broadcast rebuild + verify, jellyfin_series rebuild + nfo, audio_podcast feed + episode route + Range request + unknown-token 404)"
+echo "docker smoke test passed (boot, health, storage layout, migrations, worker/scheduler, system health, restart persistence, SIGNING_KEY persisted across restart and container recreate, operator-supplied SIGNING_KEY override honored, fake preflight e2e, fake download → vault, filesystem broadcast rebuild + verify, jellyfin_series rebuild + nfo, podcast feed + episode route + Range request + unknown-token 404)"

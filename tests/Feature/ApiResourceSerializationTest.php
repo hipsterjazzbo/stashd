@@ -17,7 +17,7 @@ test('podcast broadcast resources expose only intended token fields', function (
     [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('api-resource-podcast');
 
     $create = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'API Resource Podcast',
         'slug' => 'api-resource-podcast-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -99,7 +99,7 @@ test('auth user resources do not expose password hashes', function (): void {
 test('command and job resources do not expose raw podcast tokens', function (): void {
     [$headers, $stashId] = array_slice($this->bootstrapFakeDownloadStash('api-resource-command-token'), 0, 2);
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Command Token Podcast',
         'slug' => 'command-token-podcast-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);

@@ -82,6 +82,9 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
         } catch (\App\Downloads\DownloadException $exception) {
             $this->failJob($job, $exception->errorCode . ': ' . $exception->getMessage());
             $this->activity->downloadFailed($job, $exception->errorCode, $exception->getMessage());
+        } catch (\App\Transcoding\TranscodeException $exception) {
+            $this->failJob($job, $exception->errorCode . ': ' . $exception->getMessage());
+            $this->activity->podcastAudioTranscodeFailed($job, $exception->errorCode, $exception->getMessage());
         } catch (\App\Broadcasts\BroadcastException $exception) {
             $this->failJob($job, $exception->errorCode . ': ' . $exception->getMessage());
         } catch (\App\MediaServers\MediaServerException $exception) {
@@ -101,12 +104,14 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
         $this->jobs->save($job);
     }
 
-    public function progress(JobRecord $job, int $current, int $total, string $label): void
+    public function progress(JobRecord $job, JobProgressUpdate $update): void
     {
-        $job->progressCurrent = $current;
-        $job->progressTotal = $total;
-        $job->progressPercent = $total > 0 ? round(($current / $total) * 100, 2) : 0.0;
-        $job->progressLabel = $label;
+        $job->progressCurrent = $update->current;
+        $job->progressTotal = $update->total;
+        $job->progressPercent = $update->percent;
+        $job->progressLabel = $update->label;
+        $job->progressEtaSeconds = $update->etaSeconds;
+        $job->progressRate = $update->rate;
         $job->heartbeatAt = DateTime::now(Timezone::UTC);
         $this->jobs->save($job);
         $this->publisher->jobProgress($job);

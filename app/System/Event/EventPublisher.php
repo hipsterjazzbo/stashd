@@ -36,6 +36,8 @@ final readonly class EventPublisher
             'progress_total' => $job->progressTotal,
             'progress_percent' => $job->progressPercent,
             'progress_label' => $job->progressLabel,
+            'progress_eta_seconds' => $job->progressEtaSeconds,
+            'progress_rate' => $job->progressRate,
         ]);
     }
 

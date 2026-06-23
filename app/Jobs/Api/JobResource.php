@@ -40,6 +40,8 @@ final readonly class JobResource implements Arrayable
             'progressTotal' => $this->job->progressTotal,
             'progressPercent' => $this->job->progressPercent,
             'progressLabel' => $this->job->progressLabel,
+            'progressEtaSeconds' => $this->job->progressEtaSeconds,
+            'progressRate' => $this->job->progressRate,
             'lastError' => $this->job->lastError,
             'payload' => $this->decodeJson($this->job->payloadJson),
             'createdAt' => $this->job->createdAt,

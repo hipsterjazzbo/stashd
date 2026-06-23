@@ -10,6 +10,7 @@ use App\Commands\CommandState;
 use App\Jobs\JobHandler;
 use App\Jobs\JobHandlerContext;
 use App\Jobs\JobIntent;
+use App\Jobs\JobProgressUpdate;
 use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
@@ -48,11 +49,11 @@ final readonly class StorageCheckJobHandler implements JobHandler
         }
 
         $context->heartbeat($job);
-        $context->progress($job, 0, 2, 'Checking storage roots');
+        $context->progress($job, JobProgressUpdate::ofSteps(0, 2, 'Checking storage roots'));
 
         $this->storageChecks->checkAll();
         $context->heartbeat($job);
-        $context->progress($job, 1, 2, 'Evaluating health report');
+        $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Evaluating health report'));
 
         $report = $this->health->report();
         $ok = $report->status === 'ok';

@@ -10,6 +10,7 @@ use App\Commands\CommandState;
 use App\Jobs\JobHandler;
 use App\Jobs\JobHandlerContext;
 use App\Jobs\JobIntent;
+use App\Jobs\JobProgressUpdate;
 use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
@@ -69,7 +70,7 @@ final readonly class MediaServerJobHandler implements JobHandler
         $job->progressLabel = 'Media server ' . $action . ' complete';
         $job->finishedAt = DateTime::now(Timezone::UTC);
         $this->jobs->save($job);
-        $context->progress($job, 2, 2, $job->progressLabel);
+        $context->progress($job, JobProgressUpdate::ofSteps(2, 2, $job->progressLabel));
 
         $this->transitions->transitionJob($job, JobState::Ready);
         $this->transitions->transitionCommand($command, CommandState::Completed);
@@ -84,7 +85,7 @@ final readonly class MediaServerJobHandler implements JobHandler
         JobHandlerContext $context,
         PrefixedUlid $connectionId,
     ): array {
-        $context->progress($job, 1, 2, 'Testing media server connection');
+        $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Testing media server connection'));
         $status = $this->connections->testConnection($connectionId);
         $this->activity->mediaServerTestCompleted($command, $job, $connectionId, $status->toArray());
 
@@ -98,7 +99,7 @@ final readonly class MediaServerJobHandler implements JobHandler
         JobHandlerContext $context,
         PrefixedUlid $connectionId,
     ): array {
-        $context->progress($job, 1, 2, 'Listing media server libraries');
+        $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Listing media server libraries'));
         $libraries = $this->connections->listLibraries($connectionId);
 
         return [

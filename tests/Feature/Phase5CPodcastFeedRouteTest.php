@@ -27,7 +27,7 @@ test('public feed route serves the generated audio podcast feed to unauthenticat
     podcastRouteCreateAudioAsset($config, $this->container->get(AssetRepository::class), $mediaItemId);
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Route Audio Feed',
         'slug' => 'route-audio-feed-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -61,7 +61,7 @@ test('public feed route requires the token in the path, not a query parameter', 
     podcastRouteCreateAudioAsset($config, $this->container->get(AssetRepository::class), $mediaItemId);
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Path Token Feed',
         'slug' => 'path-token-feed-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -95,7 +95,7 @@ test('rotating the feed token invalidates the old url and the new url resolves',
     podcastRouteCreateAudioAsset($config, $this->container->get(AssetRepository::class), $mediaItemId);
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Rotate Route Feed',
         'slug' => 'rotate-route-feed-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);
@@ -154,7 +154,7 @@ test('a valid token with no generated feed returns a safe 404 without leaking pa
 
     // Broadcast created (feed token issued) but never rebuilt, so feed.xml is absent.
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'audio_podcast',
+        'type' => 'podcast',
         'name' => 'Missing Feed',
         'slug' => 'missing-feed-' . bin2hex(random_bytes(3)),
     ], headers: $headers)->assertStatus(Status::CREATED);

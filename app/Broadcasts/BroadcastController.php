@@ -7,6 +7,7 @@ namespace App\Broadcasts;
 use App\Broadcasts\Api\BroadcastItemResource;
 use App\Broadcasts\Api\BroadcastResource;
 use App\Broadcasts\Podcasts\PodcastEpisodeUrlBuilder;
+use App\Broadcasts\Podcasts\PodcastMediaKind;
 use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
@@ -131,7 +132,7 @@ final readonly class BroadcastController
 
         return new Json([
             'broadcast' => $this->mapBroadcast($broadcast),
-            'policy_mismatch' => $this->policyMismatch($stash->downloadPolicy, $type),
+            'policy_mismatch' => $this->policyMismatch($stash->downloadPolicy, $broadcast),
         ], Status::CREATED);
     }
 
@@ -246,9 +247,12 @@ final readonly class BroadcastController
     }
 
     /** @return array<string, mixed>|null */
-    private function policyMismatch(DownloadPolicy $policy, BroadcastType $type): ?array
+    private function policyMismatch(DownloadPolicy $policy, BroadcastRecord $broadcast): ?array
     {
-        if ($type->isSatisfiedByDownloadPolicy($policy)) {
+        $type = $broadcast->type;
+        $mediaKind = PodcastMediaKind::forBroadcast($broadcast);
+
+        if ($type->isSatisfiedByDownloadPolicy($policy, $mediaKind)) {
             return null;
         }
 
@@ -260,7 +264,7 @@ final readonly class BroadcastController
                 static fn (DownloadPolicy $candidate): string => $candidate->value,
                 array_filter(
                     DownloadPolicy::cases(),
-                    static fn (DownloadPolicy $candidate): bool => $type->isSatisfiedByDownloadPolicy($candidate),
+                    static fn (DownloadPolicy $candidate): bool => $type->isSatisfiedByDownloadPolicy($candidate, $mediaKind),
                 ),
             )),
         ];

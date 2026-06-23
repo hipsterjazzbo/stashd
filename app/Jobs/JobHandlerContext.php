@@ -16,8 +16,8 @@ final readonly class JobHandlerContext
         $this->callbacks->heartbeat($job);
     }
 
-    public function progress(JobRecord $job, int $current, int $total, string $label): void
+    public function progress(JobRecord $job, JobProgressUpdate $update): void
     {
-        $this->callbacks->progress($job, $current, $total, $label);
+        $this->callbacks->progress($job, $update);
     }
 }

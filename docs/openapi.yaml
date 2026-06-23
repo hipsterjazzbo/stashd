@@ -1200,7 +1200,8 @@ components:
     AssetRole: { type: string, enum: [vault_original, source_thumbnail, subtitle, transcript, podcast_audio, episode_artwork, feed_artwork, feed_xml, nfo, hardlink, remuxed_video, metadata_json, source_json] }
     AssetKind: { type: string, enum: [video, audio, image, subtitle, metadata, link, feed, other] }
     AssetState: { type: string, enum: [pending, processing, ready, stale, missing, failed] }
-    BroadcastType: { type: string, enum: [filesystem_series, jellyfin_series, plex_series, audio_podcast, video_podcast] }
+    BroadcastType: { type: string, enum: [filesystem_series, jellyfin_series, plex_series, podcast] }
+    PodcastMediaKind: { type: string, enum: [audio, video], description: "Preferred episode enclosure media for a `podcast` broadcast (settings.media_kind); defaults to audio." }
     BroadcastState: { type: string, enum: [pending, processing, ready, stale, failed, disabled] }
     BroadcastItemState: { type: string, enum: [pending, processing, ready, stale, failed, disabled] }
     JobState: { type: string, enum: [pending, processing, ready, failed, cancelled] }
@@ -1227,6 +1228,7 @@ components:
         - broadcast.rotate_token
         - media_server.test_connection
         - media_server.list_libraries
+        - asset.transcode_podcast_audio
         - system.boot
         - system.storage_check
         - system.prune_temp
@@ -1248,6 +1250,7 @@ components:
         - boot
         - verify_vault
         - media_server
+        - transcode_podcast_audio
 
     Stash:
       type: object
@@ -1407,7 +1410,7 @@ components:
           type: object
           additionalProperties: true
           nullable: true
-          description: Type-specific settings; series types may include season_mapping keyed by stash_input_id.
+          description: Type-specific settings; series types may include season_mapping keyed by stash_input_id; podcast broadcasts may include media_kind (PodcastMediaKind, defaults to audio).
         last_planned_at: { type: string, format: date-time, nullable: true }
         last_built_at: { type: string, format: date-time, nullable: true }
         last_verified_at: { type: string, format: date-time, nullable: true }
@@ -1539,6 +1542,14 @@ components:
         progress_total: { type: integer, nullable: true }
         progress_percent: { type: integer, nullable: true }
         progress_label: { type: string, nullable: true }
+        progress_eta_seconds:
+          type: integer
+          nullable: true
+          description: Estimated seconds remaining; only populated by jobs reporting true percent-based progress (e.g. podcast audio transcoding), null for discrete step-based progress.
+        progress_rate:
+          type: number
+          nullable: true
+          description: Reserved for a future per-job-type rate metric (e.g. bytes/sec); not currently populated by any job.
         last_error: { type: string, nullable: true }
         payload:
           type: object

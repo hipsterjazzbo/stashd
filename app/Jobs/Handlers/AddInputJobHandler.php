@@ -10,6 +10,7 @@ use App\Commands\CommandState;
 use App\Jobs\JobHandler;
 use App\Jobs\JobHandlerContext;
 use App\Jobs\JobIntent;
+use App\Jobs\JobProgressUpdate;
 use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
@@ -46,7 +47,7 @@ final readonly class AddInputJobHandler implements JobHandler
         $command = $this->requireCommand($job);
         $this->transitions->transitionCommand($command, CommandState::Running);
         $context->heartbeat($job);
-        $context->progress($job, 0, 1, 'Adding input to stash');
+        $context->progress($job, JobProgressUpdate::ofSteps(0, 1, 'Adding input to stash'));
 
         $payload = $job->payloadJson === null
             ? []
@@ -71,7 +72,7 @@ final readonly class AddInputJobHandler implements JobHandler
         $job->progressLabel = 'Input added to stash';
         $job->finishedAt = DateTime::now(Timezone::UTC);
         $this->jobs->save($job);
-        $context->progress($job, 1, 1, $job->progressLabel);
+        $context->progress($job, JobProgressUpdate::ofSteps(1, 1, $job->progressLabel));
 
         $this->transitions->transitionJob($job, JobState::Ready);
         $this->transitions->transitionCommand($command, CommandState::Completed);
