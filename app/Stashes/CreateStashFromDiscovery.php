@@ -78,6 +78,8 @@ final readonly class CreateStashFromDiscovery
 
         $syncMode = SyncMode::tryFrom((string) ($options['sync_mode'] ?? SyncMode::Automatic->value)) ?? SyncMode::Automatic;
 
+        $isFirstInput = $this->stashInputs->listForStash($stashId) === [];
+
         $stashInput = $this->stashInputs->create(
             stashId: $stashId,
             providerKey: $resolved->providerKey,
@@ -91,6 +93,16 @@ final readonly class CreateStashFromDiscovery
 
         if ($stash->iconUri === null && $resolved->sourceAvatarUri !== null) {
             $this->stashes->update($stash, iconUri: $resolved->sourceAvatarUri->toString());
+        }
+
+        // Only the stash's first input defaults its name -- a stash created via
+        // the "+ New stash" modal with a link but no typed title gets 'New Stash'
+        // from StashController::create() (no channel info exists at that point,
+        // before any input is resolved); this backfills it once that's known,
+        // the same way iconUri already does above. Later inputs on an
+        // already-named (possibly multi-source) stash must never overwrite it.
+        if ($isFirstInput && $stash->name === 'New Stash' && $resolved->sourceTitle !== null) {
+            $this->stashes->update($stash, name: $resolved->sourceTitle);
         }
 
         $stashInputId = PrefixedUlid::parse((string) $stashInput->id);

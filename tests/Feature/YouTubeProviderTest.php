@@ -158,10 +158,71 @@ test('youtube add input populates stash icon_uri from the resolved channel avata
 
     $updatedStash = StashRecord::findById(new \Tempest\Database\PrimaryKey($stash->body['stash']['id']));
     expect($updatedStash)->not->toBeNull()
-        ->and($updatedStash->iconUri)->toBe('https://yt3.googleusercontent.com/stashd-demo-avatar.jpg');
+        ->and($updatedStash->iconUri)->toBe('https://yt3.googleusercontent.com/stashd-demo-avatar.jpg')
+        ->and($updatedStash->name)->toBe('YouTube Handle Icon Stash');
 
     $show = $this->http->get('/api/v1/stashes/' . $stash->body['stash']['id'], headers: $headers)->assertOk();
     expect($show->body['stash']['icon_uri'])->toBe('https://yt3.googleusercontent.com/stashd-demo-avatar.jpg');
+});
+
+test('youtube add input defaults the stash name to the resolved channel title when no name was given', function (): void {
+    $headers = $this->authHeaders();
+
+    $stash = $this->http->post('/api/v1/stashes', [], headers: $headers)->assertStatus(Status::CREATED);
+    expect($stash->body['stash']['name'])->toBe('New Stash');
+
+    $preflight = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.preflight',
+        'options' => [
+            'source_uri' => 'https://www.youtube.com/@StashdDemo',
+        ],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $add = $this->http->post('/api/v1/stashes/' . $stash->body['stash']['id'] . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $updatedStash = StashRecord::findById(new \Tempest\Database\PrimaryKey($stash->body['stash']['id']));
+    expect($updatedStash)->not->toBeNull()
+        ->and($updatedStash->name)->toBe('Stashd Demo');
+});
+
+test('a second input never overwrites a stash name already defaulted from the first', function (): void {
+    $headers = $this->authHeaders();
+
+    $stash = $this->http->post('/api/v1/stashes', [], headers: $headers)->assertStatus(Status::CREATED);
+    $stashId = $stash->body['stash']['id'];
+
+    $firstPreflight = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.preflight',
+        'options' => [
+            'source_uri' => 'https://www.youtube.com/@StashdDemo',
+        ],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+    $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
+        'preflight_command_id' => $firstPreflight->body['command_id'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    expect(StashRecord::findById(new \Tempest\Database\PrimaryKey($stashId))->name)->toBe('Stashd Demo');
+
+    $secondPreflight = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.preflight',
+        'options' => [
+            'source_uri' => 'fake://channel/second-source',
+            'source_title' => 'A Totally Different Channel',
+        ],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+    $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
+        'preflight_command_id' => $secondPreflight->body['command_id'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    expect(StashRecord::findById(new \Tempest\Database\PrimaryKey($stashId))->name)->toBe('Stashd Demo');
 });
 
 test('unsupported youtube url fails preflight job with stable error', function (): void {
