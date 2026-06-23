@@ -300,6 +300,19 @@ Full task breakdown (T1-T20) in `docs/plans/phase-6-slice-6/plan.md`; `docs/plan
 - [ ] Tech debt: unused `JobIntent`/`CommandType` enum cases (`RoutineDiscovery`, `MetadataCapture`, `MetadataRefresh`, `Repair`, `Enrich` / `StashSync`, `StashBackfill`, `ItemRefreshMetadata`, `SystemPruneTemp`) — scaffolding from an earlier design pass; the underlying capabilities already work via other plumbing (scheduler + `Preflight` job, provider strategy pattern). `JobIntent::InitialBackfill` is no longer in this list — Phase 6 Slice 6's add-input pipeline wired it up to drive full-channel discovery at commit (`eae9171`). Revisit the rest: remove or wire up.
 - [ ] Tech debt: `RawMetadataSnapshotRecord` table/record exists but is never instantiated — scaffolding for a not-yet-scoped provenance feature.
 - [ ] Max concurrent downloads is not explicitly enforced in code — naturally satisfied today by the single serial `worker` process; revisit if workers are ever scaled beyond one.
+- [ ] Tech debt: no full-channel discovery fallback when no YouTube Data API key is configured —
+  `YouTubeProvider::discoveryStrategies()` only registers RSS (`StrategyCost::Low`, ~15-item RSS-feed
+  ceiling) and Data API (`StrategyCost::Medium`, gated on `hasKey()`); without a key, RSS is the only
+  option `ProviderStrategySelector` can ever pick. yt-dlp can already enumerate a full channel
+  (`YtDlp::extractAll()`/`extractPlaylist()` in `vendor/hazel/ytdlphp`) but `App\Downloads\Ytdlp\YtdlpGateway`
+  only exposes `extractInfo()` (single video) — would need a new gateway method plus a
+  `DiscoveryStrategyHandler` implementation (mirror `YouTubeRssDiscoveryStrategy`), registered with a
+  cost above RSS's `Low` and gated on yt-dlp binary availability (mirror
+  `YouTubeYtdlpDownloadStrategy::isAvailable()`'s `realDownloadsEnabled() && probe()->available` check).
+  `StrategySelectionOptions::preferHighestCapability` is already `true` for `JobIntent::InitialBackfill`
+  (`app/Stashes/DiscoverStashInput.php`), so a higher-cost strategy would be auto-preferred for
+  full-backfill commits with zero selector changes. No existing fixtures for ytdlp-shaped discovery
+  output (existing ytdlp tests stub `VideoInfo` objects directly, not fixture files) — would need new ones.
 
 ## Phase 8 — Stronger typing & Tempest-native refactor (ongoing, not gating v1)
 

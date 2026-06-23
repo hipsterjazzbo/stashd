@@ -10,7 +10,9 @@ use Generator;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Spiral\RoadRunner\Http\PSR7Worker;
 use Spiral\RoadRunner\Worker;
+use Tempest\Container\Container;
 use Tempest\Database\Config\SQLiteConfig;
+use Tempest\Http\Cookie\CookieManager;
 use Tempest\Http\HttpRequestFailed;
 use Tempest\Http\Response;
 use Tempest\Http\Responses\EventStream;
@@ -49,6 +51,7 @@ final class TempestPsr7Bridge
         private ViewRenderer $viewRenderer,
         private SqliteConfigurator $sqlite,
         private SQLiteConfig $sqliteConfig,
+        private Container $container,
     ) {
     }
 
@@ -86,7 +89,12 @@ final class TempestPsr7Bridge
             // Tempest's request mapper reads cookies from it (and decrypts
             // them). Seed it per request from the PSR-7 cookie params so the
             // session cookie is readable; reset in finally to avoid leaking
-            // cookies between requests in this long-lived worker.
+            // cookies between requests in this long-lived worker. CookieManager
+            // is unregistered in finally for the same reason: it's a Tempest
+            // #[Singleton], so without that, every cookie ever queued on this
+            // worker (including stale delete-cookie instructions from a single
+            // decryption failure) gets re-sent, re-encrypted, on every future
+            // response from this worker.
             $_COOKIE = $request->getCookieParams();
             $psr7->chunkSize = 0;
 
@@ -113,6 +121,7 @@ final class TempestPsr7Bridge
             } finally {
                 $this->authContext->set(null);
                 $_COOKIE = [];
+                $this->container->unregister(CookieManager::class);
             }
         }
 
