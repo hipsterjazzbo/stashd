@@ -7,7 +7,7 @@ use App\Config\YtdlpConfig;
 use function Tempest\env;
 
 $environment = env('ENVIRONMENT', 'local');
-$realDownloadsDefault = $environment === 'testing' ? '0' : '0';
+$realDownloadsDefault = $environment === 'testing' ? '0' : '1';
 
 return new YtdlpConfig(
     binary: env('STASHD_YTDLP_BINARY', 'yt-dlp'),

@@ -34,7 +34,7 @@ Supports channel handles, `/channel/UC…`, playlists, watch URLs, and `youtu.be
 |---|---|---|---|
 | Discovery | `youtube.rss` | Low | No API key; RSS/Atom fixtures in CI |
 | Metadata | `youtube.data_api` | Medium | Requires `YOUTUBE_DATA_API_KEY` |
-| Download | `youtube.ytdlp` | Last resort | Requires `STASHD_REAL_DOWNLOADS_ENABLED=1` + yt-dlp |
+| Download | `youtube.ytdlp` | Last resort | Real downloads on by default outside tests (`STASHD_REAL_DOWNLOADS_ENABLED`) + yt-dlp |
 
 ### Discovery (RSS)
 
@@ -58,7 +58,7 @@ All yt-dlp interaction **must** go through ytdlphp (`Ytdlphp\YtDlp`, `Ytdlphp\Op
 
 Phase 4B ships `YtdlphpDownloadAdapter` + `YtdlpDownloader`:
 
-- Provider strategy probe reports binary/version when `STASHD_REAL_DOWNLOADS_ENABLED=1`
+- Provider strategy probe reports binary/version unless `STASHD_REAL_DOWNLOADS_ENABLED=0` (real downloads are on by default outside `ENVIRONMENT=testing`)
 - Downloads: `RoutingDownloader` → `YtdlpDownloader` → `YtdlpGateway` → ytdlphp → temp staging → existing `DownloadExecutor` Vault ingest
 - Normal CI uses `StubYtdlpGateway` (no network)
 
@@ -69,7 +69,7 @@ All stash downloads go through `App\Domain\Download\DownloaderInterface`:
 | Implementation | When |
 |---|---|
 | `FakeDownloader` | `providerKey=fake` (tests, dev, Docker smoke) |
-| `YtdlpDownloader` | Non-fake providers when `STASHD_REAL_DOWNLOADS_ENABLED=1` |
+| `YtdlpDownloader` | Non-fake providers, on by default outside tests (`STASHD_REAL_DOWNLOADS_ENABLED`) |
 | `RoutingDownloader` | Default binding; selects the above |
 
 - Command: `item.download` → temp staging → Vault ingest → asset rows

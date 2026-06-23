@@ -13,7 +13,6 @@ services:
       STASHD_HTTP_PORT: "8474"
       STASHD_DATA_PATH: /data
       STASHD_MEDIA_PATH: /media
-      STASHD_REAL_DOWNLOADS_ENABLED: "0"
       XDEBUG_MODE: ${XDEBUG_MODE:-off}
       SIGNING_KEY: ${SIGNING_KEY:-}
       PUID: ${PUID:-1000}
