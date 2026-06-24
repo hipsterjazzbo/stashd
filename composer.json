@@ -12,8 +12,17 @@
     "spiral/roadrunner-cli": "^2.6",
     "nyholm/psr7": "^1.8",
     "symfony/uid": "^7.3",
-    "hazel/ytdlphp": "^1.0"
+    "hazel/ytdlphp": "*"
   },
+  "repositories": [
+    {
+      "type": "path",
+      "url": "/home/hazel/Projects/ytdlphp",
+      "options": {
+        "symlink": false
+      }
+    }
+  ],
   "require-dev": {
     "pestphp/pest": "^4.0",
     "laravel/pint": "^1.29"

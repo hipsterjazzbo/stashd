@@ -52,7 +52,7 @@ Optional enrichment via YouTube Data API when `YOUTUBE_DATA_API_KEY` is configur
 
 Strategy key: `youtube.ytdlp`
 
-Package: [`hazel/ytdlphp`](https://github.com/hipsterjazzbo/ytdlphp) — repository [`hipsterjazzbo/ytdlphp`](https://github.com/hipsterjazzbo/ytdlphp).
+Package: [`hazel/ytdlphp`](https://github.com/hipsterjazzbo/ytdlphp) — repository [`hipsterjazzbo/ytdlphp`](https://github.com/hipsterjazzbo/ytdlphp), consumed as a local Composer path repository pointing at `/home/hazel/Projects/ytdlphp` (see `composer.json`'s `repositories` entry), without a tagged release. Installed in **copy** mode (`"options": {"symlink": false}`), not symlinked: the dev container only bind-mounts `/home/hazel/Projects/stashd`, so a symlink into `/home/hazel/Projects/ytdlphp` resolves to nothing inside the container — Tempest's discovery scanner hit that directly as a fatal `DiscoveryLocation` error on a null path, crash-looping the container. Run `composer update hazel/ytdlphp` (the lock file won't show a diff, so `rm vendor/hazel/ytdlphp && composer install` if update reports "Nothing to install") to pull in local ytdlphp changes — they are not live.
 
 All yt-dlp interaction **must** go through ytdlphp (`Ytdlphp\YtDlp`, `Ytdlphp\Options`) behind `YtdlpGateway`. Stashd must not call `shell_exec`, `exec`, `proc_open`, or Symfony/Tempest Process for yt-dlp directly.
 
