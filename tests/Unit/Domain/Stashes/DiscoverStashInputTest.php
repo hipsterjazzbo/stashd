@@ -58,8 +58,16 @@ function discoverStashInputWithFixtures(?string $apiKey): DiscoverStashInput
     return new DiscoverStashInput($registry, new ProviderStrategySelector());
 }
 
-test('discover stash input uses the cheap rss strategy for the default preflight intent', function (): void {
+test('discover stash input prefers the data api strategy for the default preflight intent when keyed', function (): void {
     $executor = discoverStashInputWithFixtures(apiKey: 'test-api-key');
+
+    $result = $executor->execute(['source_uri' => 'https://www.youtube.com/channel/UCStashdDemoCh0012345678']);
+
+    expect($result->strategyKey)->toBe('youtube.data_api_discovery');
+});
+
+test('discover stash input falls back to the cheap rss strategy for the default preflight intent without a key', function (): void {
+    $executor = discoverStashInputWithFixtures(apiKey: null);
 
     $result = $executor->execute(['source_uri' => 'https://www.youtube.com/channel/UCStashdDemoCh0012345678']);
 

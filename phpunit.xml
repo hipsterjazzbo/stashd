@@ -27,5 +27,6 @@
         <env name="STASHD_DATA_PATH" value="/tmp/stashd-test/data"/>
         <env name="STASHD_MEDIA_PATH" value="/tmp/stashd-test/media"/>
         <env name="DB_DATABASE" value="/tmp/stashd-test/data/stashd.sqlite"/>
+        <env name="YOUTUBE_DATA_API_KEY" value=""/>
     </php>
 </phpunit>

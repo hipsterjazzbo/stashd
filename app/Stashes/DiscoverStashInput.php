@@ -49,9 +49,16 @@ final readonly class DiscoverStashInput
             );
         }
 
-        $selectionOptions = $intent === JobIntent::InitialBackfill
-            ? new StrategySelectionOptions(preferHighestCapability: true)
-            : null;
+        // Preflight must prefer the same strategy as the later commit
+        // (InitialBackfill) -- otherwise the items previewed here can differ
+        // from what actually gets persisted once a stronger strategy (e.g.
+        // the YouTube Data API) is available. Strategies still gate their own
+        // availability (e.g. no key configured), so this is a no-op when
+        // only the cheap strategy is available.
+        $selectionOptions = match ($intent) {
+            JobIntent::Preflight, JobIntent::InitialBackfill => new StrategySelectionOptions(preferHighestCapability: true),
+            default => null,
+        };
         $strategy = $this->strategySelector->select($provider, StrategyPurpose::Discovery, $selectionOptions);
         $discovered = $provider->discover($resolved, $strategy);
         $discoveredItems = DiscoveredItem::manyToArray($discovered);
