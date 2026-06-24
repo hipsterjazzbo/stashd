@@ -50,10 +50,16 @@ final class StubYtdlpGateway implements YtdlpGateway
         );
     }
 
-    public function download(string $url, string $workingDirectory, Options $options): \Ytdlphp\DownloadResult
+    public function download(string $url, string $workingDirectory, Options $options, ?callable $onProgress = null): \Ytdlphp\DownloadResult
     {
         $this->downloadCalls++;
         $this->lastDownloadOptions = [$options];
+
+        if ($onProgress !== null) {
+            $onProgress(new \Ytdlphp\DownloadProgress(downloadedBytes: 0, totalBytes: 100, percent: 0.0, etaSeconds: 2, speedBytesPerSecond: 50.0));
+            $onProgress(new \Ytdlphp\DownloadProgress(downloadedBytes: 50, totalBytes: 100, percent: 50.0, etaSeconds: 1, speedBytesPerSecond: 50.0));
+            $onProgress(new \Ytdlphp\DownloadProgress(downloadedBytes: 100, totalBytes: 100, percent: 100.0, etaSeconds: 0, speedBytesPerSecond: null));
+        }
 
         if ($this->failNextDownload) {
             $this->failNextDownload = false;

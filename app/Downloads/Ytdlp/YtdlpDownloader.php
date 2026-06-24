@@ -59,7 +59,7 @@ final readonly class YtdlpDownloader implements DownloaderInterface
         );
     }
 
-    public function download(DownloadRequest $request): DownloadResult
+    public function download(DownloadRequest $request, ?callable $onProgress = null): DownloadResult
     {
         if (! $this->config->realDownloadsEnabled()) {
             throw DownloadException::withCode(
@@ -87,7 +87,7 @@ final readonly class YtdlpDownloader implements DownloaderInterface
         try {
             $videoInfo = $this->gateway->extractInfo($sourceUrl, $request->tempDirectory);
             $downloadOptions = $this->options->forPolicy($request->downloadPolicy);
-            $this->gateway->download($sourceUrl, $request->tempDirectory, $downloadOptions);
+            $this->gateway->download($sourceUrl, $request->tempDirectory, $downloadOptions, $onProgress);
             $original = $this->resolveOriginalOutput($request->tempDirectory);
             $vaultFilename = $this->vaultFilename($original, $request->downloadPolicy);
             $renamedPath = rtrim($request->tempDirectory, '/') . '/' . $vaultFilename;

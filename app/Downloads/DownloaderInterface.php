@@ -18,5 +18,11 @@ interface DownloaderInterface
 
     public function probe(): DownloadProbeResult;
 
-    public function download(DownloadRequest $request): DownloadResult;
+    /**
+     * @param ?callable(\Ytdlphp\DownloadProgress): void $onProgress Invoked
+     *     with live progress where the implementation supports it. Not every
+     *     implementation reports progress (e.g. the fake downloader writes
+     *     its fixture instantly) — callers must not assume it will be called.
+     */
+    public function download(DownloadRequest $request, ?callable $onProgress = null): DownloadResult;
 }

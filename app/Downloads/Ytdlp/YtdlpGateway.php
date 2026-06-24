@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Downloads\Ytdlp;
 
+use Ytdlphp\DownloadProgress;
 use Ytdlphp\Metadata\VideoInfo;
 use Ytdlphp\Options;
 
@@ -16,5 +17,8 @@ interface YtdlpGateway
 
     public function extractInfo(string $url, string $workingDirectory): VideoInfo;
 
-    public function download(string $url, string $workingDirectory, Options $options): \Ytdlphp\DownloadResult;
+    /**
+     * @param ?callable(DownloadProgress): void $onProgress
+     */
+    public function download(string $url, string $workingDirectory, Options $options, ?callable $onProgress = null): \Ytdlphp\DownloadResult;
 }

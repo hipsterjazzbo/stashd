@@ -48,11 +48,15 @@ final readonly class DownloadMediaItem
     ) {
     }
 
+    /**
+     * @param ?callable(\Ytdlphp\DownloadProgress): void $onProgress
+     */
     public function execute(
         PrefixedUlid $mediaItemId,
         PrefixedUlid $stashId,
         PrefixedUlid $jobId,
         bool $force = false,
+        ?callable $onProgress = null,
     ): DownloadExecutionResult {
         if ($force) {
             throw DownloadException::withCode(
@@ -111,7 +115,7 @@ final readonly class DownloadMediaItem
                 publishedAt: $mediaItem->publishedAt,
             );
 
-            $download = $this->downloader->download($request);
+            $download = $this->downloader->download($request, $onProgress);
             $this->assertDownloadOutputsComplete($download);
 
             foreach ($download->files as $file) {

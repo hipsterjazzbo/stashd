@@ -22,6 +22,7 @@ use App\System\Event\EventPublisher;
 use App\System\State\StateTransitionService;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+use Ytdlphp\DownloadProgress;
 
 final readonly class DownloadJobHandler implements JobHandler
 {
@@ -45,7 +46,7 @@ final readonly class DownloadJobHandler implements JobHandler
         $command = $this->requireCommand($job);
         $this->transitions->transitionCommand($command, CommandState::Running);
         $context->heartbeat($job);
-        $context->progress($job, JobProgressUpdate::ofSteps(0, 4, 'Preparing download'));
+        $context->progress($job, JobProgressUpdate::ofPercent(0.0, 'Preparing download'));
 
         $payload = $job->payloadJson === null
             ? []
@@ -56,20 +57,56 @@ final readonly class DownloadJobHandler implements JobHandler
         $force = (bool) ($payload['force'] ?? false);
 
         try {
-            $context->progress($job, JobProgressUpdate::ofSteps(1, 4, 'Downloading to temp'));
-            $result = $this->executor->execute($mediaItemId, $stashId, PrefixedUlid::parse((string) $job->id), $force);
-            $context->progress($job, JobProgressUpdate::ofSteps(3, 4, 'Vault ingest complete'));
+            // Downloads still run strictly one at a time (a single worker
+            // tick claims and fully runs one job before the next tick
+            // starts), so a queue of several items finishes sequentially,
+            // not in parallel -- this only reports progress within whichever
+            // download is currently running.
+            $context->progress($job, JobProgressUpdate::ofPercent(0.0, 'Downloading via yt-dlp'));
+
+            $lastForwardedAt = microtime(true);
+            $lastPercent = 0.0;
+
+            $result = $this->executor->execute(
+                mediaItemId: $mediaItemId,
+                stashId: $stashId,
+                jobId: PrefixedUlid::parse((string) $job->id),
+                force: $force,
+                onProgress: function (DownloadProgress $progress) use ($job, $context, &$lastForwardedAt, &$lastPercent): void {
+                    // yt-dlp reports progress per stream (video and audio
+                    // download separately before merging), so percent isn't
+                    // monotonic across the whole download -- forwarded as-is,
+                    // not smoothed, same tradeoff as the ffmpeg transcode
+                    // path's throttling.
+                    $percent = $progress->percent ?? $lastPercent;
+                    $lastPercent = $percent;
+                    $isFinal = $percent >= 100.0;
+                    $now = microtime(true);
+
+                    if (! $isFinal && $now - $lastForwardedAt < 1.0) {
+                        return;
+                    }
+
+                    $lastForwardedAt = $now;
+                    $context->heartbeat($job);
+                    $context->progress($job, JobProgressUpdate::ofPercent(
+                        percent: $percent,
+                        label: sprintf('Downloading via yt-dlp: %d%%', (int) $percent),
+                        etaSeconds: $progress->etaSeconds,
+                        rate: $progress->speedBytesPerSecond,
+                    ));
+                },
+            );
 
             $command->resultJson = json_encode($result->toArray(), JSON_THROW_ON_ERROR);
             $this->commands->save($command);
 
-            $job->progressCurrent = 4;
-            $job->progressTotal = 4;
             $job->progressPercent = 100.0;
             $job->progressLabel = $result->skipped ? 'Download skipped (already in Vault)' : 'Download complete';
+            $job->progressEtaSeconds = 0;
             $job->finishedAt = DateTime::now(Timezone::UTC);
             $this->jobs->save($job);
-            $context->progress($job, JobProgressUpdate::ofSteps(4, 4, $job->progressLabel));
+            $context->progress($job, JobProgressUpdate::ofPercent(100.0, $job->progressLabel, 0));
 
             $this->transitions->transitionJob($job, JobState::Ready);
             $this->transitions->transitionCommand($command, CommandState::Completed);

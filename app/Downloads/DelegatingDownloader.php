@@ -41,12 +41,12 @@ final readonly class DelegatingDownloader implements DownloaderInterface
         );
     }
 
-    public function download(DownloadRequest $request): DownloadResult
+    public function download(DownloadRequest $request, ?callable $onProgress = null): DownloadResult
     {
         if ($request->providerKey === 'fake') {
-            return $this->fake->download($request);
+            return $this->fake->download($request, $onProgress);
         }
 
-        return $this->ytdlp->download($request);
+        return $this->ytdlp->download($request, $onProgress);
     }
 }

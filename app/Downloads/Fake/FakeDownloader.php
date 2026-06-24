@@ -52,7 +52,7 @@ final readonly class FakeDownloader implements DownloaderInterface
         );
     }
 
-    public function download(DownloadRequest $request): DownloadResult
+    public function download(DownloadRequest $request, ?callable $onProgress = null): DownloadResult
     {
         if (! is_dir($request->tempDirectory) || ! is_writable($request->tempDirectory)) {
             throw DownloadException::withCode('temp_not_writable', 'Temp download directory is not writable.');

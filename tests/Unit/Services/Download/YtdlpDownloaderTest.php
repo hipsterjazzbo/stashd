@@ -98,6 +98,27 @@ test('ytdlp downloader uses temp staging directory via stub gateway', function (
     rmdir($temp);
 });
 
+test('ytdlp downloader forwards a progress callback through to the gateway', function (): void {
+    $temp = sys_get_temp_dir() . '/stashd-ytdlp-' . bin2hex(random_bytes(4));
+    mkdir($temp, 0775, true);
+    $gateway = new StubYtdlpGateway();
+    $downloader = ytdlpDownloader($gateway);
+
+    $updates = [];
+    $downloader->download(
+        ytdlpDownloadRequest(DownloadPolicy::Video, $temp),
+        onProgress: function (\Ytdlphp\DownloadProgress $progress) use (&$updates): void {
+            $updates[] = $progress;
+        },
+    );
+
+    expect($updates)->not->toBeEmpty()
+        ->and($updates[array_key_last($updates)]->percent)->toBe(100.0);
+
+    array_map('unlink', glob($temp . '/*') ?: []);
+    rmdir($temp);
+});
+
 test('ytdlp downloader rejects disabled real downloads', function (): void {
     $downloader = ytdlpDownloader(new StubYtdlpGateway(), enabled: false);
 
@@ -124,7 +145,7 @@ test('ytdlp downloader rejects unavailable binary', function (): void {
             throw new \RuntimeException('not called');
         }
 
-        public function download(string $url, string $workingDirectory, Options $options): \Ytdlphp\DownloadResult
+        public function download(string $url, string $workingDirectory, Options $options, ?callable $onProgress = null): \Ytdlphp\DownloadResult
         {
             throw new \RuntimeException('not called');
         }
@@ -153,7 +174,7 @@ test('ytdlp downloader maps timeout failures', function (): void {
             return new VideoInfo(id: 'x', title: 'x');
         }
 
-        public function download(string $url, string $workingDirectory, Options $options): \Ytdlphp\DownloadResult
+        public function download(string $url, string $workingDirectory, Options $options, ?callable $onProgress = null): \Ytdlphp\DownloadResult
         {
             $process = new \Symfony\Component\Process\Process(['yt-dlp']);
             $symfonyTimeout = new \Symfony\Component\Process\Exception\ProcessTimedOutException(
@@ -191,7 +212,7 @@ test('ytdlp downloader maps process failures', function (): void {
             return new VideoInfo(id: 'x', title: 'x');
         }
 
-        public function download(string $url, string $workingDirectory, Options $options): \Ytdlphp\DownloadResult
+        public function download(string $url, string $workingDirectory, Options $options, ?callable $onProgress = null): \Ytdlphp\DownloadResult
         {
             throw new ProcessFailedException(
                 new ProcessResult(1, '', 'download failed'),
@@ -223,7 +244,7 @@ test('ytdlp downloader rejects missing output files', function (): void {
             return new VideoInfo(id: 'x', title: 'x');
         }
 
-        public function download(string $url, string $workingDirectory, Options $options): \Ytdlphp\DownloadResult
+        public function download(string $url, string $workingDirectory, Options $options, ?callable $onProgress = null): \Ytdlphp\DownloadResult
         {
             return new \Ytdlphp\DownloadResult(new ProcessResult(0, 'ok', ''));
         }

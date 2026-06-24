@@ -61,6 +61,7 @@ Phase 4B ships `YtdlphpDownloadAdapter` + `YtdlpDownloader`:
 - Provider strategy probe reports binary/version unless `STASHD_REAL_DOWNLOADS_ENABLED=0` (real downloads are on by default outside `ENVIRONMENT=testing`)
 - Downloads: `RoutingDownloader` → `YtdlpDownloader` → `YtdlpGateway` → ytdlphp → temp staging → existing `DownloadExecutor` Vault ingest
 - Normal CI uses `StubYtdlpGateway` (no network)
+- **Live download progress**: `YtDlp::download()` accepts an optional `$onProgress` callback (ytdlphp's own feature, added alongside this) — when given, it runs the process via `--progress-template` + `--newline` instead of the default blocking call, parsing yt-dlp's own progress fields (`downloaded_bytes`/`total_bytes`/`eta`/`speed`) into `Ytdlphp\DownloadProgress`. `DownloaderInterface::download()`, `YtdlpGateway::download()`, and `DownloadMediaItem::execute()` all thread this callback through; `DownloadJobHandler` forwards it into `JobProgressUpdate::ofPercent()` (throttled to ~1/sec, final update always forwarded) and calls `$context->heartbeat($job)` on the same cadence — the first real per-second heartbeat a download job has ever had, since `executor->execute()` used to block with no callback at all. Percent isn't monotonic across a single download: yt-dlp reports progress per stream, so a merged video+audio download can drop back down when it moves from one stream to the next.
 
 ## Download service
 
