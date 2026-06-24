@@ -94,34 +94,43 @@
 							</tr>
 						</thead>
 						<tbody>
-							<template x-for="item in items" x-bind:key="item.id">
-								<tr class="border-t border-line/60" x-bind:class="item.state === 'ignored' ? 'opacity-50' : ''">
-									<td class="px-4 py-2">
-										<a class="flex items-center gap-2 text-cream transition-colors hover:text-amber" x-bind:href="'/vault/' + item.media_item_id">
-											<img x-show="item.media_item?.thumbnail_uri" x-bind:src="item.media_item?.thumbnail_uri" class="h-9 w-16 shrink-0 rounded object-cover" alt=""/>
-											<span x-text="item.display_title ?? item.media_item?.title ?? item.media_item_id"></span>
-										</a>
-									</td>
-									<td class="px-4 py-2 text-muted" x-text="formatDuration(item.media_item?.duration_seconds)"></td>
-									<td class="px-4 py-2 text-muted" x-text="formatBytes(item.total_asset_size_bytes)"></td>
-									<td class="px-4 py-2">
-										<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(item.state).text">
-											<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(item.state).dot, statusBadge(item.state).pulse ? 'pulse-dot' : '']"></span>
-											<span x-text="item.state"></span>
-										</span>
-										<p class="mt-1 text-[12px] text-muted" x-show="item.state === 'ignored'" x-text="'ignored: ' + (item.ignored_reason ?? 'unknown reason').replace(/_/g, ' ')"></p>
-										<template x-if="activeJobFor(item.media_item_id)">
-											<div class="mt-1 w-32">
-												<p class="flex items-center gap-1.5 text-[11px] text-muted">
-													<span class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
-													<span x-text="activeJobFor(item.media_item_id).progress_label ?? activeJobFor(item.media_item_id).intent.replace(/_/g, ' ')"></span>
-												</p>
-												<div class="mt-0.5 h-1 rounded-full bg-espresso">
-													<div class="h-1 rounded-full bg-amber" x-bind:style="'width: ' + (activeJobFor(item.media_item_id).progress_percent ?? 0) + '%'"></div>
+							<template x-for="row in itemRows()" x-bind:key="row.key">
+								<tr class="border-t border-line/60" x-bind:class="row.item.state === 'ignored' ? 'opacity-50' : ''">
+									<template x-if="row.type === 'item'">
+										<td class="px-4 py-2">
+											<a class="flex items-center gap-2 text-cream transition-colors hover:text-amber" x-bind:href="'/vault/' + row.item.media_item_id">
+												<img x-show="row.item.media_item?.thumbnail_uri" x-bind:src="row.item.media_item?.thumbnail_uri" class="h-9 w-16 shrink-0 rounded object-cover" alt=""/>
+												<span x-text="row.item.display_title ?? row.item.media_item?.title ?? row.item.media_item_id"></span>
+											</a>
+										</td>
+									</template>
+									<template x-if="row.type === 'item'">
+										<td class="px-4 py-2 text-muted" x-text="formatDuration(row.item.media_item?.duration_seconds)"></td>
+									</template>
+									<template x-if="row.type === 'item'">
+										<td class="px-4 py-2 text-muted" x-text="formatBytes(row.item.total_asset_size_bytes)"></td>
+									</template>
+									<template x-if="row.type === 'item'">
+										<td class="px-4 py-2">
+											<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(row.item.state).text">
+												<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(row.item.state).dot, statusBadge(row.item.state).pulse ? 'pulse-dot' : '']"></span>
+												<span x-text="row.item.state"></span>
+											</span>
+											<p class="mt-1 text-[12px] text-muted" x-show="row.item.state === 'ignored'" x-text="'ignored: ' + (row.item.ignored_reason ?? 'unknown reason').replace(/_/g, ' ')"></p>
+										</td>
+									</template>
+									<template x-if="row.type === 'progress'">
+										<td colspan="4" class="px-4 py-2">
+											<div class="flex items-center gap-2">
+												<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber pulse-dot"></span>
+												<span class="shrink-0 text-[11px] text-muted" x-text="row.job.progress_label ?? row.job.intent.replace(/_/g, ' ')"></span>
+												<div class="h-1.5 flex-1 rounded-full bg-espresso">
+													<div class="h-1.5 rounded-full bg-amber" x-bind:style="'width: ' + (row.job.progress_percent ?? 0) + '%'"></div>
 												</div>
+												<span class="shrink-0 text-[11px] text-muted" x-text="Math.round(row.job.progress_percent ?? 0) + '%'"></span>
 											</div>
-										</template>
-									</td>
+										</td>
+									</template>
 								</tr>
 							</template>
 						</tbody>

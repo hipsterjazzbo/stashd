@@ -1005,6 +1005,24 @@ function stashDetailComponent(stashId: string) {
 			return this.jobs.find((job) => job.entity_type === 'media_item' && job.entity_id === mediaItemId && job.state === 'processing') ?? null
 		},
 
+		// Flattens items + their active job (if any) into one list so the items
+		// table's x-for can render a full-width progress row directly under its
+		// own item, in order. Alpine's x-for template can only have a single
+		// root element, so two parallel x-for loops over `items` can't be
+		// interleaved per-item -- this single loop with a type discriminator
+		// is what makes that possible.
+		itemRows(): Array<{ type: 'item' | 'progress'; key: string; item: StashItemSummary; job: JobSummary | null }> {
+			const rows: Array<{ type: 'item' | 'progress'; key: string; item: StashItemSummary; job: JobSummary | null }> = []
+			for (const item of this.items) {
+				rows.push({ type: 'item', key: item.id, item, job: null })
+				const job = this.activeJobFor(item.media_item_id)
+				if (job) {
+					rows.push({ type: 'progress', key: `${item.id}:progress`, item, job })
+				}
+			}
+			return rows
+		},
+
 		async runBroadcastAction(broadcastId: string, action: 'rebuild' | 'verify' | 'prune' | 'rotate_token') {
 			this.actionPending = `${broadcastId}:${action}`
 			try {
