@@ -35,6 +35,17 @@ final readonly class StateTransitionService
 {
     public function transitionCommand(CommandRecord $record, CommandState $next): CommandRecord
     {
+        // Re-asserting Running on an already-Running command is idempotent, not
+        // an illegal transition. Every job handler marks its command Running at
+        // the start of handle(); when a stalled job is re-queued by
+        // JobWorkerService::recoverStaleJobs() the command is left Running, so
+        // the retry runs that same line again. Without this guard that retry
+        // throws "Command cannot transition from running to running", which then
+        // fails the job for a bogus reason and masks the original failure.
+        if ($record->state === CommandState::Running && $next === CommandState::Running) {
+            return $record;
+        }
+
         return $this->apply($record, $record->state, $next, 'Command');
     }
 
