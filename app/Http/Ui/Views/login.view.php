@@ -40,13 +40,6 @@
 
 			<?php if ($setupRequired): ?>
 			<label class="block">
-				<span class="mb-1 block text-[12px] text-muted">Username</span>
-				<input name="username" type="text" autocomplete="username" required
-					class="w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
-			</label>
-			<?php endif; ?>
-
-			<label class="block">
 				<span class="mb-1 block text-[12px] text-muted">Password</span>
 				<input name="password" type="password" autocomplete="{{ $setupRequired ? 'new-password' : 'current-password' }}" required
 					class="w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>

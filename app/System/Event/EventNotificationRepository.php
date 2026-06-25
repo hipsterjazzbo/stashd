@@ -41,7 +41,9 @@ final class EventNotificationRepository
     /** @return list<EventNotificationRecord> */
     public function listSinceId(?string $afterId, int $limit = 100): array
     {
-        $query = EventNotificationRecord::select()->orderBy('createdAt', Direction::ASC);
+        $query = EventNotificationRecord::select()
+            ->whereNotNull('id')
+            ->orderBy('createdAt', Direction::ASC);
 
         if ($afterId !== null) {
             $query = $query->where('id > ?', $afterId);

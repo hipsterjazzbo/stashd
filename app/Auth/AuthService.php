@@ -36,16 +36,16 @@ final readonly class AuthService
         return $this->users->count() === 0;
     }
 
-    public function setupOwner(string $email, string $username, #[SensitiveParameter] string $password): UserRecord
+    public function setupOwner(string $email, #[SensitiveParameter] string $password): UserRecord
     {
         if (! $this->isSetupRequired()) {
             throw new SetupAlreadyCompleted('Owner account already exists.');
         }
 
-        $user = $this->users->createOwner(
+ $user = $this->users->createOwner(
             email: $email,
-            username: $username,
             passwordHash: $this->hashPassword($password),
+            username: '',
         );
 
         $this->context->set($user);

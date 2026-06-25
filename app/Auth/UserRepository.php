@@ -35,7 +35,7 @@ final class UserRepository
         return UserRecord::findById(new PrimaryKey($id));
     }
 
-    public function createOwner(string $email, string $username, string $passwordHash): UserRecord
+    public function createOwner(string $email, string $passwordHash, string $username = ''): UserRecord
     {
         if ($this->count() > 0) {
             throw new InvalidArgumentException('Owner account already exists.');

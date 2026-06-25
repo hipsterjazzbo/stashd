@@ -43,20 +43,19 @@ final readonly class AuthController
 
         $body = $request->body;
         $email = trim((string) ($body['email'] ?? ''));
-        $username = trim((string) ($body['username'] ?? ''));
         $password = (string) ($body['password'] ?? '');
 
-        if ($email === '' || $username === '' || $password === '') {
+        if ($email === '' || $password === '') {
             return new Json([
                 'error' => [
                     'code' => 'validation_error',
-                    'message' => 'email, username, and password are required.',
+                    'message' => 'email and password are required.',
                 ],
             ], Status::BAD_REQUEST);
         }
 
         try {
-            $user = $this->auth->setupOwner($email, $username, $password);
+            $user = $this->auth->setupOwner($email, $password);
         } catch (SetupAlreadyCompleted) {
             return new Json([
                 'error' => [
@@ -205,7 +204,6 @@ final readonly class AuthController
         return [
             'id' => (string) $user->id,
             'email' => $user->email,
-            'username' => $user->username,
             'role' => $user->role->value,
         ];
     }

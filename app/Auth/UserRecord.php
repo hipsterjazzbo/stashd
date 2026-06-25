@@ -19,9 +19,9 @@ final class UserRecord implements Authenticatable
 
     public function __construct(
         public string $email,
-        public string $username,
         public string $passwordHash,
         public UserRole $role,
+        public string $username = '',
         public ?DateTime $createdAt = null,
         public ?DateTime $updatedAt = null,
     ) {
