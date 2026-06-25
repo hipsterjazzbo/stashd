@@ -71,7 +71,7 @@ final class CreateDomainSchema implements MigratesUp
             ->string('email')
             ->string('username')
             ->string('passwordHash')
-            ->enum('role', UserRole::class, default: UserRole::Owner)
+            ->enum('role', UserRole::class, default: UserRole::Admin)
             ->unique('email')
             ->unique('username')
             ->index('role');

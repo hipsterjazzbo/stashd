@@ -40,7 +40,7 @@ final readonly class RequireAuthMiddleware implements HttpMiddleware
                 return new Json([
                     'error' => [
                         'code' => 'setup_required',
-                        'message' => 'Create the owner account before using the API.',
+                        'message' => 'Create the admin account before using the API.',
                     ],
                 ], Status::FORBIDDEN);
             }

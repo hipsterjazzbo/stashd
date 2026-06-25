@@ -1,13 +1,13 @@
 <?php
 /**
- * Pre-auth login / first-run owner setup page.
+ * Pre-auth login / first-run admin setup page.
  *
  * Standalone shell (no dashboard nav). Posts to the JSON auth API; on success
  * the server sets the HttpOnly session cookie and we redirect to the dashboard.
  * Plain vanilla JS keeps this one page free of Alpine/Tempest attribute
  * interplay.
  *
- * @var bool $setupRequired Whether the owner account still needs creating.
+ * @var bool $setupRequired Whether the admin account still needs creating.
  */
 ?>
 <!doctype html>
@@ -25,7 +25,7 @@
 		<div class="mb-6 text-center">
 			<div class="text-2xl font-semibold tracking-tight">stashd<span class="brand-underscore">_</span></div>
 			<p class="mt-2 text-muted text-[13px]">
-				{{ $setupRequired ? 'Create the owner account.' : 'Because the internet forgets.' }}
+				{{ $setupRequired ? 'Create the admin account.' : 'Because the internet forgets.' }}
 			</p>
 		</div>
 
@@ -38,6 +38,9 @@
 					class="w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
 			</label>
 
+		<form id="auth-form" class="space-y-3 rounded-lg border border-line bg-panel/60 p-5">
+			<div id="auth-error" class="hidden rounded border border-error/50 bg-error/10 px-3 py-2 text-[13px] text-error"></div>
+
 			<?php if ($setupRequired): ?>
 			<label class="block">
 				<span class="mb-1 block text-[12px] text-muted">Password</span>
@@ -47,8 +50,9 @@
 
 			<button type="submit" id="auth-submit"
 				class="w-full rounded bg-amber px-3 py-2 font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-60">
-				{{ $setupRequired ? 'Create owner' : 'Sign in' }}
+				{{ $setupRequired ? 'Create admin' : 'Sign in' }}
 			</button>
+		<?php endif; ?>
 		</form>
 	</main>
 

@@ -36,13 +36,13 @@ final readonly class AuthService
         return $this->users->count() === 0;
     }
 
-    public function setupOwner(string $email, #[SensitiveParameter] string $password): UserRecord
+public function setupAdmin(string $email, #[SensitiveParameter] string $password): UserRecord
     {
         if (! $this->isSetupRequired()) {
-            throw new SetupAlreadyCompleted('Owner account already exists.');
+            throw new SetupAlreadyCompleted('Admin account already exists.');
         }
 
- $user = $this->users->createOwner(
+        $user = $this->users->createAdmin(
             email: $email,
             passwordHash: $this->hashPassword($password),
             username: '',
@@ -56,7 +56,7 @@ final readonly class AuthService
     public function login(string $email, #[SensitiveParameter] string $password): UserRecord
     {
         if ($this->isSetupRequired()) {
-            throw new SetupRequired('Complete owner setup before logging in.');
+            throw new SetupRequired('Complete admin setup before logging in.');
         }
 
         $user = $this->users->findByEmail($email);

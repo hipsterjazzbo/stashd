@@ -35,10 +35,10 @@ final class UserRepository
         return UserRecord::findById(new PrimaryKey($id));
     }
 
-    public function createOwner(string $email, string $passwordHash, string $username = ''): UserRecord
+    public function createAdmin(string $email, string $passwordHash, string $username = ''): UserRecord
     {
         if ($this->count() > 0) {
-            throw new InvalidArgumentException('Owner account already exists.');
+            throw new InvalidArgumentException('Admin account already exists.');
         }
 
         $id = $this->ids->generate('user')->toString();
@@ -46,7 +46,7 @@ final class UserRepository
             email: $email,
             username: $username,
             passwordHash: $passwordHash,
-            role: UserRole::Owner,
+            role: UserRole::Admin,
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);

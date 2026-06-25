@@ -36,7 +36,7 @@ final readonly class AuthController
             return new Json([
                 'error' => [
                     'code' => 'setup_already_completed',
-                    'message' => 'Owner account already exists.',
+                    'message' => 'Admin account already exists.',
                 ],
             ], Status::CONFLICT);
         }
@@ -55,12 +55,12 @@ final readonly class AuthController
         }
 
         try {
-            $user = $this->auth->setupOwner($email, $password);
+            $user = $this->auth->setupAdmin($email, $password);
         } catch (SetupAlreadyCompleted) {
             return new Json([
                 'error' => [
                     'code' => 'setup_already_completed',
-                    'message' => 'Owner account already exists.',
+                    'message' => 'Admin account already exists.',
                 ],
             ], Status::CONFLICT);
         }
@@ -95,7 +95,7 @@ final readonly class AuthController
             return new Json([
                 'error' => [
                     'code' => 'setup_required',
-                    'message' => 'Create the owner account before logging in.',
+                    'message' => 'Create the admin account before logging in.',
                 ],
             ], Status::FORBIDDEN);
         } catch (InvalidCredentials) {

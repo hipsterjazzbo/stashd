@@ -6,5 +6,5 @@ namespace App\Auth;
 
 enum UserRole: string
 {
-    case Owner = 'owner';
+    case Admin = 'admin';
 }
