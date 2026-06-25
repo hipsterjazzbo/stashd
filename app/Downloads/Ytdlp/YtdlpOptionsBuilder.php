@@ -43,26 +43,44 @@ final readonly class YtdlpOptionsBuilder
 
     private function videoOptions(): Options
     {
-        return Options::create()
-            ->format($this->config->videoFormatSelector)
-            ->output(self::OUTPUT_TEMPLATE)
-            ->mergeOutputFormat(MergeOutputFormat::Mp4, MergeOutputFormat::Mkv, MergeOutputFormat::Webm)
-            ->noPlaylist()
-            ->noWarnings()
-            ->option('--restrict-filenames');
+        return $this->withRetries(
+            Options::create()
+                ->format($this->config->videoFormatSelector)
+                ->output(self::OUTPUT_TEMPLATE)
+                ->mergeOutputFormat(MergeOutputFormat::Mp4, MergeOutputFormat::Mkv, MergeOutputFormat::Webm)
+                ->noPlaylist()
+                ->noWarnings()
+                ->option('--restrict-filenames'),
+        );
     }
 
     private function audioOptions(): Options
     {
         $format = AudioFormat::tryFrom($this->config->audioFormat) ?? AudioFormat::Mp3;
 
-        return Options::create()
-            ->extractAudio()
-            ->audioFormat($format)
-            ->audioQuality($this->config->audioQualityKbps)
-            ->output(self::OUTPUT_TEMPLATE)
-            ->noPlaylist()
-            ->noWarnings()
-            ->option('--restrict-filenames');
+        return $this->withRetries(
+            Options::create()
+                ->extractAudio()
+                ->audioFormat($format)
+                ->audioQuality($this->config->audioQualityKbps)
+                ->output(self::OUTPUT_TEMPLATE)
+                ->noPlaylist()
+                ->noWarnings()
+                ->option('--restrict-filenames'),
+        );
+    }
+
+    /**
+     * YouTube intermittently returns HTTP 403 on the media data URL (not the
+     * metadata) under throttling -- a transient failure that a fresh attempt
+     * usually clears. Without retries a single 403 hard-fails the whole item;
+     * these let yt-dlp recover in-process instead.
+     */
+    private function withRetries(Options $options): Options
+    {
+        return $options
+            ->option('--retries', '10')
+            ->option('--fragment-retries', '10')
+            ->option('--extractor-retries', '3');
     }
 }
