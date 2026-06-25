@@ -21,6 +21,25 @@ use App\Vault\MediaItemState;
 use Tempest\Database\PrimaryKey;
 use Tempest\Http\Status;
 
+/**
+ * Episode bodies are now streamed as a generator of byte chunks (so large
+ * files never buffer in the worker); drain it back to a string for assertions.
+ */
+function podcastEpisodeBody(mixed $body): string
+{
+    if ($body instanceof \Generator) {
+        $bytes = '';
+
+        foreach ($body as $chunk) {
+            $bytes .= $chunk;
+        }
+
+        return $bytes;
+    }
+
+    return (string) $body;
+}
+
 test('valid audio podcast episode token returns the audio bytes with expected headers', function (): void {
     [$headers, $stashId, $mediaItemId] = podcastEpisodeReadyStash($this, 'episode-audio');
     $config = $this->container->get(StashdConfig::class);
@@ -60,7 +79,7 @@ test('valid audio podcast episode token returns the audio bytes with expected he
         ->assertHeaderContains('Content-Length', (string) strlen('episode-audio-bytes'))
         ->assertHeaderContains('Accept-Ranges', 'bytes');
 
-    expect((string) $response->body)->toBe('episode-audio-bytes');
+    expect(podcastEpisodeBody($response->body))->toBe('episode-audio-bytes');
 });
 
 test('valid video podcast episode token returns the video bytes with expected headers', function (): void {
@@ -102,7 +121,7 @@ test('valid video podcast episode token returns the video bytes with expected he
         ->assertHeaderContains('Content-Length', (string) strlen('episode-video-bytes'))
         ->assertHeaderContains('Accept-Ranges', 'bytes');
 
-    expect((string) $response->body)->toBe('episode-video-bytes');
+    expect(podcastEpisodeBody($response->body))->toBe('episode-video-bytes');
 });
 
 test('episode route requires path tokens, not a query parameter', function (): void {
@@ -463,7 +482,7 @@ test('a mid-file range request returns 206 with the exact partial bytes and head
         ->assertHeaderContains('Content-Length', '4')
         ->assertHeaderContains('Accept-Ranges', 'bytes');
 
-    expect((string) $response->body)->toBe(substr($content, 2, 4));
+    expect(podcastEpisodeBody($response->body))->toBe(substr($content, 2, 4));
 });
 
 test('a range covering the entire file returns 206, not 200', function (): void {
@@ -505,7 +524,7 @@ test('a range covering the entire file returns 206, not 200', function (): void 
         ->assertHeaderContains('Content-Range', 'bytes 0-' . $lastByte . '/' . strlen($content))
         ->assertHeaderContains('Content-Length', (string) strlen($content));
 
-    expect((string) $response->body)->toBe($content);
+    expect(podcastEpisodeBody($response->body))->toBe($content);
 });
 
 test('a suffix range request returns 206 with the trailing bytes', function (): void {
@@ -546,7 +565,7 @@ test('a suffix range request returns 206 with the trailing bytes', function (): 
         ->assertHeaderContains('Content-Range', 'bytes ' . (strlen($content) - 5) . '-' . (strlen($content) - 1) . '/' . strlen($content))
         ->assertHeaderContains('Content-Length', '5');
 
-    expect((string) $response->body)->toBe(substr($content, -5));
+    expect(podcastEpisodeBody($response->body))->toBe(substr($content, -5));
 });
 
 test('an open-ended range request returns 206 with the trailing bytes', function (): void {
@@ -587,7 +606,7 @@ test('an open-ended range request returns 206 with the trailing bytes', function
         ->assertHeaderContains('Content-Range', 'bytes 10-' . (strlen($content) - 1) . '/' . strlen($content))
         ->assertHeaderContains('Content-Length', (string) (strlen($content) - 10));
 
-    expect((string) $response->body)->toBe(substr($content, 10));
+    expect(podcastEpisodeBody($response->body))->toBe(substr($content, 10));
 });
 
 test('a range entirely beyond the end of the file returns 416 without leaking the path', function (): void {
@@ -669,7 +688,7 @@ test('a malformed range header is ignored and the full file is served', function
     $response->assertStatus(Status::OK)
         ->assertHeaderContains('Content-Length', (string) strlen($content));
 
-    expect((string) $response->body)->toBe($content);
+    expect(podcastEpisodeBody($response->body))->toBe($content);
 });
 
 test('a multi-range header is ignored and the full file is served', function (): void {
@@ -709,7 +728,7 @@ test('a multi-range header is ignored and the full file is served', function ():
     $response->assertStatus(Status::OK)
         ->assertHeaderContains('Content-Length', (string) strlen($content));
 
-    expect((string) $response->body)->toBe($content);
+    expect(podcastEpisodeBody($response->body))->toBe($content);
 });
 
 test('a range header attached to an invalid token still returns a non-revealing 404', function (): void {

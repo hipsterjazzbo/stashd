@@ -45,6 +45,12 @@ final class TempestPsr7Bridge
     // read() never waits to fill it (see GeneratorEventStream).
     private const int SSE_CHUNK_SIZE = 4096;
 
+    // Raw byte chunk size for streamed file bodies (e.g. podcast episodes).
+    // Larger than the SSE size because there's no per-message latency concern --
+    // this just bounds how much of the file is held in memory at once, keeping
+    // a multi-hundred-MB episode well under the worker's max_worker_memory cap.
+    private const int FILE_CHUNK_SIZE = 1_048_576;
+
     public function __construct(
         private Router $router,
         private AuthContext $authContext,
@@ -100,7 +106,17 @@ final class TempestPsr7Bridge
 
             try {
                 $response = $this->router->dispatch($request);
-                $psr7->chunkSize = $response instanceof EventStream ? self::SSE_CHUNK_SIZE : 0;
+                // chunkSize > 0 makes PSR7Worker::respond() stream the body
+                // incrementally instead of draining it to one string: SSE needs
+                // it for per-message latency, streamed file bodies (Generator,
+                // but not an EventStream) need it to avoid buffering a whole
+                // episode in memory. Every other response stays on the
+                // non-chunked path.
+                $psr7->chunkSize = match (true) {
+                    $response instanceof EventStream => self::SSE_CHUNK_SIZE,
+                    $response->body instanceof Generator => self::FILE_CHUNK_SIZE,
+                    default => 0,
+                };
                 $psr7->respond($this->toPsr7($factory, $response));
             } catch (HttpRequestFailed $failed) {
                 if ($failed->cause instanceof Response) {
@@ -161,15 +177,20 @@ final class TempestPsr7Bridge
         } elseif ($body instanceof \JsonSerializable) {
             $psr = $psr->withBody($factory->createStream(json_encode($body, JSON_THROW_ON_ERROR)));
         } elseif ($body instanceof Generator) {
-            // EventStream (app/System/Event/EventsController.php) yields ServerSentMessage
-            // instances from a sleep-and-poll loop. GeneratorEventStream pulls from it one
-            // message at a time; paired with chunkSize > 0 set in run(), PSR7Worker::respond()
-            // flushes each message to the client as it's produced instead of draining the
-            // whole generator into one string first. This is purely a delivery-latency fix —
-            // the worker running the loop still can't serve another request meanwhile, since
-            // RoadRunner PHP workers are one-process-one-request regardless of chunking; see
-            // EventsController's connection cap for the actual worker-pool-exhaustion fix.
-            $psr = $psr->withBody(new GeneratorEventStream($body));
+            // Two kinds of generator body, both streamed incrementally (chunkSize
+            // set in run()): an EventStream (app/System/Event/EventsController.php)
+            // yields ServerSentMessage instances from a sleep-and-poll loop and is
+            // framed as SSE by GeneratorEventStream; any other generator body
+            // yields raw byte chunks (e.g. PodcastEpisodeController streaming an
+            // episode file) and is forwarded verbatim by GeneratorFileStream.
+            // Either way PSR7Worker::respond() flushes each chunk as produced
+            // instead of draining the whole generator into one string -- which for
+            // a large episode would blow the worker's memory cap.
+            $psr = $psr->withBody(
+                $response instanceof EventStream
+                    ? new GeneratorEventStream($body)
+                    : new GeneratorFileStream($body),
+            );
         }
 
         if ($psr->getBody()->getSize() === 0 && $response->status !== Status::NO_CONTENT) {

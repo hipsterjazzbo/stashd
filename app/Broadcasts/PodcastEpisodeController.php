@@ -10,8 +10,10 @@ use App\Broadcasts\Podcasts\PodcastMediaKind;
 use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
+use Generator;
 use SensitiveParameter;
 use Tempest\Http\ContentType;
+use Tempest\Http\Method;
 use Tempest\Http\Request;
 use Tempest\Http\Response;
 use Tempest\Http\Responses\NotFound;
@@ -88,6 +90,14 @@ final readonly class PodcastEpisodeController
             return $this->notRevealed();
         }
 
+        // Episodes are tens to hundreds of MB; the response body is always a
+        // generator that reads the file in bounded chunks (never the whole span
+        // at once), streamed by the RoadRunner bridge under chunkSize so it
+        // never exceeds the worker's memory cap. HEAD must report the same
+        // status/headers as the equivalent GET but carry no body, so it never
+        // reads the file at all.
+        $isHead = $request->method === Method::HEAD;
+
         $range = PodcastEpisodeByteRange::fromHeader($request->headers->get('Range'), $selection->length);
 
         if ($range->present && ! $range->satisfiable) {
@@ -101,13 +111,7 @@ final readonly class PodcastEpisodeController
         }
 
         if ($range->present) {
-            $bytes = $this->readRange($path, $range->start, $range->length());
-
-            if ($bytes === null) {
-                return $this->notRevealed();
-            }
-
-            return (new Ok($bytes))
+            return (new Ok($isHead ? null : $this->streamFile($path, $range->start, $range->length())))
                 ->setStatus(Status::PARTIAL_CONTENT)
                 ->addHeader(ContentType::HEADER, $selection->mimeType)
                 ->addHeader('Accept-Ranges', 'bytes')
@@ -115,16 +119,10 @@ final readonly class PodcastEpisodeController
                 ->addHeader('Content-Length', (string) $range->length());
         }
 
-        $bytes = @file_get_contents($path);
-
-        if ($bytes === false) {
-            return $this->notRevealed();
-        }
-
-        return (new Ok($bytes))
+        return (new Ok($isHead ? null : $this->streamFile($path, 0, $selection->length)))
             ->addHeader(ContentType::HEADER, $selection->mimeType)
             ->addHeader('Accept-Ranges', 'bytes')
-            ->addHeader('Content-Length', (string) strlen($bytes));
+            ->addHeader('Content-Length', (string) $selection->length);
     }
 
     private function extensionFromEpisodeFile(string $episodeFile): ?string
@@ -139,39 +137,42 @@ final readonly class PodcastEpisodeController
     }
 
     /**
-     * Reads exactly `$length` bytes starting at `$start`, in bounded chunks
-     * (never the whole file at once). Returns null on any I/O failure,
-     * including a short read caused by the file changing after the asset
-     * was selected — the caller treats that the same as a missing asset.
+     * Yields exactly `$length` bytes starting at `$start`, in bounded chunks
+     * (never the whole span at once), so the RoadRunner bridge can stream the
+     * file to the client without buffering it in the worker's memory. Stops
+     * early on any I/O failure, including a short read caused by the file
+     * changing after the asset was selected; the client then sees a truncated
+     * body, which (with the Content-Length already sent) it treats as a failed
+     * transfer — the same observable outcome as the old buffered path's
+     * not-found, without first loading the file into memory.
+     *
+     * @return Generator<int, string>
      */
-    private function readRange(string $path, int $start, int $length): ?string
+    private function streamFile(string $path, int $start, int $length): Generator
     {
         $handle = @fopen($path, 'rb');
 
         if ($handle === false) {
-            return null;
+            return;
         }
 
         try {
-            if (fseek($handle, $start) !== 0) {
-                return null;
+            if ($start > 0 && fseek($handle, $start) !== 0) {
+                return;
             }
 
             $remaining = $length;
-            $bytes = '';
 
             while ($remaining > 0) {
                 $chunk = fread($handle, min(self::RANGE_READ_CHUNK_BYTES, $remaining));
 
                 if ($chunk === false || $chunk === '') {
-                    return null;
+                    return;
                 }
 
-                $bytes .= $chunk;
+                yield $chunk;
                 $remaining -= strlen($chunk);
             }
-
-            return $bytes;
         } finally {
             fclose($handle);
         }
