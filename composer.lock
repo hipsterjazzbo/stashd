@@ -984,7 +984,7 @@
             "dist": {
                 "type": "path",
                 "url": "/home/hazel/Projects/ytdlphp",
-                "reference": "7797732427c0a5219abbb0cc54d56b795dc0da0f"
+                "reference": "41350366b62826068f16fa300af0dd1dc2f2fb64"
             },
             "require": {
                 "ext-json": "*",
