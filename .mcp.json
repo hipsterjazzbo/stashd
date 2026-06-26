@@ -8,6 +8,23 @@
             "env": {
                 "LERD_SITE_PATH": "/home/hazel/Projects/stashd"
             }
+        },
+        "github.com/upstash/context7-mcp": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@upstash/context7-mcp"
+            ],
+            "env": {
+                "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
+            }
+        },
+        "github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-sequential-thinking"
+            ]
         }
     }
 }
