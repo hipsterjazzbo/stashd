@@ -7,7 +7,7 @@ namespace App\Broadcasts;
 use App\Stashes\StashItemRepository;
 use App\Stashes\StashItemState;
 use App\Stashes\StashRepository;
-use App\Support\PrefixedUlid;
+
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
@@ -26,12 +26,11 @@ final readonly class BroadcastContextFactory
     ) {
     }
 
-    public function build(PrefixedUlid $broadcastId): BroadcastContext
+    public function build(BroadcastRecord $broadcast): BroadcastContext
     {
-        $broadcast = $this->broadcasts->find($broadcastId)
-            ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
+        $stashId = $broadcast->stashId;
 
-        $stash = $this->stashes->find(PrefixedUlid::parse($broadcast->stashId))
+        $stash = $this->stashes->find($stashId)
             ?? throw BroadcastException::withCode('stash_not_found', 'Stash not found.');
 
         $stashItems = \App\Stashes\StashItemRecord::select()

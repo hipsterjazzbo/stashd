@@ -27,7 +27,7 @@ final readonly class PodcastTokenService
 
     public function supports(BroadcastRecord $broadcast): bool
     {
-        return $broadcast->type === BroadcastType::Podcast;
+        return $broadcast->type === 'podcast';
     }
 
     public function ensureBroadcastToken(BroadcastRecord $broadcast): string

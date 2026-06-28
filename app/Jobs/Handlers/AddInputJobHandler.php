@@ -16,7 +16,7 @@ use App\Jobs\JobRepository;
 use App\Jobs\JobState;
 use App\Stashes\CreateStashFromDiscovery;
 use App\Stashes\StashRepository;
-use App\Support\PrefixedUlid;
+
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
 use App\System\State\StateTransitionService;
@@ -57,9 +57,11 @@ final readonly class AddInputJobHandler implements JobHandler
         $stash = $this->stashes->find($stashId)
             ?? throw new RuntimeException('Add-input job targets a stash that no longer exists.');
 
-        $preflightCommandId = PrefixedUlid::parse((string) ($payload['preflight_command_id'] ?? ''));
+        $preflightCommandId = (string) ($payload['preflight_command_id'] ?? '');
         $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
-        $result = $this->stashFromPreflight->commitInput($stash, $preflightCommandId, $options);
+        $preflightCommand = $this->commands->find($preflightCommandId)
+            ?? throw new RuntimeException('Preflight command not found.');
+        $result = $this->stashFromPreflight->commitInput($stash, $preflightCommand, $options);
 
         $command->resultJson = json_encode($result->toArray(), JSON_THROW_ON_ERROR);
         $command->targetType = 'stash';
@@ -87,7 +89,7 @@ final readonly class AddInputJobHandler implements JobHandler
             throw new RuntimeException('Add-input job is missing commandId.');
         }
 
-        return $this->commands->find(PrefixedUlid::parse($job->commandId))
+        return $this->commands->find($job->commandId)
             ?? throw new RuntimeException('Add-input command not found.');
     }
 }

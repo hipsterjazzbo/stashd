@@ -20,7 +20,7 @@ use App\Broadcasts\BroadcastSidecarType;
 use App\Broadcasts\BroadcastSidecarWriter;
 use App\Broadcasts\BroadcastVerifyResult;
 use App\Broadcasts\HardlinkPublisher;
-use App\Support\PrefixedUlid;
+
 use App\System\State\StateTransitionService;
 use App\Vault\AssetKind;
 use App\Vault\AssetRepository;
@@ -135,7 +135,7 @@ abstract readonly class AbstractSeriesBroadcastType implements BroadcastFormat
 
     public function publish(BroadcastContext $context, BroadcastPlan $plan): BroadcastPublishResult
     {
-        $broadcastId = PrefixedUlid::parse($plan->broadcastId);
+        $broadcastId = $plan->broadcastId;
         $publishedPaths = [];
         $failedStashItemIds = [];
         $publishedCount = 0;
@@ -143,14 +143,14 @@ abstract readonly class AbstractSeriesBroadcastType implements BroadcastFormat
         foreach ($plan->files as $planned) {
             $item = $this->broadcastItems->findByBroadcastAndStashItem(
                 $broadcastId,
-                PrefixedUlid::parse($planned->stashItemId),
+                $planned->stashItemId,
             );
 
             if ($item === null) {
                 $item = $this->broadcastItems->create(
                     broadcastId: $broadcastId,
-                    stashItemId: PrefixedUlid::parse($planned->stashItemId),
-                    mediaItemId: PrefixedUlid::parse($planned->mediaItemId),
+                    stashItemId: $planned->stashItemId,
+                    mediaItemId: $planned->mediaItemId,
                 );
             }
 
@@ -169,9 +169,9 @@ abstract readonly class AbstractSeriesBroadcastType implements BroadcastFormat
 
                 $this->upsertHardlinkAsset(
                     broadcastId: $broadcastId,
-                    broadcastItemId: PrefixedUlid::parse((string) $item->id),
-                    mediaItemId: PrefixedUlid::parse($planned->mediaItemId),
-                    sourceAssetId: PrefixedUlid::parse($planned->sourceAssetId),
+                    broadcastItemId: (string) $item->id,
+                    mediaItemId: $planned->mediaItemId,
+                    sourceAssetId: $planned->sourceAssetId,
                     path: $planned->absolutePath,
                     relativePath: $planned->relativePath,
                     sourcePath: $planned->sourcePath,
@@ -224,7 +224,7 @@ abstract readonly class AbstractSeriesBroadcastType implements BroadcastFormat
             $plannedByStashItem[$file->stashItemId] = $file;
         }
 
-        foreach ($this->broadcastItems->listForBroadcast(PrefixedUlid::parse($broadcastId)) as $item) {
+        foreach ($this->broadcastItems->listForBroadcast($broadcastId) as $item) {
             $planned = $plannedByStashItem[$item->stashItemId] ?? null;
 
             if ($planned === null) {
@@ -338,7 +338,7 @@ abstract readonly class AbstractSeriesBroadcastType implements BroadcastFormat
     {
         foreach ($context->stashItems as $stashItem) {
             $thumbnail = $this->assets->findByMediaItemAndRole(
-                PrefixedUlid::parse($stashItem->mediaItemId),
+                $stashItem->mediaItemId,
                 AssetRole::SourceThumbnail,
             );
 
@@ -373,7 +373,7 @@ abstract readonly class AbstractSeriesBroadcastType implements BroadcastFormat
         }
 
         $thumbnail = $this->assets->findByMediaItemAndRole(
-            PrefixedUlid::parse($sidecar->mediaItemId),
+            $sidecar->mediaItemId,
             AssetRole::SourceThumbnail,
         );
 
@@ -389,16 +389,16 @@ abstract readonly class AbstractSeriesBroadcastType implements BroadcastFormat
     }
 
     private function upsertHardlinkAsset(
-        PrefixedUlid $broadcastId,
-        PrefixedUlid $broadcastItemId,
-        PrefixedUlid $mediaItemId,
-        PrefixedUlid $sourceAssetId,
+        string $broadcastId,
+        string $broadcastItemId,
+        string $mediaItemId,
+        string $sourceAssetId,
         string $path,
         string $relativePath,
         string $sourcePath,
     ): void {
         $existing = \App\Vault\AssetRecord::select()
-            ->where('broadcastItemId = ? AND role = ?', $broadcastItemId->toString(), AssetRole::Hardlink)
+            ->where('broadcastItemId = ? AND role = ?', $broadcastItemId, AssetRole::Hardlink)
             ->first();
 
         $sizeBytes = is_file($sourcePath) ? filesize($sourcePath) : null;

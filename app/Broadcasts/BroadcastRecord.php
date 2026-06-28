@@ -18,7 +18,7 @@ final class BroadcastRecord
 
     public function __construct(
         public string $stashId,
-        public BroadcastType $type,
+        public string $type,
         public string $name,
         public string $slug,
         public BroadcastState $state,

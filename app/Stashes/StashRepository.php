@@ -61,9 +61,9 @@ final class StashRepository
             ?? throw new InvalidArgumentException('Failed to persist stash record.');
     }
 
-    public function find(PrefixedUlid $id): ?StashRecord
+    public function find(string $id): ?StashRecord
     {
-        return StashRecord::findById(new PrimaryKey($id->toString()));
+        return StashRecord::findById(new PrimaryKey($id));
     }
 
     public function findBySlug(string $slug): ?StashRecord
@@ -162,14 +162,14 @@ final class StashRepository
      */
     public function delete(StashRecord $stash): void
     {
-        $stashId = PrefixedUlid::parse((string) $stash->id);
+        $stashId = (string) $stash->id;
 
         foreach ($this->stashItems->listForStash($stashId) as $item) {
             $item->delete();
         }
 
         foreach ($this->stashInputs->listForStash($stashId) as $input) {
-            $this->mediaItemSources->deleteForStashInput(PrefixedUlid::parse((string) $input->id));
+            $this->mediaItemSources->deleteForStashInput((string) $input->id);
             $input->delete();
         }
 
@@ -184,7 +184,7 @@ final class StashRepository
      */
     public function deleteImpact(StashRecord $stash): array
     {
-        $stashId = PrefixedUlid::parse((string) $stash->id);
+        $stashId = (string) $stash->id;
 
         $mediaItemIds = array_values(array_unique(array_map(
             static fn (StashItemRecord $item): string => $item->mediaItemId,
@@ -205,7 +205,7 @@ final class StashRepository
 
         foreach ($otherStashIdsByMediaItemId as $otherStashIds) {
             foreach (array_keys($otherStashIds) as $otherStashId) {
-                $stashNamesById[$otherStashId] ??= $this->find(PrefixedUlid::parse($otherStashId))?->name ?? 'Unknown stash';
+                $stashNamesById[$otherStashId] ??= $this->find($otherStashId)?->name ?? 'Unknown stash';
             }
         }
 
@@ -213,7 +213,7 @@ final class StashRepository
         $orphanedItems = [];
 
         foreach ($mediaItemIds as $mediaItemId) {
-            $title = $this->mediaItems->find(PrefixedUlid::parse($mediaItemId))?->title ?? $mediaItemId;
+            $title = $this->mediaItems->find($mediaItemId)?->title ?? $mediaItemId;
             $otherStashIds = array_keys($otherStashIdsByMediaItemId[$mediaItemId] ?? []);
 
             if ($otherStashIds === []) {

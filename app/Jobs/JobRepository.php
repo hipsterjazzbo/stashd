@@ -52,9 +52,9 @@ final class JobRepository
             ?? throw new InvalidArgumentException('Failed to persist job record.');
     }
 
-    public function find(PrefixedUlid $id): ?JobRecord
+    public function find(string $id): ?JobRecord
     {
-        return JobRecord::findById(new PrimaryKey($id->toString()));
+        return JobRecord::findById(new PrimaryKey($id));
     }
 
     public function save(JobRecord $record): JobRecord

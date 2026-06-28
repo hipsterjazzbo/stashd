@@ -99,7 +99,7 @@ test('broadcast belongs to stash via foreign key', function (): void {
     $stash = $stashes->create('Broadcast Stash', 'broadcast-stash');
     $broadcast = $broadcasts->create(
         stashId: \App\Support\PrefixedUlid::parse((string) $stash->id),
-        type: BroadcastType::Podcast,
+        type: 'podcast',
         name: 'Podcast',
         slug: 'podcast',
     );
@@ -108,7 +108,7 @@ test('broadcast belongs to stash via foreign key', function (): void {
 
     expect(fn () => $broadcasts->create(
         stashId: \App\Support\PrefixedUlid::parse('stash_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
-        type: BroadcastType::Podcast,
+        type: 'podcast',
         name: 'Orphan',
         slug: 'orphan',
     ))->toThrow(\Tempest\Database\Exceptions\QueryWasInvalid::class);
@@ -150,7 +150,7 @@ test('repository smoke creates stash with input media item stash item and broadc
 
     $broadcast = $broadcasts->create(
         stashId: $stashId,
-        type: BroadcastType::JellyfinSeries,
+        type: 'jellyfin',
         name: 'Demo Series',
         slug: 'demo-series',
     );

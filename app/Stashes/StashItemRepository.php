@@ -52,32 +52,32 @@ final class StashItemRepository
             ?? throw new InvalidArgumentException('Failed to persist stash item record.');
     }
 
-    public function find(PrefixedUlid $id): ?StashItemRecord
+    public function find(string $id): ?StashItemRecord
     {
-        return StashItemRecord::findById(new PrimaryKey($id->toString()));
+        return StashItemRecord::findById(new PrimaryKey($id));
     }
 
-    public function findByStashAndMediaItem(PrefixedUlid $stashId, PrefixedUlid $mediaItemId): ?StashItemRecord
+    public function findByStashAndMediaItem(string $stashId, string $mediaItemId): ?StashItemRecord
     {
         return StashItemRecord::select()
-            ->where('stashId = ? AND mediaItemId = ?', $stashId->toString(), $mediaItemId->toString())
+            ->where('stashId = ? AND mediaItemId = ?', $stashId, $mediaItemId)
             ->first();
     }
 
     /** @return list<StashItemRecord> */
-    public function listForStash(PrefixedUlid $stashId): array
+    public function listForStash(string $stashId): array
     {
         return StashItemRecord::select()
-            ->where('stashId = ?', $stashId->toString())
+            ->where('stashId = ?', $stashId)
             ->orderBy('position', Direction::ASC)
             ->all();
     }
 
     /** @return list<StashItemRecord> */
-    public function listForMediaItem(PrefixedUlid $mediaItemId): array
+    public function listForMediaItem(string $mediaItemId): array
     {
         return StashItemRecord::select()
-            ->where('mediaItemId = ?', $mediaItemId->toString())
+            ->where('mediaItemId = ?', $mediaItemId)
             ->all();
     }
 
@@ -85,7 +85,7 @@ final class StashItemRepository
      * @param list<string> $mediaItemIds
      * @return list<StashItemRecord>
      */
-    public function listForMediaItemsExcludingStash(array $mediaItemIds, PrefixedUlid $excludingStashId): array
+    public function listForMediaItemsExcludingStash(array $mediaItemIds, string $excludingStashId): array
     {
         if ($mediaItemIds === []) {
             return [];
@@ -93,7 +93,7 @@ final class StashItemRepository
 
         return StashItemRecord::select()
             ->whereIn('mediaItemId', $mediaItemIds)
-            ->where('stashId != ?', $excludingStashId->toString())
+            ->where('stashId != ?', $excludingStashId)
             ->all();
     }
 }

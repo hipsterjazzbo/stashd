@@ -129,7 +129,7 @@ final readonly class TranscodePodcastAudioJobHandler implements JobHandler
 
             if (
                 $broadcast !== null
-                && $broadcast->type === BroadcastType::Podcast
+                && $broadcast->type === 'podcast'
                 && PodcastMediaKind::forBroadcast($broadcast) === PodcastMediaKind::Audio
             ) {
                 $broadcastIds[(string) $broadcast->id] = true;

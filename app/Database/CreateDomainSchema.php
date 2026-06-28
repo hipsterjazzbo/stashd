@@ -237,7 +237,7 @@ final class CreateDomainSchema implements MigratesUp
     {
         return $this->prefixedIdTable('broadcasts')
             ->raw($this->fkColumn('stashId', 40, 'stashes', OnDelete::CASCADE))
-            ->enum('type', BroadcastType::class)
+            ->string('type')
             ->string('name')
             ->string('slug')
             ->enum('state', BroadcastState::class, default: BroadcastState::Pending)

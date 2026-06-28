@@ -121,13 +121,13 @@ final readonly class StashController
     #[Get('/api/v1/stashes/{id}/items')]
     public function items(string $id): Json
     {
-        $stash = $this->stashes->find(PrefixedUlid::parse($id));
+        $stash = $this->stashes->find($id);
 
         if ($stash === null) {
             return $this->notFound('Stash not found.');
         }
 
-        $stashItems = $this->stashItems->listForStash(PrefixedUlid::parse($id));
+        $stashItems = $this->stashItems->listForStash($id);
         $mediaItemIds = array_values(array_unique(array_map(
             static fn ($item): string => $item->mediaItemId,
             $stashItems,
@@ -151,7 +151,7 @@ final readonly class StashController
     #[Get('/api/v1/stashes/{id}/inputs')]
     public function inputs(string $id): Json
     {
-        $stash = $this->stashes->find(PrefixedUlid::parse($id));
+        $stash = $this->stashes->find($id);
 
         if ($stash === null) {
             return $this->notFound('Stash not found.');
@@ -160,7 +160,7 @@ final readonly class StashController
         return new Json([
             'inputs' => array_map(
                 static fn ($input): array => StashInputResource::fromRecord($input)->toArray(),
-                $this->stashInputs->listForStash(PrefixedUlid::parse($id)),
+                $this->stashInputs->listForStash($id),
             ),
         ]);
     }
@@ -168,7 +168,7 @@ final readonly class StashController
     #[Post('/api/v1/stashes/{id}/inputs')]
     public function addInput(string $id, Request $request): Json
     {
-        if ($this->stashes->find(PrefixedUlid::parse($id)) === null) {
+        if ($this->stashes->find($id) === null) {
             return $this->notFound('Stash not found.');
         }
 
@@ -199,7 +199,7 @@ final readonly class StashController
     #[Patch('/api/v1/stashes/{id}')]
     public function update(string $id, Request $request): Json
     {
-        $stash = $this->stashes->find(PrefixedUlid::parse($id));
+        $stash = $this->stashes->find($id);
 
         if ($stash === null) {
             return $this->notFound('Stash not found.');
@@ -264,7 +264,7 @@ final readonly class StashController
     #[Delete('/api/v1/stashes/{id}')]
     public function delete(string $id): Json
     {
-        $stash = $this->stashes->find(PrefixedUlid::parse($id));
+        $stash = $this->stashes->find($id);
 
         if ($stash === null) {
             return $this->notFound('Stash not found.');
@@ -278,7 +278,7 @@ final readonly class StashController
     #[Get('/api/v1/stashes/{id}/delete-impact')]
     public function deleteImpact(string $id): Json
     {
-        $stash = $this->stashes->find(PrefixedUlid::parse($id));
+        $stash = $this->stashes->find($id);
 
         if ($stash === null) {
             return $this->notFound('Stash not found.');

@@ -39,7 +39,7 @@ final readonly class BroadcastCommandHandler implements CommandHandler
 
         if (
             $this->commandType === CommandType::BroadcastRotateToken
-            && $broadcast->type !== BroadcastType::Podcast
+            && $broadcast->type !== 'podcast'
         ) {
             throw InvalidCommandPayload::withErrors(['Token rotation is only supported for podcast broadcasts.']);
         }

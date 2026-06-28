@@ -22,9 +22,11 @@ use Tempest\Database\PrimaryKey;
 use Tempest\Http\Status;
 
 test('the podcast broadcast format is registered', function (): void {
-    $registry = $this->container->get(BroadcastTypeRegistry::class);
+    $registry = $this->container->get(BroadcastPluginRegistry::class);
+    $plugin = $registry->findByKey('podcast');
 
-    expect($registry->handlerFor(BroadcastType::Podcast))->toBeInstanceOf(PodcastBroadcastFormat::class);
+    expect($plugin)->not->toBeNull()
+        ->and($plugin->plugin)->toBeInstanceOf(PodcastBroadcastPlugin::class);
 });
 
 test('broadcast.rebuild writes deterministic audio podcast feed with tokenized enclosures', function (): void {

@@ -55,9 +55,9 @@ final class StashInputRepository
             ?? throw new InvalidArgumentException('Failed to persist stash input record.');
     }
 
-    public function find(PrefixedUlid $id): ?StashInputRecord
+    public function find(string $id): ?StashInputRecord
     {
-        return StashInputRecord::findById(new PrimaryKey($id->toString()));
+        return StashInputRecord::findById(new PrimaryKey($id));
     }
 
     public function save(StashInputRecord $record): StashInputRecord
@@ -83,10 +83,10 @@ final class StashInputRepository
     }
 
     /** @return list<StashInputRecord> */
-    public function listForStash(PrefixedUlid $stashId): array
+    public function listForStash(string $stashId): array
     {
         return StashInputRecord::select()
-            ->where('stashId = ?', $stashId->toString())
+            ->where('stashId = ?', $stashId)
             ->orderBy('createdAt', Direction::ASC)
             ->all();
     }

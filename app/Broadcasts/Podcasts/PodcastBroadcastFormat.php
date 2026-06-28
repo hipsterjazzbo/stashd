@@ -21,7 +21,7 @@ use App\Broadcasts\BroadcastVerifyResult;
 use App\Broadcasts\Formats\BroadcastFormat;
 use App\Stashes\StashItemRecord;
 use App\Stashes\StashItemState;
-use App\Support\PrefixedUlid;
+
 use App\System\State\StateTransitionService;
 use App\Vault\MediaItemRecord;
 use Tempest\DateTime\DateTime;
@@ -159,8 +159,8 @@ final readonly class PodcastBroadcastFormat implements BroadcastFormat
             }
 
             $item = $this->broadcastItems->findByBroadcastAndStashItem(
-                PrefixedUlid::parse((string) $context->broadcast->id),
-                PrefixedUlid::parse((string) $stashItem->id),
+                (string) $context->broadcast->id,
+                (string) $stashItem->id,
             );
 
             if ($item === null) {
@@ -223,16 +223,16 @@ final readonly class PodcastBroadcastFormat implements BroadcastFormat
 
     private function findOrCreateItem(BroadcastContext $context, StashItemRecord $stashItem): BroadcastItemRecord
     {
-        $broadcastId = PrefixedUlid::parse((string) $context->broadcast->id);
+        $broadcastId = (string) $context->broadcast->id;
         $item = $this->broadcastItems->findByBroadcastAndStashItem(
             $broadcastId,
-            PrefixedUlid::parse((string) $stashItem->id),
+            (string) $stashItem->id,
         );
 
         return $item ?? $this->broadcastItems->create(
             broadcastId: $broadcastId,
-            stashItemId: PrefixedUlid::parse((string) $stashItem->id),
-            mediaItemId: PrefixedUlid::parse($stashItem->mediaItemId),
+            stashItemId: (string) $stashItem->id,
+            mediaItemId: $stashItem->mediaItemId,
         );
     }
 

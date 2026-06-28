@@ -23,7 +23,7 @@ final class BroadcastRepository
 
     public function create(
         PrefixedUlid $stashId,
-        BroadcastType $type,
+        string $type,
         string $name,
         string $slug,
         BroadcastState $state = BroadcastState::Pending,
@@ -87,7 +87,7 @@ final class BroadcastRepository
     public function listPodcastBroadcastsWithFeedToken(): array
     {
         return BroadcastRecord::select()
-            ->where('tokenSecretId IS NOT NULL AND type = ?', BroadcastType::Podcast->value)
+            ->where('tokenSecretId IS NOT NULL AND type = ?', 'podcast')
             ->orderBy('createdAt', \Tempest\Database\Direction::ASC)
             ->all();
     }

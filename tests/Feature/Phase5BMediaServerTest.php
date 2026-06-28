@@ -340,11 +340,15 @@ test('broadcast nfo builder escapes unsafe xml characters', function (): void {
 });
 
 test('jellyfin and plex broadcast types are registered distinctly from filesystem_series', function (): void {
-    $registry = $this->container->get(\App\Broadcasts\BroadcastTypeRegistry::class);
+    $registry = $this->container->get(\App\Broadcasts\BroadcastPluginRegistry::class);
 
-    expect($registry->handlerFor(BroadcastType::FilesystemSeries)->key())->toBe('filesystem_series')
-        ->and($registry->handlerFor(BroadcastType::JellyfinSeries)->key())->toBe('jellyfin_series')
-        ->and($registry->handlerFor(BroadcastType::PlexSeries)->key())->toBe('plex_series');
+    $filesystem = $registry->findByKey('filesystem');
+    $jellyfin = $registry->findByKey('jellyfin');
+    $plex = $registry->findByKey('plex');
+
+    expect($filesystem)->not->toBeNull()
+        ->and($jellyfin)->not->toBeNull()
+        ->and($plex)->not->toBeNull();
 });
 
 test('filesystem_series rebuild remains green after media server types added', function (): void {

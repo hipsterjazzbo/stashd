@@ -15,7 +15,7 @@ use App\Providers\InputOption;
 use App\Providers\InputOptionType;
 use App\Providers\ProviderDates;
 use App\Providers\StashdUri;
-use App\Support\PrefixedUlid;
+
 use App\Vault\MediaItemRepository;
 use App\Vault\MediaItemSourceRepository;
 use InvalidArgumentException;
@@ -49,9 +49,9 @@ final readonly class CreateStashFromDiscovery
     /**
      * @param array<string, mixed> $options
      */
-    public function commitInput(StashRecord $stash, PrefixedUlid $preflightCommandId, array $options = []): StashInputCommitResult
+    public function commitInput(StashRecord $stash, CommandRecord $preflightCommand, array $options = []): StashInputCommitResult
     {
-        $preflight = $this->requireCompletedPreflight($preflightCommandId);
+        $preflight = $this->requireCompletedPreflight($preflightCommand);
         $preflightResult = $this->decodePreflightResult($preflight);
 
         $sourceUri = str((string) ($preflightResult['source_uri'] ?? ''))->trim()->toString();
@@ -73,7 +73,7 @@ final readonly class CreateStashFromDiscovery
         $inputOptions = StashInputOptions::fromArray($options);
         $excludedContentTypes = $this->excludedContentTypes($discovered->inputOptions, $inputOptions);
 
-        $stashId = PrefixedUlid::parse((string) $stash->id);
+        $stashId = (string) $stash->id;
         $inputType = StashInputTypeMapper::fromProviderInputType($resolved->inputType);
 
         $syncMode = SyncMode::tryFrom((string) ($options['sync_mode'] ?? SyncMode::Automatic->value)) ?? SyncMode::Automatic;
@@ -105,7 +105,7 @@ final readonly class CreateStashFromDiscovery
             $this->stashes->update($stash, name: $resolved->sourceTitle);
         }
 
-        $stashInputId = PrefixedUlid::parse((string) $stashInput->id);
+        $stashInputId = (string) $stashInput->id;
         $mediaItemsCreated = 0;
         $mediaItemsReused = 0;
         $stashItemsCreated = 0;
@@ -154,7 +154,7 @@ final readonly class CreateStashFromDiscovery
                 $mediaItemsReused++;
             }
 
-            $mediaItemId = PrefixedUlid::parse((string) $mediaItem->id);
+            $mediaItemId = (string) $mediaItem->id;
 
             if ($this->mediaItemSources->findForMediaItemAndInput($mediaItemId, $stashInputId) === null) {
                 $this->mediaItemSources->create(
@@ -259,9 +259,9 @@ final readonly class CreateStashFromDiscovery
         return null;
     }
 
-    private function requireCompletedPreflight(PrefixedUlid $preflightCommandId): CommandRecord
+    private function requireCompletedPreflight(CommandRecord $preflightCommand): CommandRecord
     {
-        $command = $this->commands->find($preflightCommandId);
+        $command = $this->commands->find((string) $preflightCommand->id);
 
         if ($command === null || $command->type !== CommandType::StashPreflight) {
             throw new InvalidArgumentException('Preflight command not found.');
