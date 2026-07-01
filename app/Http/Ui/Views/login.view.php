@@ -38,10 +38,6 @@
 					class="w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
 			</label>
 
-		<form id="auth-form" class="space-y-3 rounded-lg border border-line bg-panel/60 p-5">
-			<div id="auth-error" class="hidden rounded border border-error/50 bg-error/10 px-3 py-2 text-[13px] text-error"></div>
-
-			<?php if ($setupRequired): ?>
 			<label class="block">
 				<span class="mb-1 block text-[12px] text-muted">Password</span>
 				<input name="password" type="password" autocomplete="{{ $setupRequired ? 'new-password' : 'current-password' }}" required
@@ -52,7 +48,6 @@
 				class="w-full rounded bg-amber px-3 py-2 font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-60">
 				{{ $setupRequired ? 'Create admin' : 'Sign in' }}
 			</button>
-		<?php endif; ?>
 		</form>
 	</main>
 
