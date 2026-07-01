@@ -45,7 +45,7 @@ test('season mapping rejects a stash input id belonging to a different stash', f
     $stashBInputId = $addToBCommand->body['command']['result']['stash_input_id'];
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashA->body['stash']['id'] . '/broadcasts', [
-        'type' => 'filesystem_series',
+        'type' => 'filesystem',
         'name' => 'Series A',
     ], headers: $headers)->assertStatus(Status::CREATED);
 
@@ -84,7 +84,7 @@ test('broadcast.rebuild honours per-input season mapping, falling back to season
     $inputB = $addInput('fake://channel/season-mapping-b');
 
     $broadcastResponse = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'filesystem_series',
+        'type' => 'filesystem',
         'name' => 'Season Mapping Broadcast',
     ], headers: $headers)->assertStatus(Status::CREATED);
     $broadcastId = $broadcastResponse->body['broadcast']['id'];
