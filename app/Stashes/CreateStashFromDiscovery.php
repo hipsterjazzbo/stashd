@@ -15,6 +15,7 @@ use App\Providers\InputOption;
 use App\Providers\InputOptionType;
 use App\Providers\ProviderDates;
 use App\Providers\StashdUri;
+use App\Support\PrefixedUlid;
 
 use App\Vault\MediaItemRepository;
 use App\Vault\MediaItemSourceRepository;
@@ -81,7 +82,7 @@ final readonly class CreateStashFromDiscovery
         $isFirstInput = $this->stashInputs->listForStash($stashId) === [];
 
         $stashInput = $this->stashInputs->create(
-            stashId: $stashId,
+            stashId: PrefixedUlid::parse($stashId),
             providerKey: $resolved->providerKey,
             inputType: $inputType,
             sourceUri: $resolved->sourceUri->toString(),
@@ -156,13 +157,13 @@ final readonly class CreateStashFromDiscovery
 
             $mediaItemId = (string) $mediaItem->id;
 
-            if ($this->mediaItemSources->findForMediaItemAndInput($mediaItemId, $stashInputId) === null) {
+            if ($this->mediaItemSources->findForMediaItemAndInput(PrefixedUlid::parse($mediaItemId), PrefixedUlid::parse($stashInputId)) === null) {
                 $this->mediaItemSources->create(
-                    mediaItemId: $mediaItemId,
+                    mediaItemId: PrefixedUlid::parse($mediaItemId),
                     providerKey: $resolved->providerKey,
                     providerInputId: $resolved->providerInputId,
                     discoveredUri: $canonicalUri->toString(),
-                    stashInputId: $stashInputId,
+                    stashInputId: PrefixedUlid::parse($stashInputId),
                     position: $index + 1,
                 );
             }
@@ -172,9 +173,9 @@ final readonly class CreateStashFromDiscovery
                 $ignoredReason = $this->ignoredReason($title, $contentType, $inputOptions, $excludedContentTypes);
 
                 $stashItem = $this->stashItems->create(
-                    stashId: $stashId,
-                    mediaItemId: $mediaItemId,
-                    stashInputId: $stashInputId,
+                    stashId: PrefixedUlid::parse($stashId),
+                    mediaItemId: PrefixedUlid::parse($mediaItemId),
+                    stashInputId: PrefixedUlid::parse($stashInputId),
                     position: $index + 1,
                     ignoredReason: $ignoredReason,
                     state: $ignoredReason !== null ? StashItemState::Ignored : StashItemState::Active,
@@ -192,8 +193,8 @@ final readonly class CreateStashFromDiscovery
         if ($this->downloadPolicy->allowsAutomaticDownload($stash->downloadPolicy)) {
             foreach ($downloadableMediaItemIds as $downloadableMediaItemId) {
                 $this->commandDispatch->dispatch(CommandType::ItemDownload, [
-                    'mediaItemId' => $downloadableMediaItemId->toString(),
-                    'stashId' => $stashId->toString(),
+                    'mediaItemId' => $downloadableMediaItemId,
+                    'stashId' => $stashId,
                 ]);
             }
         }

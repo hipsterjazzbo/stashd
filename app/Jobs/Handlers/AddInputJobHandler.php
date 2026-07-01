@@ -16,6 +16,7 @@ use App\Jobs\JobRepository;
 use App\Jobs\JobState;
 use App\Stashes\CreateStashFromDiscovery;
 use App\Stashes\StashRepository;
+use App\Support\PrefixedUlid;
 
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
