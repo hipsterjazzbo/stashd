@@ -15,3 +15,7 @@ CLAUDE.local.md
 /test-results/
 /playwright-report/
 /.env.lerd_override
+.claude/settings.local.json
+.claude/transcripts/
+.claude/checkpoints/
+/.pi-lens/
