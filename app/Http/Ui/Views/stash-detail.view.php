@@ -227,7 +227,7 @@
 
 					<div class="border-t border-line p-4">
 						<div class="flex items-center gap-2">
-							<select x-model="newBroadcastType" x-on:change="onBroadcastTypeChanged()"
+							<select x-model="newBroadcastType" x-on:change="newBroadcastSettings = {}; onBroadcastTypeChanged()"
 								class="rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber">
 								<template x-for="plugin in broadcastPlugins" x-bind:key="plugin.key">
 									<option x-bind:value="plugin.key" x-text="plugin.label"></option>
@@ -245,6 +245,26 @@
 								class="shrink-0 rounded bg-amber px-3 py-2 text-[13px] font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-60">
 								Add broadcast
 							</button>
+						</div>
+
+						<div class="mt-3 flex flex-wrap items-center gap-2" x-show="currentBroadcastExtraControls().length > 0">
+							<template x-for="control in currentBroadcastExtraControls()" x-bind:key="control.name">
+								<label class="min-w-[160px] flex-1">
+									<span class="mb-1 block text-[11px] uppercase tracking-wide text-muted" x-text="control.label"></span>
+									<template x-if="control.type === 'select'">
+										<select x-model="newBroadcastSettings[control.name]"
+											class="w-full rounded border border-line bg-espresso px-2 py-1 text-[13px] text-cream outline-none focus:border-amber">
+											<template x-for="option in control.options" x-bind:key="option">
+												<option x-bind:value="option" x-text="option"></option>
+											</template>
+										</select>
+									</template>
+									<template x-if="control.type !== 'select'">
+										<input type="text" x-model="newBroadcastSettings[control.name]"
+											class="w-full rounded border border-line bg-espresso px-2 py-1 text-[13px] text-cream outline-none focus:border-amber"/>
+									</template>
+								</label>
+							</template>
 						</div>
 
 						<div class="mt-3 rounded border border-warn/40 bg-warn/10 p-3" x-show="broadcastPolicyMismatchMessage()">

@@ -241,10 +241,15 @@ with zero migration surface.
 3. Core calls `publish()` → plugin creates its output (RSS feed, Jellyfin layout, etc.)
 4. Plugin returns `BroadcastPublishResult` with publication details
 
-`uiControls()` is exposed over the API but the create form doesn't yet render
-per-plugin controls from it (podcast settings like `media_kind` are edited
-after creation, via `settings` on `PATCH`/broadcast update) — that's the
-remaining gap between this doc's original UI-flow vision and what shipped.
+`uiControls()` is exposed over the API and the create form now renders
+per-plugin controls from it (the podcast plugin's `title`/`description`/
+`author`/`funding_url`; `media_kind` keeps its own dedicated select, excluded
+from the generic render to avoid a duplicate). There is still no general
+`PATCH` for broadcast settings after creation — `settings` can only be set at
+creation time (`POST /api/v1/stashes/{id}/broadcasts`) or, for the one
+settings key that has its own endpoint, via `PATCH /api/v1/broadcasts/{id}/
+season-mapping`. Series plugins declare no `uiControls()`, so nothing renders
+for them.
 
 ### Plugin bootstrap — ⏸ deferred, doesn't apply
 

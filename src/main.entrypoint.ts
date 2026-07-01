@@ -926,6 +926,7 @@ function stashDetailComponent(stashId: string) {
 		newBroadcastType: 'filesystem',
 		newBroadcastMediaKind: 'audio',
 		newBroadcastName: '',
+		newBroadcastSettings: {} as Record<string, string>,
 		creatingBroadcast: false,
 		compatibleDownloadPolicyChoice: 'video',
 		updatingDownloadPolicy: false,
@@ -1026,6 +1027,14 @@ function stashDetailComponent(stashId: string) {
 		isSeriesBroadcastType(type: string): boolean {
 			const plugin = this.broadcastPlugins.find((candidate) => candidate.key === type)
 			return plugin !== undefined && plugin.supported_file_kinds.length === 1 && plugin.supported_file_kinds[0] === 'video'
+		},
+
+		// media_kind has its own dedicated select (with bespoke show/hide
+		// logic tied to newBroadcastMediaKind), so it's excluded here to
+		// avoid rendering it twice.
+		currentBroadcastExtraControls(): BroadcastPluginUiControl[] {
+			const plugin = this.broadcastPlugins.find((candidate) => candidate.key === this.newBroadcastType)
+			return (plugin?.ui_controls ?? []).filter((control) => control.name !== 'media_kind')
 		},
 
 		// Download/metadata jobs record entity_type 'media_item' + entity_id on
@@ -1204,6 +1213,10 @@ function stashDetailComponent(stashId: string) {
 		async createBroadcast() {
 			if (this.newBroadcastName.trim() === '') return
 			this.creatingBroadcast = true
+			const settings = {
+				...this.newBroadcastSettings,
+				...(this.newBroadcastType === 'podcast' ? { media_kind: this.newBroadcastMediaKind } : {}),
+			}
 			try {
 				const response = await apiFetch(`/api/v1/stashes/${stashId}/broadcasts`, {
 					method: 'POST',
@@ -1211,7 +1224,7 @@ function stashDetailComponent(stashId: string) {
 					body: JSON.stringify({
 						type: this.newBroadcastType,
 						name: this.newBroadcastName.trim(),
-						...(this.newBroadcastType === 'podcast' ? { settings: { media_kind: this.newBroadcastMediaKind } } : {}),
+						...(Object.keys(settings).length > 0 ? { settings } : {}),
 					}),
 				})
 				if (!response.ok) {
@@ -1220,6 +1233,7 @@ function stashDetailComponent(stashId: string) {
 					return
 				}
 				this.newBroadcastName = ''
+				this.newBroadcastSettings = {}
 				this.error = null
 				await this.refresh()
 			} catch (cause) {
