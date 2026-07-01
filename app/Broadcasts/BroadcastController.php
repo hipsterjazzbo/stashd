@@ -41,6 +41,20 @@ final readonly class BroadcastController
     ) {
     }
 
+    #[Get('/api/v1/broadcast-plugins')]
+    public function plugins(): Json
+    {
+        $plugins = [];
+
+        foreach (BroadcastPluginRegistry::all() as $discovered) {
+            foreach ($discovered->broadcastKeys as $key) {
+                $plugins[] = $this->mapPlugin($key, $discovered);
+            }
+        }
+
+        return new Json(['plugins' => $plugins]);
+    }
+
     #[Get('/api/v1/stashes/{stashId}/broadcasts')]
     public function index(string $stashId): Json
     {
@@ -301,5 +315,28 @@ final readonly class BroadcastController
         $token = $this->podcastTokens->ensureBroadcastToken($broadcast);
 
         return BroadcastResource::fromRecord($broadcast, $this->podcastUrls->feedUrl($token))->toArray();
+    }
+
+    private function mapPlugin(string $key, DiscoveredPlugin $discovered): array
+    {
+        return ApiJson::encode([
+            'key' => $key,
+            'label' => $discovered->name,
+            'description' => $discovered->description,
+            'supportedFileKinds' => array_map(
+                static fn (FileKind $kind): string => $kind->value,
+                $discovered->plugin->supportedFileKinds(),
+            ),
+            'uiControls' => array_map(
+                static fn (UiControl $control): array => [
+                    'name' => $control->name,
+                    'label' => $control->label,
+                    'type' => $control->type,
+                    'default' => $control->default,
+                    'options' => $control->options,
+                ],
+                $discovered->plugin->uiControls(),
+            ),
+        ]);
     }
 }

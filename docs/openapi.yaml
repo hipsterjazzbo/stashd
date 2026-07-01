@@ -517,6 +517,23 @@ paths:
               schema: { $ref: "#/components/schemas/PreflightReview" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/v1/broadcast-plugins:
+    get:
+      operationId: listBroadcastPlugins
+      tags: [Broadcasts]
+      summary: List discovered broadcast plugins and their metadata
+      responses:
+        "200":
+          description: Broadcast plugins
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plugins:
+                    type: array
+                    items: { $ref: "#/components/schemas/BroadcastPlugin" }
+
   /api/v1/stashes/{stashId}/broadcasts:
     get:
       operationId: listBroadcasts
@@ -1200,7 +1217,7 @@ components:
     AssetRole: { type: string, enum: [vault_original, source_thumbnail, subtitle, transcript, podcast_audio, episode_artwork, feed_artwork, feed_xml, nfo, hardlink, remuxed_video, metadata_json, source_json] }
     AssetKind: { type: string, enum: [video, audio, image, subtitle, metadata, link, feed, other] }
     AssetState: { type: string, enum: [pending, processing, ready, stale, missing, failed] }
-    BroadcastType: { type: string, enum: [filesystem_series, jellyfin_series, plex_series, podcast] }
+    BroadcastType: { type: string, enum: [filesystem, jellyfin, plex, podcast] }
     PodcastMediaKind: { type: string, enum: [audio, video], description: "Preferred episode enclosure media for a `podcast` broadcast (settings.media_kind); defaults to audio." }
     BroadcastState: { type: string, enum: [pending, processing, ready, stale, failed, disabled] }
     BroadcastItemState: { type: string, enum: [pending, processing, ready, stale, failed, disabled] }
@@ -1442,6 +1459,28 @@ components:
         last_error: { type: string, nullable: true }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+
+    BroadcastPlugin:
+      type: object
+      properties:
+        key: { $ref: "#/components/schemas/BroadcastType" }
+        label: { type: string }
+        description: { type: string }
+        supported_file_kinds:
+          type: array
+          items: { type: string, enum: [video, audio] }
+        ui_controls:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              label: { type: string }
+              type: { type: string, description: "Control type hint, e.g. text or select." }
+              default: {}
+              options:
+                type: array
+                items: { type: string }
 
     PolicyMismatch:
       type: object
