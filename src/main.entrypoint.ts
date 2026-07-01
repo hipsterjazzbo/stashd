@@ -132,7 +132,7 @@ function compatibleDownloadPolicies(broadcastType: string, mediaKind?: string): 
 	return ALL_DOWNLOAD_POLICIES.filter((policy) => downloadPolicySatisfiesBroadcastType(policy, broadcastType, mediaKind))
 }
 
-const SERIES_BROADCAST_TYPES = ['filesystem_series', 'jellyfin_series', 'plex_series']
+const SERIES_BROADCAST_TYPES = ['filesystem', 'jellyfin', 'plex']
 
 /** Mirrors App\Broadcasts\BroadcastType::isSeries(). */
 function isSeriesBroadcastType(type: string): boolean {
@@ -913,7 +913,7 @@ function stashDetailComponent(stashId: string) {
 		inputs: [] as StashInputSummary[],
 		broadcasts: [] as BroadcastSummary[],
 		actionPending: null as string | null,
-		newBroadcastType: 'filesystem_series',
+		newBroadcastType: 'filesystem',
 		newBroadcastMediaKind: 'audio',
 		newBroadcastName: '',
 		creatingBroadcast: false,
