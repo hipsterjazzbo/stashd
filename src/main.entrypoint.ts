@@ -132,13 +132,6 @@ function compatibleDownloadPolicies(broadcastType: string, mediaKind?: string): 
 	return ALL_DOWNLOAD_POLICIES.filter((policy) => downloadPolicySatisfiesBroadcastType(policy, broadcastType, mediaKind))
 }
 
-const SERIES_BROADCAST_TYPES = ['filesystem', 'jellyfin', 'plex']
-
-/** Mirrors App\Broadcasts\BroadcastType::isSeries(). */
-function isSeriesBroadcastType(type: string): boolean {
-	return SERIES_BROADCAST_TYPES.includes(type)
-}
-
 function formatRelativeTime(iso: string | null | undefined): string {
 	if (!iso) return '—'
 
@@ -569,6 +562,22 @@ interface BroadcastSummary {
 	token_preview?: string
 }
 
+interface BroadcastPluginUiControl {
+	name: string
+	label: string
+	type: string
+	default: unknown
+	options: string[]
+}
+
+interface BroadcastPluginSummary {
+	key: string
+	label: string
+	description: string
+	supported_file_kinds: string[]
+	ui_controls: BroadcastPluginUiControl[]
+}
+
 interface MediaItemSummary {
 	id: string
 	provider_key: string
@@ -912,6 +921,7 @@ function stashDetailComponent(stashId: string) {
 		jobs: [] as JobSummary[],
 		inputs: [] as StashInputSummary[],
 		broadcasts: [] as BroadcastSummary[],
+		broadcastPlugins: [] as BroadcastPluginSummary[],
 		actionPending: null as string | null,
 		newBroadcastType: 'filesystem',
 		newBroadcastMediaKind: 'audio',
@@ -921,7 +931,6 @@ function stashDetailComponent(stashId: string) {
 		updatingDownloadPolicy: false,
 		seasonMappingDrafts: {} as Record<string, Record<string, string>>,
 		savingSeasonMapping: null as string | null,
-		isSeriesBroadcastType,
 		statusBadge,
 		formatRelativeTime,
 		formatDuration,
@@ -955,7 +964,7 @@ function stashDetailComponent(stashId: string) {
 		addInputProviderOptions: {} as Record<string, boolean | string>,
 
 		async init() {
-			await this.refresh()
+			await Promise.all([this.refresh(), this.loadBroadcastPlugins()])
 			this.loading = false
 
 			this.onBroadcastTypeChanged()
@@ -995,6 +1004,28 @@ function stashDetailComponent(stashId: string) {
 				if (cause instanceof UnauthenticatedError) return
 				this.error = 'Could not reach the server.'
 			}
+		},
+
+		// Static per-session: the plugin registry doesn't change while the page
+		// is open, so this is fetched once in init() rather than on every
+		// refresh() (unlike stash/items/inputs/broadcasts/jobs, which do).
+		async loadBroadcastPlugins() {
+			try {
+				const response = await apiFetch('/api/v1/broadcast-plugins')
+				this.broadcastPlugins = (await response.json()).plugins
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not reach the server.'
+			}
+		},
+
+		// Mirrors App\Broadcasts\Plugins\AbstractSeriesBroadcastPlugin --
+		// series plugins support video only, unlike the podcast plugin (audio
+		// and video). No dedicated "is series" flag on BroadcastPlugin itself
+		// since it'd only ever have one caller.
+		isSeriesBroadcastType(type: string): boolean {
+			const plugin = this.broadcastPlugins.find((candidate) => candidate.key === type)
+			return plugin !== undefined && plugin.supported_file_kinds.length === 1 && plugin.supported_file_kinds[0] === 'video'
 		},
 
 		// Download/metadata jobs record entity_type 'media_item' + entity_id on

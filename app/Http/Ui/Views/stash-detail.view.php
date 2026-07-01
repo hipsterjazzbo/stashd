@@ -229,10 +229,9 @@
 						<div class="flex items-center gap-2">
 							<select x-model="newBroadcastType" x-on:change="onBroadcastTypeChanged()"
 								class="rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber">
-								<option value="filesystem">Filesystem series</option>
-								<option value="jellyfin">Jellyfin series</option>
-								<option value="plex">Plex series</option>
-								<option value="podcast">Podcast</option>
+								<template x-for="plugin in broadcastPlugins" x-bind:key="plugin.key">
+									<option x-bind:value="plugin.key" x-text="plugin.label"></option>
+								</template>
 							</select>
 							<select x-show="newBroadcastType === 'podcast'" x-model="newBroadcastMediaKind" x-on:change="onBroadcastTypeChanged()"
 								class="rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber">
