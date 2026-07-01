@@ -207,12 +207,8 @@ Job intent should drive strategy selection.
 Examples:
 
 ```text
-routine_discovery
 initial_backfill
-metadata_capture
-metadata_refresh
 download
-repair
 broadcast
 enrich
 storage_check
@@ -334,13 +330,9 @@ Example command types:
 ```text
 stash.preflight
 stash.create
-stash.sync
-stash.backfill
-item.refresh_metadata
 item.download
 broadcast.rebuild
 broadcast.rotate_token
-system.prune_temp
 storage.verify
 ```
 

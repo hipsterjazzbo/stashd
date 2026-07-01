@@ -6,9 +6,6 @@ namespace App\Commands;
 
 enum CommandType: string
 {
-    case StashSync = 'stash.sync';
-    case StashBackfill = 'stash.backfill';
-    case ItemRefreshMetadata = 'item.refresh_metadata';
     case BroadcastPlan = 'broadcast.plan';
     case BroadcastRebuild = 'broadcast.rebuild';
     case BroadcastVerify = 'broadcast.verify';
@@ -17,7 +14,6 @@ enum CommandType: string
     case BroadcastRotateToken = 'broadcast.rotate_token';
     case StashPreflight = 'stash.preflight';
     case StashAddInput = 'stash.add_input';
-    case SystemPruneTemp = 'system.prune_temp';
     case SystemBoot = 'system.boot';
     case SystemStorageCheck = 'system.storage_check';
     case ItemDownload = 'item.download';

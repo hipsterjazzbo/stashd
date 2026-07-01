@@ -1232,9 +1232,6 @@ components:
       enum:
         - stash.preflight
         - stash.add_input
-        - stash.sync
-        - stash.backfill
-        - item.refresh_metadata
         - item.download
         - asset.verify
         - broadcast.plan
@@ -1248,21 +1245,16 @@ components:
         - asset.transcode_podcast_audio
         - system.boot
         - system.storage_check
-        - system.prune_temp
         - system.verify_vault
     JobIntent:
       type: string
       enum:
         - preflight
         - add_input
-        - routine_discovery
         - initial_backfill
-        - metadata_capture
-        - metadata_refresh
         - download
         - enrich
         - broadcast
-        - repair
         - storage_check
         - boot
         - verify_vault
