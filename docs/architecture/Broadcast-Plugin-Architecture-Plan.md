@@ -18,6 +18,13 @@ under `app/Broadcasts/Plugins/`, discovered the same way — the packaging
 boundary was never actually needed for a single-binary self-hosted app; revisit
 only if a real third-party plugin ecosystem becomes a goal.
 
+**Update (2026-07-02): `FilesystemBroadcastPlugin` removed.** It was a bare
+series layout with no NFO sidecars and no media-server targeting — unclear
+value next to `JellyfinBroadcastPlugin`/`PlexBroadcastPlugin`, so it's gone.
+The plugin registry now has three keys: `podcast`, `jellyfin`, `plex`. Any
+mention of a `filesystem` broadcast type below is historical record of what
+the original migration produced, not current state.
+
 The sections below are the **original plan as written**, kept for the design
 rationale, with corrections inline where the actual implementation ended up
 different (marked **✅ implemented differently** or **⏸ deferred**). Do not
@@ -143,7 +150,7 @@ fields (title, description, author, funding_url, media_kind); see
 ### Core (`app/Broadcasts/`) — ✅ implemented, in-tree
 
 The plugin implementations live under `app/Broadcasts/Plugins/`
-(`FilesystemBroadcastPlugin`, `JellyfinBroadcastPlugin`, `PlexBroadcastPlugin`,
+(`JellyfinBroadcastPlugin`, `PlexBroadcastPlugin`,
 `AbstractSeriesBroadcastPlugin` as their shared base, `SeriesFormatOptions`) and
 `app/Broadcasts/Podcasts/` (podcast support classes — `PodcastAssetSelector`,
 `PodcastTokenService`, `PodcastEpisodeUrlBuilder`, etc. — plus
@@ -157,7 +164,7 @@ layout.
 
 These packages don't exist and aren't planned. Everything they would have
 contained (`PodcastAssetSelector`, `PodcastTokenService`,
-`JellyfinBroadcastPlugin`, `PlexBroadcastPlugin`, `FilesystemBroadcastPlugin`,
+`JellyfinBroadcastPlugin`, `PlexBroadcastPlugin`,
 `AbstractSeriesBroadcastPlugin`, `SeriesFormatOptions`, etc.) lives in-tree
 under `app/Broadcasts/Podcasts/` and `app/Broadcasts/Plugins/` instead, per the
 in-tree-only decision at the top of this doc.

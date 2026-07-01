@@ -143,7 +143,7 @@ test('a feed token bound to a non-podcast broadcast does not return a feed', fun
     $broadcast->tokenSecretId = (string) $secret->id;
     $broadcasts->save($broadcast);
 
-    // Token decrypts to a real value, but the broadcast is filesystem_series, not a podcast.
+    // Token decrypts to a real value, but the broadcast is jellyfin, not a podcast.
     $this->http->get('/b/' . rawurlencode($token) . '/feed.xml')->assertStatus(Status::NOT_FOUND);
 });
 

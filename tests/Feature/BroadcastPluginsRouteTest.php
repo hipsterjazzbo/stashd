@@ -12,14 +12,14 @@ test('broadcast plugins endpoint lists the discovered plugin keys', function ():
 
     $keys = array_column($response->body['plugins'], 'key');
 
-    expect($keys)->toContain('filesystem', 'jellyfin', 'plex', 'podcast');
+    expect($keys)->toContain('jellyfin', 'plex', 'podcast');
 
-    $filesystem = array_values(array_filter(
+    $jellyfin = array_values(array_filter(
         $response->body['plugins'],
-        static fn (array $plugin): bool => $plugin['key'] === 'filesystem',
+        static fn (array $plugin): bool => $plugin['key'] === 'jellyfin',
     ))[0] ?? null;
 
-    expect($filesystem)->not->toBeNull()
-        ->and($filesystem['label'])->toBeString()
-        ->and($filesystem['supported_file_kinds'])->toBe(['video']);
+    expect($jellyfin)->not->toBeNull()
+        ->and($jellyfin['label'])->toBeString()
+        ->and($jellyfin['supported_file_kinds'])->toBe(['video']);
 });

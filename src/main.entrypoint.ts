@@ -923,7 +923,7 @@ function stashDetailComponent(stashId: string) {
 		broadcasts: [] as BroadcastSummary[],
 		broadcastPlugins: [] as BroadcastPluginSummary[],
 		actionPending: null as string | null,
-		newBroadcastType: 'filesystem',
+		newBroadcastType: 'podcast',
 		newBroadcastMediaKind: 'audio',
 		newBroadcastName: '',
 		newBroadcastSettings: {} as Record<string, string>,

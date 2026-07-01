@@ -338,40 +338,12 @@ test('broadcast nfo builder escapes unsafe xml characters', function (): void {
         ->and($xml)->toContain('&quot;');
 });
 
-test('jellyfin and plex broadcast types are registered distinctly from filesystem_series', function (): void {
+test('jellyfin and plex broadcast types are registered distinctly', function (): void {
     $registry = $this->container->get(\App\Broadcasts\BroadcastPluginRegistry::class);
 
-    $filesystem = $registry->findByKey('filesystem');
     $jellyfin = $registry->findByKey('jellyfin');
     $plex = $registry->findByKey('plex');
 
-    expect($filesystem)->not->toBeNull()
-        ->and($jellyfin)->not->toBeNull()
+    expect($jellyfin)->not->toBeNull()
         ->and($plex)->not->toBeNull();
-});
-
-test('filesystem_series rebuild remains green after media server types added', function (): void {
-    [$headers, $stashId, $mediaItemId, $broadcastId] = $this->bootstrapFakeDownloadBroadcast('filesystem-regression');
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'item.download',
-        'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
-    ], headers: $headers);
-    $this->processAllJobs();
-
-    $rebuild = $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => $broadcastId],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $command = $this->http->get('/api/v1/commands/' . $rebuild->body['command_id'], headers: $headers);
-    expect($command->body['command']['state'])->toBe('completed')
-        ->and($command->body['command']['result']['plan']['sidecar_count'])->toBe(0);
-
-    $items = $this->http->get('/api/v1/broadcasts/' . $broadcastId . '/items', headers: $headers);
-    $publishedPath = $items->body['items'][0]['published_path'];
-    expect($publishedPath)->toMatch('/\d{3} - /')
-        ->and(is_file($publishedPath))->toBeTrue()
-        ->and($command->body['command']['result']['plan']['sidecar_count'])->toBe(0);
 });

@@ -1217,7 +1217,7 @@ components:
     AssetRole: { type: string, enum: [vault_original, source_thumbnail, subtitle, transcript, podcast_audio, episode_artwork, feed_artwork, feed_xml, nfo, hardlink, remuxed_video, metadata_json, source_json] }
     AssetKind: { type: string, enum: [video, audio, image, subtitle, metadata, link, feed, other] }
     AssetState: { type: string, enum: [pending, processing, ready, stale, missing, failed] }
-    BroadcastType: { type: string, enum: [filesystem, jellyfin, plex, podcast] }
+    BroadcastType: { type: string, enum: [jellyfin, plex, podcast] }
     PodcastMediaKind: { type: string, enum: [audio, video], description: "Preferred episode enclosure media for a `podcast` broadcast (settings.media_kind); defaults to audio." }
     BroadcastState: { type: string, enum: [pending, processing, ready, stale, failed, disabled] }
     BroadcastItemState: { type: string, enum: [pending, processing, ready, stale, failed, disabled] }

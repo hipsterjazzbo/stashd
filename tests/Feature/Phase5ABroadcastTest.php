@@ -14,17 +14,17 @@ use App\Vault\AssetRole;
 use App\Vault\MediaItemRecord;
 use Tempest\Http\Status;
 
-test('create filesystem broadcast for stash returns snake_case json', function (): void {
+test('create jellyfin broadcast for stash returns snake_case json', function (): void {
     [$headers, $stashId] = array_slice($this->bootstrapFakeDownloadStash('broadcast-create'), 0, 2);
 
     $response = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'filesystem',
+        'type' => 'jellyfin',
         'name' => 'Demo Series',
         'slug' => 'demo-series',
     ], headers: $headers)->assertStatus(Status::CREATED);
 
     expect($response->body)->toHaveKey('broadcast')
-        ->and($response->body['broadcast']['type'])->toBe('filesystem')
+        ->and($response->body['broadcast']['type'])->toBe('jellyfin')
         ->and($response->body['broadcast']['state'])->toBe('pending')
         ->and($response->body['broadcast']['stash_id'])->toBe($stashId)
         ->and($response->body['broadcast']['last_planned_at'])->toBeNull();

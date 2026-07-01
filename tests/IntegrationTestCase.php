@@ -112,7 +112,7 @@ abstract class IntegrationTestCase extends IntegrationTest
         [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash($channel);
 
         $create = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-            'type' => 'filesystem',
+            'type' => 'jellyfin',
             'name' => 'Broadcast Demo',
             'slug' => $channel . '-broadcast-' . bin2hex(random_bytes(3)),
         ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);

@@ -406,11 +406,11 @@ if [ ! -f "$vault_file" ]; then
     exit 1
 fi
 
-echo "Creating filesystem broadcast and running broadcast.rebuild..."
+echo "Creating jellyfin broadcast and running broadcast.rebuild..."
 broadcast_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/stashes/${stash_id}/broadcasts" \
     -H 'Content-Type: application/json' \
     -H "Authorization: Bearer ${token}" \
-    -d '{"type":"filesystem_series","name":"Smoke Broadcast","slug":"smoke-broadcast"}')"
+    -d '{"type":"jellyfin","name":"Smoke Broadcast","slug":"smoke-broadcast"}')"
 echo "$broadcast_body"
 
 broadcast_id="$(printf '%s' "$broadcast_body" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
@@ -762,4 +762,4 @@ $CONTAINER rm -f "$override_name" >/dev/null 2>&1 || true
 rm -rf "$override_tmp"
 echo "Operator-supplied SIGNING_KEY honored correctly."
 
-echo "docker smoke test passed (boot, health, storage layout, migrations, worker/scheduler, system health, restart persistence, SIGNING_KEY persisted across restart and container recreate, operator-supplied SIGNING_KEY override honored, fake preflight e2e, fake download → vault, filesystem broadcast rebuild + verify, jellyfin_series rebuild + nfo, podcast feed + episode route + Range request + unknown-token 404)"
+echo "docker smoke test passed (boot, health, storage layout, migrations, worker/scheduler, system health, restart persistence, SIGNING_KEY persisted across restart and container recreate, operator-supplied SIGNING_KEY override honored, fake preflight e2e, fake download → vault, jellyfin broadcast rebuild + verify, jellyfin_series rebuild + nfo, podcast feed + episode route + Range request + unknown-token 404)"

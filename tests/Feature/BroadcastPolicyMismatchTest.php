@@ -64,7 +64,7 @@ test('creating a podcast configured for audio on an audio-only stash has no mism
     expect($response->body['policy_mismatch'])->toBeNull();
 });
 
-test('creating a filesystem series on an audio-only stash has no mismatch', function (): void {
+test('creating a jellyfin series on an audio-only stash has no mismatch', function (): void {
     $headers = $this->authHeaders();
 
     $stash = $this->http->post('/api/v1/stashes', [
@@ -73,7 +73,7 @@ test('creating a filesystem series on an audio-only stash has no mismatch', func
     ], headers: $headers)->assertStatus(Status::CREATED);
 
     $response = $this->http->post('/api/v1/stashes/' . $stash->body['stash']['id'] . '/broadcasts', [
-        'type' => 'filesystem',
+        'type' => 'jellyfin',
         'name' => 'My Series',
     ], headers: $headers);
 
