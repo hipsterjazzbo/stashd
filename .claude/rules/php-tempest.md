@@ -4,6 +4,7 @@ paths:
   - "tests/**/*.php"
   - "composer.json"
   - "pint.json"
+  - "phpstan.neon"
 ---
 
 # PHP / Tempest rules
@@ -30,6 +31,7 @@ Prefer:
 
 ```bash
 composer lint
+composer test:static
 composer test:unit -- --filter RelevantTest
 composer test:feature -- --filter RelevantTest
 ```

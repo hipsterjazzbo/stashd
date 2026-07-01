@@ -25,7 +25,8 @@
   ],
   "require-dev": {
     "pestphp/pest": "^4.0",
-    "laravel/pint": "^1.29"
+    "laravel/pint": "^1.29",
+    "phpstan/phpstan": "^2.2"
   },
   "autoload": {
     "psr-4": {
@@ -54,7 +55,8 @@
     "test:docker-smoke": "tests/docker/smoke.sh",
     "test:docker-smoke:no-build": "STASHD_SMOKE_SKIP_BUILD=1 tests/docker/smoke.sh",
     "lint": "vendor/bin/pint --test",
-    "format": "vendor/bin/pint"
+    "format": "vendor/bin/pint",
+    "test:static": "vendor/bin/phpstan analyse --memory-limit=1G"
   },
   "minimum-stability": "dev",
   "prefer-stable": true,

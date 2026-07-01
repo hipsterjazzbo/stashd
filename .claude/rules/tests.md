@@ -4,6 +4,8 @@ paths:
   - "phpunit.xml"
   - "composer.json"
   - "app/**/*.php"
+  - "phpstan.neon"
+  - "phpstan-baseline.neon"
 ---
 
 # Testing rules
@@ -14,12 +16,18 @@ Use focused checks during implementation and broader checks before completion wh
 
 ```bash
 composer lint
+composer test:static
 composer test:unit
 composer test:feature
 composer test
 composer test:docker-smoke:no-build
 composer test:docker-smoke
 ```
+
+`test:static` runs PHPStan at `level: max` against `app/`. New code must pass
+clean — do not add entries to `phpstan-baseline.neon` for anything you write;
+regenerate the baseline only to absorb pre-existing debt you're not touching,
+never to silence a finding in your own diff.
 
 ## Test style
 
