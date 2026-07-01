@@ -43,7 +43,6 @@ final readonly class BroadcastTriggerResult
 final readonly class BroadcastTriggerService
 {
     public function __construct(
-        private BroadcastRepository $broadcasts,
         private BroadcastTriggerRepository $triggers,
         private BroadcastTriggerRunRepository $triggerRuns,
         private MediaServerConnectionRepository $connections,
@@ -86,11 +85,8 @@ final readonly class BroadcastTriggerService
         );
     }
 
-    public function execute(PrefixedUlid $broadcastId, string $reason = 'manual'): BroadcastTriggerResult
+    public function execute(BroadcastRecord $broadcast, string $reason = 'manual'): BroadcastTriggerResult
     {
-        $broadcast = $this->broadcasts->find($broadcastId)
-            ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
-
         $trigger = $this->ensureScanTrigger($broadcast);
 
         if ($trigger === null || ! $trigger->enabled) {

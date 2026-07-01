@@ -52,9 +52,9 @@ final class StashItemRepository
             ?? throw new InvalidArgumentException('Failed to persist stash item record.');
     }
 
-    public function find(string $id): ?StashItemRecord
+    public function find(string|\Stringable $id): ?StashItemRecord
     {
-        return StashItemRecord::findById(new PrimaryKey($id));
+        return StashItemRecord::findById(new PrimaryKey((string) $id));
     }
 
     public function findByStashAndMediaItem(string|\Stringable $stashId, string|\Stringable $mediaItemId): ?StashItemRecord
@@ -65,19 +65,19 @@ final class StashItemRepository
     }
 
     /** @return list<StashItemRecord> */
-    public function listForStash(string $stashId): array
+    public function listForStash(string|\Stringable $stashId): array
     {
         return StashItemRecord::select()
-            ->where('stashId = ?', $stashId)
+            ->where('stashId = ?', (string) $stashId)
             ->orderBy('position', Direction::ASC)
             ->all();
     }
 
     /** @return list<StashItemRecord> */
-    public function listForMediaItem(string $mediaItemId): array
+    public function listForMediaItem(string|\Stringable $mediaItemId): array
     {
         return StashItemRecord::select()
-            ->where('mediaItemId = ?', $mediaItemId)
+            ->where('mediaItemId = ?', (string) $mediaItemId)
             ->all();
     }
 
@@ -85,7 +85,7 @@ final class StashItemRepository
      * @param list<string> $mediaItemIds
      * @return list<StashItemRecord>
      */
-    public function listForMediaItemsExcludingStash(array $mediaItemIds, string $excludingStashId): array
+    public function listForMediaItemsExcludingStash(array $mediaItemIds, string|\Stringable $excludingStashId): array
     {
         if ($mediaItemIds === []) {
             return [];
@@ -93,7 +93,7 @@ final class StashItemRepository
 
         return StashItemRecord::select()
             ->whereIn('mediaItemId', $mediaItemIds)
-            ->where('stashId != ?', $excludingStashId)
+            ->where('stashId != ?', (string) $excludingStashId)
             ->all();
     }
 }

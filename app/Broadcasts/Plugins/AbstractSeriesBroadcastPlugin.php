@@ -12,9 +12,9 @@ use App\Broadcasts\BroadcastItemState;
 use App\Broadcasts\BroadcastNfoBuilder;
 use App\Broadcasts\BroadcastPathBuilder;
 use App\Broadcasts\BroadcastPlan;
-use App\Broadcasts\BroadcastPlugin;
 use App\Broadcasts\BroadcastPlannedFile;
 use App\Broadcasts\BroadcastPlannedSidecar;
+use App\Broadcasts\BroadcastPlugin;
 use App\Broadcasts\BroadcastPruneResult;
 use App\Broadcasts\BroadcastPublishResult;
 use App\Broadcasts\BroadcastSidecarType;
@@ -22,8 +22,6 @@ use App\Broadcasts\BroadcastSidecarWriter;
 use App\Broadcasts\BroadcastVerifyResult;
 use App\Broadcasts\FileKind;
 use App\Broadcasts\HardlinkPublisher;
-use App\Broadcasts\Plugins\SeriesFormatOptions;
-use App\Broadcasts\UiControl;
 use App\System\State\StateTransitionService;
 use App\Vault\AssetKind;
 use App\Vault\AssetRepository;
@@ -446,9 +444,9 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
                 relativePath: $relativePath,
                 sizeBytes: is_int($sizeBytes) ? $sizeBytes : null,
             );
-            $asset->broadcastId = $broadcastId->toString();
-            $asset->broadcastItemId = $broadcastItemId->toString();
-            $asset->derivedFromAssetId = $sourceAssetId->toString();
+            $asset->broadcastId = $broadcastId;
+            $asset->broadcastItemId = $broadcastItemId;
+            $asset->derivedFromAssetId = $sourceAssetId;
             $this->assets->save($asset);
 
             return;
@@ -456,7 +454,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
 
         $existing->path = $path;
         $existing->relativePath = $relativePath;
-        $existing->derivedFromAssetId = $sourceAssetId->toString();
+        $existing->derivedFromAssetId = $sourceAssetId;
         $existing->sizeBytes = is_int($sizeBytes) ? $sizeBytes : $existing->sizeBytes;
         $existing->lastVerifiedAt = DateTime::now(Timezone::UTC);
         $existing->missingAt = null;

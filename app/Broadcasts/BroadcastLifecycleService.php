@@ -6,9 +6,7 @@ namespace App\Broadcasts;
 
 use App\Broadcasts\Podcasts\PodcastTokenRotationResult;
 use App\Broadcasts\Podcasts\PodcastTokenService;
-use App\Broadcasts\Plugins\AbstractSeriesBroadcastPlugin;
-use App\Broadcasts\Plugins\PodcastBroadcastPlugin;
-
+use App\Support\PrefixedUlid;
 use App\System\State\StateTransitionService;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
@@ -50,20 +48,19 @@ final readonly class BroadcastLifecycleService
     ) {
     }
 
-    public function plan(string $broadcastId): BroadcastPlan
+    public function plan(PrefixedUlid $broadcastId): BroadcastPlan
     {
-        $broadcast = $this->broadcasts->find($broadcastId);
-        $plan = $this->planOnly($broadcast);
+        $broadcast = $this->broadcasts->find($broadcastId)
+            ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
 
-        if ($broadcast !== null) {
-            $broadcast->lastPlannedAt = DateTime::now(Timezone::UTC);
-            $this->broadcasts->save($broadcast);
-        }
+        $plan = $this->planOnly($broadcast);
+        $broadcast->lastPlannedAt = DateTime::now(Timezone::UTC);
+        $this->broadcasts->save($broadcast);
 
         return $plan;
     }
 
-    public function rebuild(string $broadcastId): BroadcastLifecycleResult
+    public function rebuild(PrefixedUlid $broadcastId): BroadcastLifecycleResult
     {
         $broadcast = $this->broadcasts->find($broadcastId)
             ?? throw \App\Broadcasts\BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
@@ -98,21 +95,20 @@ final readonly class BroadcastLifecycleService
         );
     }
 
-    public function verify(string $broadcastId): BroadcastVerifyResult
+    public function verify(PrefixedUlid $broadcastId): BroadcastVerifyResult
     {
-        $verify = $this->verifyOnly($broadcastId);
-        $broadcast = $this->broadcasts->find($broadcastId);
+        $broadcast = $this->broadcasts->find($broadcastId)
+            ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
 
-        if ($broadcast !== null) {
-            $broadcast->lastVerifiedAt = DateTime::now(Timezone::UTC);
-            $this->applyVerifyState($broadcast, $verify);
-            $this->broadcasts->save($broadcast);
-        }
+        $verify = $this->verifyOnly($broadcast);
+        $broadcast->lastVerifiedAt = DateTime::now(Timezone::UTC);
+        $this->applyVerifyState($broadcast, $verify);
+        $this->broadcasts->save($broadcast);
 
         return $verify;
     }
 
-    public function prune(string $broadcastId): BroadcastPruneResult
+    public function prune(PrefixedUlid $broadcastId): BroadcastPruneResult
     {
         $broadcast = $this->broadcasts->find($broadcastId)
             ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
@@ -123,7 +119,7 @@ final readonly class BroadcastLifecycleService
         return $plugin->plugin->prune($context);
     }
 
-    public function trigger(string $broadcastId): BroadcastTriggerResult
+    public function trigger(PrefixedUlid $broadcastId): BroadcastTriggerResult
     {
         $broadcast = $this->broadcasts->find($broadcastId)
             ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
@@ -131,7 +127,7 @@ final readonly class BroadcastLifecycleService
         return $this->triggers->execute($broadcast, 'manual');
     }
 
-    public function rotateToken(string $broadcastId): PodcastTokenRotationResult
+    public function rotateToken(PrefixedUlid $broadcastId): PodcastTokenRotationResult
     {
         $broadcast = $this->broadcasts->find($broadcastId)
             ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
@@ -163,11 +159,8 @@ final readonly class BroadcastLifecycleService
         return $plugin->plugin->publish($context, $plan);
     }
 
-    private function verifyOnly(string $broadcastId): BroadcastVerifyResult
+    private function verifyOnly(BroadcastRecord $broadcast): BroadcastVerifyResult
     {
-        $broadcast = $this->broadcasts->find($broadcastId)
-            ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
-
         $context = $this->contextFactory->build($broadcast);
         $plugin = $this->resolvePlugin($context->broadcast->type);
 

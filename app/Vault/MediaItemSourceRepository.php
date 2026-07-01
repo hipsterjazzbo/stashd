@@ -56,10 +56,10 @@ final class MediaItemSourceRepository
             ->first();
     }
 
-    public function deleteForStashInput(PrefixedUlid $stashInputId): void
+    public function deleteForStashInput(string|\Stringable $stashInputId): void
     {
         $sources = MediaItemSourceRecord::select()
-            ->where('stashInputId = ?', $stashInputId->toString())
+            ->where('stashInputId = ?', (string) $stashInputId)
             ->all();
 
         foreach ($sources as $source) {

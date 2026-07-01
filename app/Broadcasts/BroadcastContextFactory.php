@@ -7,7 +7,7 @@ namespace App\Broadcasts;
 use App\Stashes\StashItemRepository;
 use App\Stashes\StashItemState;
 use App\Stashes\StashRepository;
-
+use App\Support\PrefixedUlid;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;

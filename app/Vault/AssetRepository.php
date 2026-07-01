@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Vault;
 
-use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
 use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
@@ -22,7 +21,7 @@ final class AssetRepository
     }
 
     public function create(
-        PrefixedUlid $mediaItemId,
+        string|\Stringable $mediaItemId,
         AssetRole $role,
         AssetKind $kind,
         AssetState $state = AssetState::Pending,
@@ -39,7 +38,7 @@ final class AssetRepository
             role: $role,
             kind: $kind,
             state: $state,
-            mediaItemId: $mediaItemId->toString(),
+            mediaItemId: (string) $mediaItemId,
             path: $path,
             relativePath: $relativePath,
             mimeType: $mimeType,
@@ -59,9 +58,9 @@ final class AssetRepository
             ?? throw new InvalidArgumentException('Failed to persist asset record.');
     }
 
-    public function find(PrefixedUlid $id): ?AssetRecord
+    public function find(string|\Stringable $id): ?AssetRecord
     {
-        return AssetRecord::findById(new PrimaryKey($id->toString()));
+        return AssetRecord::findById(new PrimaryKey((string) $id));
     }
 
     public function save(AssetRecord $record): AssetRecord
@@ -72,18 +71,18 @@ final class AssetRepository
         return $record;
     }
 
-    public function findByMediaItemAndRole(PrefixedUlid $mediaItemId, AssetRole $role): ?AssetRecord
+    public function findByMediaItemAndRole(string|\Stringable $mediaItemId, AssetRole $role): ?AssetRecord
     {
         return AssetRecord::select()
-            ->where('mediaItemId = ? AND role = ?', $mediaItemId->toString(), $role)
+            ->where('mediaItemId = ? AND role = ?', (string) $mediaItemId, $role)
             ->first();
     }
 
     /** @return list<AssetRecord> */
-    public function listForMediaItem(PrefixedUlid $mediaItemId): array
+    public function listForMediaItem(string|\Stringable $mediaItemId): array
     {
         return AssetRecord::select()
-            ->where('mediaItemId = ?', $mediaItemId->toString())
+            ->where('mediaItemId = ?', (string) $mediaItemId)
             ->all();
     }
 
