@@ -8,7 +8,6 @@ use App\Broadcasts\BroadcastItemRecord;
 use App\Broadcasts\BroadcastItemRepository;
 use App\Broadcasts\BroadcastRecord;
 use App\Broadcasts\BroadcastRepository;
-use App\Broadcasts\BroadcastType;
 use App\Support\PrefixedUlid;
 use App\System\Secret\SecretRecord;
 use App\System\Secret\SecretRepository;
@@ -153,7 +152,7 @@ final readonly class PodcastTokenService
         $this->secrets->put($key, SecretType::BroadcastToken, $token, [
             'scope' => 'podcast_feed',
             'broadcast_id' => (string) $broadcast->id,
-            'broadcast_type' => $broadcast->type->value,
+            'broadcast_type' => $broadcast->type,
         ]);
 
         $secret = $this->requireSecretByKey($key);

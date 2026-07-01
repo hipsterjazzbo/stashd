@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Broadcasts\Formats;
+namespace App\Broadcasts\Plugins;
 
 /** Per-type filesystem layout and sidecar policy. */
 final readonly class SeriesFormatOptions

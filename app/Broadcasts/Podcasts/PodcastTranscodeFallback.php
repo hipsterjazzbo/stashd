@@ -14,10 +14,7 @@ use App\Vault\AssetState;
 
 /**
  * Decides whether a missing podcast episode asset can be generated instead of
- * just failing. Named generically (not `...Audio...`) because the call site
- * in {@see PodcastBroadcastFormat} treats both media kinds uniformly — this
- * is the single place that knows which kinds currently have a working
- * transcode pathway.
+ * just failing. Single place that knows which kinds have a working transcode pathway.
  */
 final readonly class PodcastTranscodeFallback
 {

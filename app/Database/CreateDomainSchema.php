@@ -10,7 +10,6 @@ use App\Broadcasts\BroadcastState;
 use App\Broadcasts\BroadcastTriggerRunState;
 use App\Broadcasts\BroadcastTriggerState;
 use App\Broadcasts\BroadcastTriggerType;
-use App\Broadcasts\BroadcastType;
 use App\MediaServers\MediaServerConnectionState;
 use App\MediaServers\MediaServerType;
 use App\Providers\ProviderAccountState;

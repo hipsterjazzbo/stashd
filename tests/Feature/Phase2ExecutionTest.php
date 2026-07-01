@@ -217,9 +217,8 @@ test('event publisher writes sse notification rows', function (): void {
 
 test('events endpoint requires authentication', function (): void {
     $users = $this->container->get(\App\Auth\UserRepository::class);
-    $users->createOwner(
+    $users->createAdmin(
         email: 'owner@stashd.test',
-        username: 'owner',
         passwordHash: password_hash('secret-password', PASSWORD_DEFAULT),
     );
 
@@ -247,9 +246,8 @@ test('bearer auth does not leak to subsequent unauthenticated requests', functio
 test('api token uses stashd_pat prefix and supports lookup and revoke', function (): void {
     $users = $this->container->get(\App\Auth\UserRepository::class);
     $auth = $this->container->get(AuthService::class);
-    $user = $users->createOwner(
+    $user = $users->createAdmin(
         email: 'owner@stashd.test',
-        username: 'owner',
         passwordHash: password_hash('secret-password', PASSWORD_DEFAULT),
     );
 

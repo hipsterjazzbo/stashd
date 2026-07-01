@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Broadcasts\BroadcastItemRecord;
-use App\Broadcasts\BroadcastType;
-use App\Broadcasts\BroadcastTypeRegistry;
-use App\Broadcasts\Podcasts\PodcastBroadcastFormat;
+use App\Broadcasts\BroadcastPluginRegistry;
+use App\Broadcasts\Plugins\PodcastBroadcastPlugin;
 use App\Config\StashdConfig;
 use App\Stashes\StashItemRecord;
 use App\Stashes\StashItemState;

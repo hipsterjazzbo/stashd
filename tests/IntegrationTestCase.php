@@ -17,14 +17,13 @@ abstract class IntegrationTestCase extends IntegrationTest
         $users = $this->container->get(\App\Auth\UserRepository::class);
 
         if ($auth->isSetupRequired()) {
-            $user = $users->createOwner(
+            $user = $users->createAdmin(
                 email: 'owner@stashd.test',
-                username: 'owner',
                 passwordHash: password_hash('secret-password', PASSWORD_DEFAULT),
             );
         } else {
             $user = $users->findByEmail('owner@stashd.test')
-                ?? throw new \RuntimeException('Expected owner user for auth headers.');
+                ?? throw new \RuntimeException('Expected admin user for auth headers.');
         }
 
         $token = $auth->createApiToken($user, 'test');
@@ -113,7 +112,7 @@ abstract class IntegrationTestCase extends IntegrationTest
         [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash($channel);
 
         $create = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-            'type' => 'filesystem_series',
+            'type' => 'filesystem',
             'name' => 'Broadcast Demo',
             'slug' => $channel . '-broadcast-' . bin2hex(random_bytes(3)),
         ], headers: $headers)->assertStatus(\Tempest\Http\Status::CREATED);
@@ -140,7 +139,7 @@ abstract class IntegrationTestCase extends IntegrationTest
         $connectionId = $server->body['media_server']['id'];
 
         $create = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-            'type' => 'jellyfin_series',
+            'type' => 'jellyfin',
             'name' => 'Jellyfin Demo Series',
             'slug' => $channel . '-jellyfin-' . bin2hex(random_bytes(3)),
             'settings' => [

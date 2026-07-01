@@ -8,7 +8,6 @@ use App\Broadcasts\BroadcastLifecycleService;
 use App\Broadcasts\BroadcastNfoBuilder;
 use App\Broadcasts\BroadcastTriggerRecord;
 use App\Broadcasts\BroadcastTriggerRunRecord;
-use App\Broadcasts\BroadcastType;
 use App\Broadcasts\MediaServerScanTriggerSettings;
 use App\MediaServers\MediaServerConnectionRecord;
 use App\MediaServers\MediaServerLibrarySelection;
@@ -63,7 +62,7 @@ test('plex_series broadcast rebuild publishes hardlinks and nfo sidecars', funct
     ], headers: $headers)->assertStatus(Status::CREATED);
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'plex_series',
+        'type' => 'plex',
         'name' => 'Plex Demo',
         'slug' => 'plex-demo-' . bin2hex(random_bytes(3)),
         'settings' => ['media_server_connection_id' => $server->body['media_server']['id']],
@@ -290,7 +289,7 @@ test('broadcast trigger scan failure does not mark broadcast failed', function (
     ], headers: $headers)->assertStatus(Status::CREATED);
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'jellyfin_series',
+        'type' => 'jellyfin',
         'name' => 'Trigger Fail Series',
         'slug' => 'trigger-fail-' . bin2hex(random_bytes(3)),
         'settings' => ['media_server_connection_id' => $server->body['media_server']['id']],

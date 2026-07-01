@@ -22,7 +22,7 @@ use App\Broadcasts\BroadcastSidecarWriter;
 use App\Broadcasts\BroadcastVerifyResult;
 use App\Broadcasts\FileKind;
 use App\Broadcasts\HardlinkPublisher;
-use App\Broadcasts\Formats\SeriesFormatOptions;
+use App\Broadcasts\Plugins\SeriesFormatOptions;
 use App\Broadcasts\UiControl;
 use App\System\State\StateTransitionService;
 use App\Vault\AssetKind;

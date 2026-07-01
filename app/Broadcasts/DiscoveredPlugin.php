@@ -13,14 +13,11 @@ namespace App\Broadcasts;
 final readonly class DiscoveredPlugin
 {
     public function __construct(
-        /** The concrete plugin class name. */
         public string $className,
-        /** Plugin name from the #[StashdBroadcast] attribute. */
         public string $name,
-        /** Plugin description from the #[StashdBroadcast] attribute. */
         public string $description,
-        /** Deduplicated broadcast keys from the plugin. */
         public array $broadcastKeys,
+        public BroadcastPlugin $plugin,
     ) {
     }
 }

@@ -6,13 +6,16 @@ namespace App\Broadcasts;
 
 use App\Broadcasts\Api\BroadcastItemResource;
 use App\Broadcasts\Api\BroadcastResource;
+use App\Broadcasts\Podcasts\PodcastEpisodeUrlBuilder;
 use App\Broadcasts\Podcasts\PodcastMediaKind;
+use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
 use App\Stashes\DownloadPolicy;
 use App\Stashes\StashInputRepository;
 use App\Stashes\StashRepository;
+use App\Support\PrefixedUlid;
 use App\System\Storage\PathSanitizer;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
@@ -21,6 +24,7 @@ use Tempest\Router\Get;
 use Tempest\Router\Patch;
 use Tempest\Router\Post;
 use Tempest\Router\WithMiddleware;
+
 use function Tempest\Support\str;
 
 #[AllowApiClients]
@@ -32,6 +36,8 @@ final readonly class BroadcastController
         private StashInputRepository $stashInputs,
         private BroadcastRepository $broadcasts,
         private BroadcastItemRepository $broadcastItems,
+        private PodcastTokenService $podcastTokens,
+        private PodcastEpisodeUrlBuilder $podcastUrls,
     ) {
     }
 
@@ -47,7 +53,7 @@ final readonly class BroadcastController
         return new Json([
             'broadcasts' => array_map(
                 fn ($broadcast): array => $this->mapBroadcast($broadcast),
-                $this->broadcasts->listForStash($stashId),
+                $this->broadcasts->listForStash(PrefixedUlid::parse($stashId)),
             ),
         ]);
     }
@@ -55,7 +61,7 @@ final readonly class BroadcastController
     #[Post('/api/v1/stashes/{stashId}/broadcasts')]
     public function create(string $stashId, Request $request): Json
     {
-        $stash = $this->stashes->find(PrefixedUlid::parse($stashId));
+        $stash = $this->stashes->find($stashId);
 
         if ($stash === null) {
             return $this->notFound('Stash not found.');
@@ -98,7 +104,7 @@ final readonly class BroadcastController
             ], Status::BAD_REQUEST);
         }
 
-        $stashUlid = $stashId;
+        $stashUlid = PrefixedUlid::parse($stashId);
 
         if ($this->broadcasts->findByStashAndSlug($stashUlid, $slug) !== null) {
             return new Json([
@@ -109,7 +115,7 @@ final readonly class BroadcastController
             ], Status::BAD_REQUEST);
         }
 
-        $settings = is_array($body['settings'] ?? null) ? ApiJson::encode($body['settings']) : [];
+        $settings = is_array($body['settings'] ?? null) ? ApiJson::encode($body['settings']) : null;
 
         $broadcast = $this->broadcasts->create(
             stashId: $stashUlid,
@@ -118,11 +124,6 @@ final readonly class BroadcastController
             slug: $slug,
             settings: $settings,
         );
-
-        // Ensure podcast token for podcast broadcasts.
-        if ($typeRaw === 'podcast') {
-            $this->ensurePodcastToken($broadcast);
-        }
 
         return new Json([
             'broadcast' => $this->mapBroadcast($broadcast),
@@ -185,7 +186,7 @@ final readonly class BroadcastController
 
         $validInputIds = array_map(
             static fn ($input): string => (string) $input->id,
-            $this->stashInputs->listForStash(PrefixedUlid::parse($broadcast->stashId)),
+            $this->stashInputs->listForStash($broadcast->stashId),
         );
 
         $mapping = [];
@@ -255,10 +256,10 @@ final readonly class BroadcastController
             'broadcast_type' => $type,
             'message' => "This stash's \"{$policy->value}\" download policy won't produce media for a \"{$type}\" broadcast.",
             'compatible_download_policies' => array_values(array_map(
-                static fn (DownloadPolicy $candidate): string => $candidate->value,
+                fn (DownloadPolicy $candidate): string => $candidate->value,
                 array_filter(
                     DownloadPolicy::cases(),
-                    static fn (DownloadPolicy $candidate): bool => $this->isTypeSatisfiedByPolicy($type, $candidate, $mediaKind),
+                    fn (DownloadPolicy $candidate): bool => $this->isTypeSatisfiedByPolicy($type, $candidate, $mediaKind),
                 ),
             )),
         ];
@@ -297,15 +298,8 @@ final readonly class BroadcastController
             return BroadcastResource::fromRecord($broadcast)->toArray();
         }
 
-        // For podcast broadcasts, we'd need the token service to generate feed URLs.
-        // This is handled by the plugin system at a later stage.
-        return BroadcastResource::fromRecord($broadcast)->toArray();
-    }
+        $token = $this->podcastTokens->ensureBroadcastToken($broadcast);
 
-    /** Ensure a podcast broadcast has a token. */
-    private function ensurePodcastToken(BroadcastRecord $broadcast): void
-    {
-        // Token generation is handled by PodcastTokenService.
-        // This is wired via the plugin system at a later stage.
+        return BroadcastResource::fromRecord($broadcast, $this->podcastUrls->feedUrl($token))->toArray();
     }
 }

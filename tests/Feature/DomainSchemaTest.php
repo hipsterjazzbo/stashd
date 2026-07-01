@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Broadcasts\BroadcastRecord;
-use App\Broadcasts\BroadcastType;
 use App\Stashes\StashInputRecord;
 use App\Stashes\StashItemRecord;
 use App\Stashes\StashRecord;

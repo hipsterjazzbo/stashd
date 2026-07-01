@@ -169,9 +169,8 @@ test('bearer auth takes precedence over session for the same request', function 
     $users = $this->container->get(\App\Auth\UserRepository::class);
     $auth = $this->container->get(AuthService::class);
 
-    $owner = $users->createOwner(
+    $owner = $users->createAdmin(
         email: 'owner@stashd.test',
-        username: 'owner',
         passwordHash: password_hash('secret-password', PASSWORD_DEFAULT),
     );
 
@@ -193,9 +192,8 @@ test('revoked bearer token is rejected even when session cookie would authentica
     $auth = $this->container->get(AuthService::class);
     $users = $this->container->get(\App\Auth\UserRepository::class);
 
-    $owner = $users->createOwner(
+    $owner = $users->createAdmin(
         email: 'owner@stashd.test',
-        username: 'owner',
         passwordHash: password_hash('secret-password', PASSWORD_DEFAULT),
     );
 

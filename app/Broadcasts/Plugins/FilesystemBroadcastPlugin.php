@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Broadcasts\Plugins;
 
-use App\Broadcasts\Formats\SeriesFormatOptions;
+use App\Broadcasts\Plugins\SeriesFormatOptions;
 use App\Broadcasts\StashdBroadcast;
 
 /**

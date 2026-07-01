@@ -73,7 +73,7 @@ test('creating a filesystem series on an audio-only stash has no mismatch', func
     ], headers: $headers)->assertStatus(Status::CREATED);
 
     $response = $this->http->post('/api/v1/stashes/' . $stash->body['stash']['id'] . '/broadcasts', [
-        'type' => 'filesystem_series',
+        'type' => 'filesystem',
         'name' => 'My Series',
     ], headers: $headers);
 
