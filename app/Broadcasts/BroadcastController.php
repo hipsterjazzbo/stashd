@@ -292,7 +292,9 @@ final readonly class BroadcastController
     /** Check if a broadcast type (string key) is a series-type broadcast. */
     private function isSeriesBroadcast(string $type): bool
     {
-        return in_array($type, ['filesystem', 'jellyfin', 'plex'], true);
+        $plugin = BroadcastPluginRegistry::findByKey($type);
+
+        return $plugin !== null && $plugin->plugin->supportedFileKinds() === [FileKind::Video];
     }
 
     private function notFound(string $message): Json
