@@ -4,11 +4,6 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
-use App\Broadcasts\BroadcastPlan;
-use App\Broadcasts\BroadcastPruneResult;
-use App\Broadcasts\BroadcastPublishResult;
-use App\Broadcasts\BroadcastVerifyResult;
-
 /**
  * Interface for broadcast plugins that generate views from stashed media.
  *

@@ -112,7 +112,7 @@ final readonly class StateTransitionService
 
     /**
      * @template TState of object
-     * @template TRecord of object{state: TState, updatedAt: ?DateTime, save(): void}
+     * @template TRecord of object{state: TState, updatedAt?: ?DateTime, save(): void}
      *
      * @param TRecord $record
      * @param TState $current
@@ -131,7 +131,11 @@ final readonly class StateTransitionService
         }
 
         $record->state = $next;
-        $record->updatedAt = DateTime::now(Timezone::UTC);
+
+        if (property_exists($record, 'updatedAt')) {
+            $record->updatedAt = DateTime::now(Timezone::UTC);
+        }
+
         $record->save();
 
         return $record;
