@@ -1,5 +1,12 @@
 {
     "mcpServers": {
+        "github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking": {
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-sequential-thinking"
+            ],
+            "command": "npx"
+        },
         "lerd": {
             "args": [
                 "mcp"
@@ -8,13 +15,6 @@
             "env": {
                 "LERD_SITE_PATH": "/home/hazel/Projects/stashd"
             }
-        },
-        "github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking": {
-            "args": [
-                "-y",
-                "@modelcontextprotocol/server-sequential-thinking"
-            ],
-            "command": "npx"
         }
     }
 }
