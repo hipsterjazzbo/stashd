@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Stashes;
 
-use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
 use App\Vault\MediaItemRepository;
 use App\Vault\MediaItemSourceRepository;

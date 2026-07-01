@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Vault;
 
 use App\Providers\StashdUri;
-use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
 use InvalidArgumentException;
 use Tempest\Database\Direction;
