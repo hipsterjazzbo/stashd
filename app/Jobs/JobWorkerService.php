@@ -6,7 +6,6 @@ namespace App\Jobs;
 
 use App\Commands\CommandRepository;
 use App\Commands\CommandState;
-use App\Support\PrefixedUlid;
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
 use App\System\State\StateTransitionService;
@@ -142,7 +141,7 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
             return;
         }
 
-        $command = $this->commands->find(PrefixedUlid::parse($job->commandId));
+        $command = $this->commands->find($job->commandId);
 
         if ($command === null || $command->state === CommandState::Failed || $command->state === CommandState::Completed) {
             return;

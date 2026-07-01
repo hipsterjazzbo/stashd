@@ -61,9 +61,9 @@ final class StashRepository
             ?? throw new InvalidArgumentException('Failed to persist stash record.');
     }
 
-    public function find(string $id): ?StashRecord
+    public function find(string|\Stringable $id): ?StashRecord
     {
-        return StashRecord::findById(new PrimaryKey($id));
+        return StashRecord::findById(new PrimaryKey((string) $id));
     }
 
     public function findBySlug(string $slug): ?StashRecord

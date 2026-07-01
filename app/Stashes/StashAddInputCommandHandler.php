@@ -36,7 +36,7 @@ final readonly class StashAddInputCommandHandler implements CommandHandler
             throw InvalidCommandPayload::withErrors(['stash_id is required.']);
         }
 
-        if ($this->stashes->find(PrefixedUlid::parse($stashId)) === null) {
+        if ($this->stashes->find($stashId) === null) {
             throw InvalidCommandPayload::withErrors(['Stash not found.']);
         }
 
@@ -46,7 +46,7 @@ final readonly class StashAddInputCommandHandler implements CommandHandler
             throw InvalidCommandPayload::withErrors(['preflight_command_id is required.']);
         }
 
-        $command = $this->commands->find(PrefixedUlid::parse($preflightCommandId));
+        $command = $this->commands->find($preflightCommandId);
 
         if ($command === null || $command->type !== CommandType::StashPreflight) {
             throw InvalidCommandPayload::withErrors(['Preflight command not found.']);

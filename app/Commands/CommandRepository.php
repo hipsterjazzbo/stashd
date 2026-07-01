@@ -49,9 +49,9 @@ final class CommandRepository
             ?? throw new InvalidArgumentException('Failed to persist command record.');
     }
 
-    public function find(string $id): ?CommandRecord
+    public function find(string|\Stringable $id): ?CommandRecord
     {
-        return CommandRecord::findById(new PrimaryKey($id));
+        return CommandRecord::findById(new PrimaryKey((string) $id));
     }
 
     public function save(CommandRecord $record): CommandRecord

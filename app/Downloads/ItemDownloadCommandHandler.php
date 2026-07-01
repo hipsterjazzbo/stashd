@@ -41,15 +41,15 @@ final readonly class ItemDownloadCommandHandler implements CommandHandler
             throw InvalidCommandPayload::withErrors(['media_item_id and stash_id are required.']);
         }
 
-        if ($this->mediaItems->find(PrefixedUlid::parse($mediaItemId)) === null) {
+        if ($this->mediaItems->find($mediaItemId) === null) {
             throw InvalidCommandPayload::withErrors(['Media item not found.']);
         }
 
-        if ($this->stashes->find(PrefixedUlid::parse($stashId)) === null) {
+        if ($this->stashes->find($stashId) === null) {
             throw InvalidCommandPayload::withErrors(['Stash not found.']);
         }
 
-        if ($this->stashItems->findByStashAndMediaItem(PrefixedUlid::parse($stashId), PrefixedUlid::parse($mediaItemId)) === null) {
+        if ($this->stashItems->findByStashAndMediaItem($stashId, $mediaItemId) === null) {
             throw InvalidCommandPayload::withErrors(['Media item is not part of the requested stash.']);
         }
     }

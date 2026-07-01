@@ -38,7 +38,7 @@ final readonly class AssetTranscodePodcastAudioCommandHandler implements Command
             throw InvalidCommandPayload::withErrors(['media_item_id, source_asset_id, and asset_id are required.']);
         }
 
-        if ($this->mediaItems->find(PrefixedUlid::parse($payload['media_item_id'])) === null) {
+        if ($this->mediaItems->find($payload['media_item_id']) === null) {
             throw InvalidCommandPayload::withErrors(['Media item not found.']);
         }
 
