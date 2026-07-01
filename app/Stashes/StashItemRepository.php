@@ -57,10 +57,10 @@ final class StashItemRepository
         return StashItemRecord::findById(new PrimaryKey($id));
     }
 
-    public function findByStashAndMediaItem(string $stashId, string $mediaItemId): ?StashItemRecord
+    public function findByStashAndMediaItem(string|\Stringable $stashId, string|\Stringable $mediaItemId): ?StashItemRecord
     {
         return StashItemRecord::select()
-            ->where('stashId = ? AND mediaItemId = ?', $stashId, $mediaItemId)
+            ->where('stashId = ? AND mediaItemId = ?', (string) $stashId, (string) $mediaItemId)
             ->first();
     }
 
