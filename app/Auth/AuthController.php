@@ -43,6 +43,7 @@ final readonly class AuthController
 
         $body = $request->body;
         $email = trim((string) ($body['email'] ?? ''));
+        $username = trim((string) ($body['username'] ?? ''));
         $password = (string) ($body['password'] ?? '');
 
         if ($email === '' || $password === '') {
@@ -55,7 +56,7 @@ final readonly class AuthController
         }
 
         try {
-            $user = $this->auth->setupAdmin($email, $password);
+            $user = $this->auth->setupAdmin($email, $password, $username);
         } catch (SetupAlreadyCompleted) {
             return new Json([
                 'error' => [
@@ -204,6 +205,7 @@ final readonly class AuthController
         return [
             'id' => (string) $user->id,
             'email' => $user->email,
+            'username' => $user->username,
             'role' => $user->role->value,
         ];
     }
