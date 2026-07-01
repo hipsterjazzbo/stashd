@@ -14,7 +14,6 @@ use Tempest\Http\Status;
 test('owner setup creates the first user', function (): void {
     $response = $this->http->post('/api/v1/auth/setup', [
         'email' => 'owner@stashd.test',
-        'username' => 'owner',
         'password' => 'secret-password',
     ]);
 
@@ -27,13 +26,11 @@ test('owner setup creates the first user', function (): void {
 test('setup is rejected when owner already exists', function (): void {
     $this->http->post('/api/v1/auth/setup', [
         'email' => 'owner@stashd.test',
-        'username' => 'owner',
         'password' => 'secret-password',
     ])->assertStatus(Status::CREATED);
 
     $response = $this->http->post('/api/v1/auth/setup', [
         'email' => 'other@stashd.test',
-        'username' => 'other',
         'password' => 'other-password',
     ]);
 
@@ -44,7 +41,6 @@ test('setup is rejected when owner already exists', function (): void {
 test('login and session me endpoint work', function (): void {
     $this->http->post('/api/v1/auth/setup', [
         'email' => 'owner@stashd.test',
-        'username' => 'owner',
         'password' => 'secret-password',
     ])->assertStatus(Status::CREATED);
 
@@ -57,13 +53,12 @@ test('login and session me endpoint work', function (): void {
 
     $me = $this->http->get('/api/v1/auth/me');
     $me->assertOk();
-    expect($me->body['user']['username'])->toBe('owner');
+    expect($me->body['user']['email'])->toBe('owner@stashd.test');
 });
 
 test('login sets an httponly session cookie carrying a revocable token', function (): void {
     $this->http->post('/api/v1/auth/setup', [
         'email' => 'owner@stashd.test',
-        'username' => 'owner',
         'password' => 'secret-password',
     ])->assertStatus(Status::CREATED);
 
@@ -80,7 +75,6 @@ test('login sets an httponly session cookie carrying a revocable token', functio
 test('the session cookie issued at login authenticates protected routes', function (): void {
     $this->http->post('/api/v1/auth/setup', [
         'email' => 'owner@stashd.test',
-        'username' => 'owner',
         'password' => 'secret-password',
     ])->assertStatus(Status::CREATED);
 
@@ -101,7 +95,6 @@ test('the session cookie issued at login authenticates protected routes', functi
 test('logout revokes the session token and clears the cookie', function (): void {
     $this->http->post('/api/v1/auth/setup', [
         'email' => 'owner@stashd.test',
-        'username' => 'owner',
         'password' => 'secret-password',
     ])->assertStatus(Status::CREATED);
 
@@ -149,7 +142,6 @@ test('protected routes require setup before owner exists', function (): void {
 test('protected routes require authentication after setup', function (): void {
     $setup = $this->http->post('/api/v1/auth/setup', [
         'email' => 'owner@stashd.test',
-        'username' => 'owner',
         'password' => 'secret-password',
     ])->assertStatus(Status::CREATED);
 
@@ -178,7 +170,6 @@ test('login fails before setup with setup_required', function (): void {
 test('invalid login credentials are rejected', function (): void {
     $this->http->post('/api/v1/auth/setup', [
         'email' => 'owner@stashd.test',
-        'username' => 'owner',
         'password' => 'secret-password',
     ])->assertStatus(Status::CREATED);
 
@@ -194,7 +185,6 @@ test('invalid login credentials are rejected', function (): void {
 test('api tokens can be revoked', function (): void {
     $setup = $this->http->post('/api/v1/auth/setup', [
         'email' => 'owner@stashd.test',
-        'username' => 'owner',
         'password' => 'secret-password',
     ])->assertStatus(Status::CREATED);
 

@@ -21,7 +21,6 @@ final class UserRecord implements Authenticatable
         public string $email,
         public string $passwordHash,
         public UserRole $role,
-        public string $username = '',
         public ?DateTime $createdAt = null,
         public ?DateTime $updatedAt = null,
     ) {

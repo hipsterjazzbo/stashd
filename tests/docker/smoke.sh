@@ -165,7 +165,7 @@ setup_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/auth/setup" \
     -H 'Content-Type: application/json' \
     -c /tmp/stashd-smoke-cookies-$$ \
     -b /tmp/stashd-smoke-cookies-$$ \
-    -d '{"email":"smoke@stashd.test","username":"smoke","password":"smoke-password"}')"
+    -d '{"email":"smoke@stashd.test","password":"smoke-password"}')"
 echo "$setup_body"
 
 echo "Logging in to establish session (setup cookie alone is not persisted across RR requests)..."

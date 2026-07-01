@@ -35,7 +35,7 @@ final class UserRepository
         return UserRecord::findById(new PrimaryKey($id));
     }
 
-    public function createAdmin(string $email, string $passwordHash, string $username = ''): UserRecord
+    public function createAdmin(string $email, string $passwordHash): UserRecord
     {
         if ($this->count() > 0) {
             throw new InvalidArgumentException('Admin account already exists.');
@@ -44,7 +44,6 @@ final class UserRepository
         $id = $this->ids->generate('user')->toString();
         $record = new UserRecord(
             email: $email,
-            username: $username,
             passwordHash: $passwordHash,
             role: UserRole::Admin,
         );

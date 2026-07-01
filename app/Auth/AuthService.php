@@ -36,7 +36,7 @@ final readonly class AuthService
         return $this->users->count() === 0;
     }
 
-    public function setupAdmin(string $email, #[SensitiveParameter] string $password, string $username = ''): UserRecord
+    public function setupAdmin(string $email, #[SensitiveParameter] string $password): UserRecord
     {
         if (! $this->isSetupRequired()) {
             throw new SetupAlreadyCompleted('Admin account already exists.');
@@ -45,7 +45,6 @@ final readonly class AuthService
         $user = $this->users->createAdmin(
             email: $email,
             passwordHash: $this->hashPassword($password),
-            username: $username,
         );
 
         $this->context->set($user);

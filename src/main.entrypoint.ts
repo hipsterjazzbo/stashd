@@ -1488,7 +1488,7 @@ function settingsComponent() {
 	return {
 		loading: true,
 		error: null as string | null,
-		me: null as { id: string; email: string; username: string; role: string } | null,
+		me: null as { id: string; email: string; role: string } | null,
 		health: null as HealthReport | null,
 		tokens: [] as ApiTokenSummary[],
 		mediaServers: [] as MediaServerSummary[],
