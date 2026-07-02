@@ -20,3 +20,24 @@ test('hardlink failure returns actionable error code', function (): void {
         ->and($result->errorCode)->toBe('storage_root_missing')
         ->and($result->message)->toContain('Vault is not writable');
 });
+
+test('an unwritable directory reports storage_root_unwritable', function (): void {
+    $probe = new FilesystemProbe();
+    $tmp = sys_get_temp_dir() . '/stashd-probe-unwritable-' . bin2hex(random_bytes(4));
+    mkdir($tmp);
+    chmod($tmp, 0o555);
+
+    if (is_writable($tmp)) {
+        chmod($tmp, 0o775);
+        rmdir($tmp);
+        $this->markTestSkipped('Running as a user that bypasses directory permission bits (likely root); cannot force an unwritable directory.');
+    }
+
+    $result = $probe->probeWritable($tmp);
+
+    chmod($tmp, 0o775);
+    rmdir($tmp);
+
+    expect($result->ok)->toBeFalse()
+        ->and($result->errorCode)->toBe('storage_root_unwritable');
+});

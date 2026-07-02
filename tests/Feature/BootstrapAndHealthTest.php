@@ -13,6 +13,7 @@ use App\System\Storage\StorageCapabilityChecker;
 use App\System\Storage\StorageCheckRecord;
 use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRecord;
+use App\System\Storage\StorageLocationState;
 use App\System\Storage\StorageRootService;
 use Tempest\Database\PrimaryKey;
 
@@ -153,6 +154,27 @@ test('vault to broadcasts hardlink probe succeeds on a shared filesystem', funct
 
     expect($vault?->supportsHardlinks)->toBeTrue()
         ->and($broadcasts?->supportsHardlinks)->toBeTrue();
+});
+
+test('an unwritable storage root is recorded as unwritable, not silently ready', function (): void {
+    $checker = $this->container->get(StorageCapabilityChecker::class);
+    $tmp = sys_get_temp_dir() . '/stashd-storage-unwritable-' . bin2hex(random_bytes(4));
+    mkdir($tmp);
+    chmod($tmp, 0o555);
+
+    if (is_writable($tmp)) {
+        chmod($tmp, 0o775);
+        rmdir($tmp);
+        $this->markTestSkipped('Running as a user that bypasses directory permission bits (likely root); cannot force an unwritable directory.');
+    }
+
+    $record = $checker->checkRoot(StorageLocationKey::Vault, $tmp);
+
+    chmod($tmp, 0o775);
+    rmdir($tmp);
+
+    expect($record->state)->toBe(StorageLocationState::Unwritable)
+        ->and($record->writable)->toBeFalse();
 });
 
 test('detailed health reports vault broadcast hardlink status', function (): void {
