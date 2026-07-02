@@ -21,7 +21,6 @@ test('domain schema migration creates all v1 tables on a fresh database', functi
         'stash_items',
         'media_items',
         'media_item_sources',
-        'raw_metadata_snapshots',
         'assets',
         'broadcasts',
         'broadcast_items',
@@ -37,6 +36,8 @@ test('domain schema migration creates all v1 tables on a fresh database', functi
     foreach ($tables as $table) {
         expect(schemaTableExists($database, $table))->toBeTrue("Expected table {$table} to exist.");
     }
+
+    expect(schemaTableExists($database, 'raw_metadata_snapshots'))->toBeFalse();
 
     $jobsInfo = $database->fetch(new Query('PRAGMA table_info(jobs)'));
     $jobColumns = array_column($jobsInfo ?? [], 'name');
