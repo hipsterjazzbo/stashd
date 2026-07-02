@@ -8,6 +8,7 @@ use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
 use Tempest\DateTime\DateTime;
+use Tempest\Mapper\Hidden;
 
 #[Table(name: 'media_server_connections')]
 final class MediaServerConnectionRecord
@@ -21,6 +22,7 @@ final class MediaServerConnectionRecord
         public string $name,
         public string $baseUri,
         public MediaServerConnectionState $state,
+        #[Hidden]
         public ?string $tokenSecretId = null,
         public ?MediaServerLibrarySelection $settingsJson = null,
         public ?DateTime $lastCheckedAt = null,

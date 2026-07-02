@@ -8,6 +8,7 @@ use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
 use Tempest\DateTime\DateTime;
+use Tempest\Mapper\Hidden;
 
 #[Table(name: 'provider_accounts')]
 final class ProviderAccountRecord
@@ -21,6 +22,7 @@ final class ProviderAccountRecord
         public string $name,
         public ProviderAuthType $authType,
         public ProviderAccountState $state,
+        #[Hidden]
         public ?string $secretId = null,
         public ?DateTime $lastCheckedAt = null,
         public ?string $lastError = null,

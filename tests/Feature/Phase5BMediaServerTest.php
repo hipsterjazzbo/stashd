@@ -102,14 +102,16 @@ test('media server connection stores token through secrets service', function ()
         'token' => 'super-secret-jellyfin-token-value',
     ], headers: $headers)->assertStatus(Status::CREATED);
 
-    $connection = \App\MediaServers\MediaServerConnectionRecord::findById(
-        new \Tempest\Database\PrimaryKey($response->body['media_server']['id']),
-    );
+    $connection = \App\MediaServers\MediaServerConnectionRecord::select()
+        ->include('tokenSecretId')
+        ->get(new \Tempest\Database\PrimaryKey($response->body['media_server']['id']));
 
     expect($connection?->tokenSecretId)->not->toBeNull()
         ->and($connection?->tokenSecretId)->toStartWith('secret_');
 
-    $secret = SecretRecord::findById(new \Tempest\Database\PrimaryKey($connection->tokenSecretId));
+    $secret = SecretRecord::select()
+        ->include('encryptedValue')
+        ->get(new \Tempest\Database\PrimaryKey($connection->tokenSecretId));
     expect($secret)->not->toBeNull()
         ->and($secret->key)->toStartWith('media_server:')
         ->and($secret->encryptedValue)->not->toContain('super-secret-jellyfin-token-value');

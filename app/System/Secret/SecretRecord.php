@@ -8,6 +8,7 @@ use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
 use Tempest\DateTime\DateTime;
+use Tempest\Mapper\Hidden;
 
 #[Table(name: 'secrets')]
 final class SecretRecord
@@ -19,8 +20,11 @@ final class SecretRecord
     public function __construct(
         public string $key,
         public SecretType $type,
+        #[Hidden]
         public string $encryptedValue,
+        #[Hidden]
         public string $nonce,
+        #[Hidden]
         public ?string $metadataJson = null,
         public ?DateTime $lastUsedAt = null,
         public ?DateTime $revokedAt = null,

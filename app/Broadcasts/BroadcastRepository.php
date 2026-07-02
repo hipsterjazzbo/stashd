@@ -45,13 +45,17 @@ final class BroadcastRepository
 
         query(BroadcastRecord::class)->insert($record)->execute();
 
-        return BroadcastRecord::findById(new PrimaryKey($id))
+        return BroadcastRecord::select()
+            ->include('tokenSecretId')
+            ->get(new PrimaryKey($id))
             ?? throw new InvalidArgumentException('Failed to persist broadcast record.');
     }
 
     public function find(PrefixedUlid $id): ?BroadcastRecord
     {
-        return BroadcastRecord::findById(new PrimaryKey($id->toString()));
+        return BroadcastRecord::select()
+            ->include('tokenSecretId')
+            ->get(new PrimaryKey($id->toString()));
     }
 
     public function save(BroadcastRecord $record): BroadcastRecord
@@ -66,6 +70,7 @@ final class BroadcastRepository
     public function listForStash(PrefixedUlid $stashId): array
     {
         return BroadcastRecord::select()
+            ->include('tokenSecretId')
             ->where('stashId = ?', $stashId->toString())
             ->orderBy('createdAt', \Tempest\Database\Direction::ASC)
             ->all();
@@ -87,6 +92,7 @@ final class BroadcastRepository
     public function listPodcastBroadcastsWithFeedToken(): array
     {
         return BroadcastRecord::select()
+            ->include('tokenSecretId')
             ->where('tokenSecretId IS NOT NULL AND type = ?', 'podcast')
             ->orderBy('createdAt', \Tempest\Database\Direction::ASC)
             ->all();

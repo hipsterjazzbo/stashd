@@ -8,6 +8,7 @@ use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
 use Tempest\DateTime\DateTime;
+use Tempest\Mapper\Hidden;
 
 #[Table(name: 'api_tokens')]
 final class ApiTokenRecord
@@ -19,6 +20,7 @@ final class ApiTokenRecord
     public function __construct(
         public string $userId,
         public string $name,
+        #[Hidden]
         public string $tokenHash,
         public ?string $tokenPreview = null,
         public ?ApiTokenScopes $scopesJson = null,

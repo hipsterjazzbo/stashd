@@ -53,7 +53,9 @@ test('broadcast item record maps podcast token columns', function (): void {
     $item->tokenPreview = 'abcd...uvwxyz';
     $this->container->get(BroadcastItemRepository::class)->save($item);
 
-    $reloaded = BroadcastItemRecord::findById(new PrimaryKey((string) $item->id));
+    $reloaded = BroadcastItemRecord::select()
+        ->include('tokenSecretId')
+        ->get(new PrimaryKey((string) $item->id));
 
     expect($reloaded?->tokenSecretId)->toBe((string) $secret->id)
         ->and($reloaded?->tokenPreview)->toBe('abcd...uvwxyz');
@@ -93,7 +95,9 @@ test('podcast broadcast token is encrypted and reconstructed after database relo
     $token = podcastTokenFromFeedUrl($feedUrl);
     $broadcast = $this->container->get(BroadcastRepository::class)
         ->find(PrefixedUlid::parse($create->body['broadcast']['id']));
-    $secret = SecretRecord::findById(new PrimaryKey((string) $broadcast->tokenSecretId));
+    $secret = SecretRecord::select()
+        ->include('encryptedValue')
+        ->get(new PrimaryKey((string) $broadcast->tokenSecretId));
 
     expect($broadcast?->tokenPreview)->not->toBe($token)
         ->and($broadcast?->tokenPreview)->not->toContain($token)
@@ -121,8 +125,12 @@ test('podcast item token is generated and stored encrypted', function (): void {
     );
 
     $token = $this->container->get(PodcastTokenService::class)->ensureItemToken($item);
-    $reloaded = BroadcastItemRecord::findById(new PrimaryKey((string) $item->id));
-    $secret = SecretRecord::findById(new PrimaryKey((string) $reloaded->tokenSecretId));
+    $reloaded = BroadcastItemRecord::select()
+        ->include('tokenSecretId')
+        ->get(new PrimaryKey((string) $item->id));
+    $secret = SecretRecord::select()
+        ->include('encryptedValue')
+        ->get(new PrimaryKey((string) $reloaded->tokenSecretId));
 
     expect($reloaded?->tokenPreview)->not->toBe($token)
         ->and($reloaded?->tokenPreview)->not->toContain($token)

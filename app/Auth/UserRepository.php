@@ -27,7 +27,7 @@ final class UserRepository
 
     public function findByEmail(string $email): ?UserRecord
     {
-        return UserRecord::select()->where('email = ?', $email)->first();
+        return UserRecord::select()->where('email = ?', $email)->include('passwordHash')->first();
     }
 
     public function findById(string $id): ?UserRecord

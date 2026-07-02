@@ -25,7 +25,9 @@ test('podcast broadcast resources expose only intended token fields', function (
     $feedToken = apiResourcePodcastTokenFromFeedUrl($create->body['broadcast']['feed_url']);
     $broadcast = $this->container->get(BroadcastRepository::class)
         ->find(PrefixedUlid::parse($create->body['broadcast']['id']));
-    $secret = SecretRecord::findById(new PrimaryKey((string) $broadcast->tokenSecretId));
+    $secret = SecretRecord::select()
+        ->include('encryptedValue')
+        ->get(new PrimaryKey((string) $broadcast->tokenSecretId));
     $json = json_encode($create->body, JSON_THROW_ON_ERROR);
 
     expect($create->body['broadcast'])->toHaveKey('feed_url')
@@ -94,6 +96,28 @@ test('auth user resources do not expose password hashes', function (): void {
     expect($json)->not->toContain('passwordHash')
         ->and($json)->not->toContain('password_hash')
         ->and($json)->not->toContain('$2y$');
+});
+
+test('#[Hidden] guards a record property from generic array mapping', function (): void {
+    $headers = $this->authHeaders();
+    $userId = $this->http->get('/api/v1/auth/me', headers: $headers)->assertStatus(Status::OK)->body['user']['id'];
+
+    $user = \App\Auth\UserRecord::findById(new PrimaryKey($userId));
+
+    expect(\Tempest\Mapper\map($user)->toArray())->not->toHaveKey('passwordHash');
+});
+
+test('#[Hidden] excludes a property from the default record select', function (): void {
+    $headers = $this->authHeaders();
+    $userId = $this->http->get('/api/v1/auth/me', headers: $headers)->body['user']['id'];
+
+    // Loaded via the plain default select (no ->include('passwordHash')) --
+    // this is the guardrail actually doing something, not just the attribute
+    // being present: reading the hidden property must fail because it was
+    // never hydrated by the query.
+    $user = \App\Auth\UserRecord::findById(new PrimaryKey($userId));
+
+    expect(fn () => $user->passwordHash)->toThrow(\Tempest\Database\Exceptions\ValueWasMissing::class);
 });
 
 test('command and job resources do not expose raw podcast tokens', function (): void {

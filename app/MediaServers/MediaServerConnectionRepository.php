@@ -51,7 +51,9 @@ final class MediaServerConnectionRepository
 
     public function find(PrefixedUlid $id): ?MediaServerConnectionRecord
     {
-        return MediaServerConnectionRecord::findById(new PrimaryKey($id->toString()));
+        return MediaServerConnectionRecord::select()
+            ->include('tokenSecretId')
+            ->get(new PrimaryKey($id->toString()));
     }
 
     public function save(MediaServerConnectionRecord $record): MediaServerConnectionRecord

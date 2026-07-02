@@ -24,6 +24,7 @@ final class SecretRepository
     {
         return SecretRecord::select()
             ->where('key = ? AND revokedAt IS NULL', $key)
+            ->include('encryptedValue', 'nonce', 'metadataJson')
             ->first();
     }
 

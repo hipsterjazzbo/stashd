@@ -9,6 +9,7 @@ use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
 use Tempest\DateTime\DateTime;
+use Tempest\Mapper\Hidden;
 
 #[Table(name: 'users')]
 final class UserRecord implements Authenticatable
@@ -19,6 +20,7 @@ final class UserRecord implements Authenticatable
 
     public function __construct(
         public string $email,
+        #[Hidden]
         public string $passwordHash,
         public UserRole $role,
         public ?DateTime $createdAt = null,
