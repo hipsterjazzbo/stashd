@@ -512,7 +512,7 @@ echo "Creating jellyfin_series broadcast and running broadcast.rebuild..."
 jellyfin_broadcast_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/stashes/${stash_id}/broadcasts" \
     -H 'Content-Type: application/json' \
     -H "Authorization: Bearer ${token}" \
-    -d '{"type":"jellyfin_series","name":"Smoke Jellyfin Series","slug":"smoke-jellyfin-series"}')"
+    -d '{"type":"jellyfin","name":"Smoke Jellyfin Series","slug":"smoke-jellyfin-series"}')"
 echo "$jellyfin_broadcast_body"
 
 jellyfin_broadcast_id="$(printf '%s' "$jellyfin_broadcast_body" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"

@@ -18,6 +18,7 @@ FROM php:8.5-cli-bookworm AS base
 
 ARG PUID=1000
 ARG PGID=1000
+ARG TARGETARCH
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -36,7 +37,15 @@ RUN docker-php-ext-install pdo_sqlite sockets intl \
     && php -m | grep -i '^uri$' >/dev/null \
     && php -r 'exit(extension_loaded("uri") ? 0 : 1);'
 
-RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
+# yt-dlp's plain "yt-dlp" release asset is an amd64-only PyInstaller build --
+# arm64 needs the dedicated "yt-dlp_linux_aarch64" asset, or it silently
+# installs a binary that can't execute on that architecture.
+RUN case "${TARGETARCH}" in \
+        amd64) ytdlpAsset="yt-dlp" ;; \
+        arm64) ytdlpAsset="yt-dlp_linux_aarch64" ;; \
+        *) echo "Unsupported architecture for yt-dlp: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && curl -L "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ytdlpAsset}" -o /usr/local/bin/yt-dlp \
     && chmod a+rx /usr/local/bin/yt-dlp
 
 COPY --from=composer /usr/bin/composer /usr/bin/composer

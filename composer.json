@@ -12,15 +12,12 @@
     "spiral/roadrunner-cli": "^2.6",
     "nyholm/psr7": "^1.8",
     "symfony/uid": "^7.3",
-    "hazel/ytdlphp": "*"
+    "hazel/ytdlphp": "^1.0.2"
   },
   "repositories": [
     {
-      "type": "path",
-      "url": "/home/hazel/Projects/ytdlphp",
-      "options": {
-        "symlink": false
-      }
+      "type": "vcs",
+      "url": "https://github.com/hipsterjazzbo/ytdlphp.git"
     }
   ],
   "require-dev": {
