@@ -7,6 +7,7 @@ namespace App\Jobs\Handlers;
 use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandState;
+use App\Config\YtdlpConfig;
 use App\Downloads\DownloadException;
 use App\Downloads\DownloadMediaItem;
 use App\Jobs\JobHandler;
@@ -33,6 +34,7 @@ final readonly class DownloadJobHandler implements JobHandler
         private StateTransitionService $transitions,
         private ActivityEventService $activity,
         private EventPublisher $publisher,
+        private YtdlpConfig $ytdlpConfig,
     ) {
     }
 
@@ -63,6 +65,15 @@ final readonly class DownloadJobHandler implements JobHandler
             // not in parallel -- this only reports progress within whichever
             // download is currently running.
             $context->progress($job, JobProgressUpdate::ofPercent(0.0, 'Downloading via yt-dlp'));
+
+            // Paces consecutive downloads (e.g. a large channel backfill) so
+            // they don't hit YouTube back-to-back -- zero in testing via
+            // YtdlpConfig defaults.
+            $maxDelay = max($this->ytdlpConfig->minDelaySeconds, $this->ytdlpConfig->maxDelaySeconds);
+
+            if ($maxDelay > 0) {
+                sleep(random_int($this->ytdlpConfig->minDelaySeconds, $maxDelay));
+            }
 
             $lastForwardedAt = microtime(true);
             $lastPercent = 0.0;

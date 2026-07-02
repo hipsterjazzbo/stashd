@@ -15,7 +15,13 @@ interface YtdlpGateway
 {
     public function probe(): YtdlpProbeResult;
 
-    public function extractInfo(string $url, string $workingDirectory): VideoInfo;
+    public function extractInfo(string $url, string $workingDirectory, ?Options $options = null): VideoInfo;
+
+    /**
+     * Extracts playlist/channel metadata as a single JSON object (`-J`); the
+     * per-entry list lives in the returned VideoInfo's `raw['entries']`.
+     */
+    public function extractPlaylist(string $url, string $workingDirectory, ?Options $options = null): VideoInfo;
 
     /**
      * @param ?callable(DownloadProgress): void $onProgress

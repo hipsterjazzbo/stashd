@@ -17,7 +17,15 @@ final class StubYtdlpGateway implements YtdlpGateway
 
     public int $extractInfoCalls = 0;
 
+    public int $extractPlaylistCalls = 0;
+
     public bool $failNextDownload = false;
+
+    /** @var list<array<string, mixed>> */
+    public array $flatPlaylistEntries = [
+        ['id' => 'stub-flat-1', 'title' => 'Stub Flat Video 1', 'ie_key' => 'Youtube'],
+        ['id' => 'stub-flat-2', 'title' => 'Stub Flat Video 2', 'ie_key' => 'Youtube'],
+    ];
 
     /** @var list<Options> */
     public array $lastDownloadOptions = [];
@@ -31,7 +39,7 @@ final class StubYtdlpGateway implements YtdlpGateway
         );
     }
 
-    public function extractInfo(string $url, string $workingDirectory): VideoInfo
+    public function extractInfo(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
     {
         $this->extractInfoCalls++;
 
@@ -46,6 +54,22 @@ final class StubYtdlpGateway implements YtdlpGateway
                 'webpage_url' => $url,
                 'duration' => 120,
                 'ext' => 'mp4',
+            ],
+        );
+    }
+
+    public function extractPlaylist(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
+    {
+        $this->extractPlaylistCalls++;
+
+        return new VideoInfo(
+            id: 'stub-playlist-id',
+            title: 'Stub Playlist',
+            raw: [
+                'id' => 'stub-playlist-id',
+                'title' => 'Stub Playlist',
+                'webpage_url' => $url,
+                'entries' => $this->flatPlaylistEntries,
             ],
         );
     }

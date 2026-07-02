@@ -18,10 +18,14 @@ use App\Providers\YouTube\YouTubeProvider;
 use App\Providers\YouTube\YouTubeRssDiscoveryStrategy;
 use App\Providers\YouTube\YouTubeRssParser;
 use App\Providers\YouTube\YouTubeVideoDiscovery;
+use App\Providers\YouTube\YouTubeYtdlpDiscoveryStrategy;
 use App\Providers\YouTube\YouTubeYtdlpDownloadStrategy;
 
-function youtubeProviderWithFixtures(?string $apiKey = null, bool $realDownloads = false): YouTubeProvider
-{
+function youtubeProviderWithFixtures(
+    ?string $apiKey = null,
+    bool $realDownloads = false,
+    ?\App\Downloads\Ytdlp\YtdlpGateway $ytdlpGateway = null,
+): YouTubeProvider {
     $fixturesDirectory = __DIR__ . '/../../../../fixtures/providers/youtube/http';
     $map = json_decode((string) file_get_contents($fixturesDirectory . '/map.json'), true, flags: JSON_THROW_ON_ERROR);
     $http = new FixtureProviderHttpClient($fixturesDirectory, $map);
@@ -34,12 +38,14 @@ function youtubeProviderWithFixtures(?string $apiKey = null, bool $realDownloads
         audioFormat: 'mp3',
         audioQualityKbps: 128,
     );
+    $ytdlpGateway ??= new \App\Downloads\Ytdlp\StubYtdlpGateway();
+    $channelIds = new YouTubeChannelIdResolver($http);
 
     return new YouTubeProvider(
         dataApiKey: $dataApiKey,
         rssDiscovery: new YouTubeRssDiscoveryStrategy(
             http: $http,
-            channelIds: new YouTubeChannelIdResolver($http),
+            channelIds: $channelIds,
             parser: new YouTubeRssParser(),
             videos: new YouTubeVideoDiscovery($http),
         ),
@@ -53,9 +59,15 @@ function youtubeProviderWithFixtures(?string $apiKey = null, bool $realDownloads
         ),
         downloadAdapter: new YouTubeYtdlpDownloadStrategy(
             config: $ytdlpConfig,
-            gateway: new \App\Downloads\Ytdlp\StubYtdlpGateway(),
+            gateway: $ytdlpGateway,
         ),
-        channelIds: new YouTubeChannelIdResolver($http),
+        ytdlpDiscovery: new YouTubeYtdlpDiscoveryStrategy(
+            config: $ytdlpConfig,
+            gateway: $ytdlpGateway,
+            options: new \App\Downloads\Ytdlp\YtdlpOptionsBuilder($ytdlpConfig),
+            channelIds: $channelIds,
+        ),
+        channelIds: $channelIds,
     );
 }
 
@@ -148,6 +160,33 @@ test('youtube strategy selector falls back to rss for a backfill-intent selectio
     );
 
     expect($discovery->key)->toBe('youtube.rss');
+});
+
+test('youtube strategy selector prefers ytdlp discovery over rss for a backfill-intent selection without a key when ytdlp is enabled', function (): void {
+    $provider = youtubeProviderWithFixtures(apiKey: null, realDownloads: true);
+    $selector = new ProviderStrategySelector();
+
+    $discovery = $selector->select(
+        $provider,
+        StrategyPurpose::Discovery,
+        new StrategySelectionOptions(preferHighestCapability: true),
+    );
+
+    expect($discovery->key)->toBe('youtube.ytdlp_discovery')
+        ->and($discovery->cost)->toBe(StrategyCost::Medium);
+});
+
+test('youtube strategy selector prefers data api discovery over ytdlp when both are available', function (): void {
+    $provider = youtubeProviderWithFixtures(apiKey: 'test-api-key', realDownloads: true);
+    $selector = new ProviderStrategySelector();
+
+    $discovery = $selector->select(
+        $provider,
+        StrategyPurpose::Discovery,
+        new StrategySelectionOptions(preferHighestCapability: true),
+    );
+
+    expect($discovery->key)->toBe('youtube.data_api_discovery');
 });
 
 test('youtube strategy selector prefers data api metadata when configured', function (): void {

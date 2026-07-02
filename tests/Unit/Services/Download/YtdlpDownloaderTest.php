@@ -22,7 +22,7 @@ use Ytdlphp\Exception\ProcessFailedException;
 use Ytdlphp\Metadata\VideoInfo;
 use Ytdlphp\Options;
 
-function ytdlpTestConfig(bool $enabled = true): YtdlpConfig
+function ytdlpTestConfig(bool $enabled = true, ?string $cookiesFile = null): YtdlpConfig
 {
     return new YtdlpConfig(
         binary: 'yt-dlp',
@@ -31,6 +31,7 @@ function ytdlpTestConfig(bool $enabled = true): YtdlpConfig
         videoFormatSelector: 'bestvideo[height<=1080]+bestaudio/best',
         audioFormat: 'mp3',
         audioQualityKbps: 128,
+        cookiesFile: $cookiesFile,
     );
 }
 
@@ -140,7 +141,12 @@ test('ytdlp downloader rejects unavailable binary', function (): void {
             return new YtdlpProbeResult(false, 'missing-yt-dlp', message: 'Binary missing.');
         }
 
-        public function extractInfo(string $url, string $workingDirectory): VideoInfo
+        public function extractInfo(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
+        {
+            throw new \RuntimeException('not called');
+        }
+
+        public function extractPlaylist(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
         {
             throw new \RuntimeException('not called');
         }
@@ -169,9 +175,14 @@ test('ytdlp downloader maps timeout failures', function (): void {
             return new YtdlpProbeResult(true, 'yt-dlp', '2026.01.01');
         }
 
-        public function extractInfo(string $url, string $workingDirectory): VideoInfo
+        public function extractInfo(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
         {
             return new VideoInfo(id: 'x', title: 'x');
+        }
+
+        public function extractPlaylist(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
+        {
+            throw new \RuntimeException('not called');
         }
 
         public function download(string $url, string $workingDirectory, Options $options, ?callable $onProgress = null): \Ytdlphp\DownloadResult
@@ -207,9 +218,14 @@ test('ytdlp downloader maps process failures', function (): void {
             return new YtdlpProbeResult(true, 'yt-dlp', '2026.01.01');
         }
 
-        public function extractInfo(string $url, string $workingDirectory): VideoInfo
+        public function extractInfo(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
         {
             return new VideoInfo(id: 'x', title: 'x');
+        }
+
+        public function extractPlaylist(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
+        {
+            throw new \RuntimeException('not called');
         }
 
         public function download(string $url, string $workingDirectory, Options $options, ?callable $onProgress = null): \Ytdlphp\DownloadResult
@@ -224,12 +240,120 @@ test('ytdlp downloader maps process failures', function (): void {
     try {
         ytdlpDownloader($gateway)->download(ytdlpDownloadRequest(DownloadPolicy::Video, sys_get_temp_dir()));
     } catch (DownloadException $exception) {
-        expect($exception->errorCode)->toBe('download_ytdlp_failed');
+        expect($exception->errorCode)->toBe('download_ytdlp_failed')
+            ->and($exception->retryable)->toBeFalse();
 
         return;
     }
 
     throw new \RuntimeException('Expected DownloadException was not thrown.');
+});
+
+test('ytdlp downloader classifies bot-check failures as retryable', function (): void {
+    $gateway = new class () implements YtdlpGateway {
+        public function probe(): YtdlpProbeResult
+        {
+            return new YtdlpProbeResult(true, 'yt-dlp', '2026.01.01');
+        }
+
+        public function extractInfo(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
+        {
+            throw new ProcessFailedException(
+                new ProcessResult(1, '', "ERROR: [youtube] x: Sign in to confirm you're not a bot"),
+                new \Tempest\Process\PendingProcess(['yt-dlp']),
+            );
+        }
+
+        public function extractPlaylist(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
+        {
+            throw new \RuntimeException('not called');
+        }
+
+        public function download(string $url, string $workingDirectory, Options $options, ?callable $onProgress = null): \Ytdlphp\DownloadResult
+        {
+            throw new \RuntimeException('not called');
+        }
+    };
+
+    try {
+        ytdlpDownloader($gateway)->download(ytdlpDownloadRequest(DownloadPolicy::Video, sys_get_temp_dir()));
+    } catch (DownloadException $exception) {
+        expect($exception->errorCode)->toBe('download_ytdlp_bot_check')
+            ->and($exception->retryable)->toBeTrue();
+
+        return;
+    }
+
+    throw new \RuntimeException('Expected DownloadException was not thrown.');
+});
+
+test('ytdlp downloader classifies rate-limit failures as retryable', function (): void {
+    $gateway = new class () implements YtdlpGateway {
+        public function probe(): YtdlpProbeResult
+        {
+            return new YtdlpProbeResult(true, 'yt-dlp', '2026.01.01');
+        }
+
+        public function extractInfo(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
+        {
+            return new VideoInfo(id: 'x', title: 'x');
+        }
+
+        public function extractPlaylist(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
+        {
+            throw new \RuntimeException('not called');
+        }
+
+        public function download(string $url, string $workingDirectory, Options $options, ?callable $onProgress = null): \Ytdlphp\DownloadResult
+        {
+            throw new ProcessFailedException(
+                new ProcessResult(1, '', 'ERROR: HTTP Error 429: Too Many Requests'),
+                new \Tempest\Process\PendingProcess(['yt-dlp']),
+            );
+        }
+    };
+
+    try {
+        ytdlpDownloader($gateway)->download(ytdlpDownloadRequest(DownloadPolicy::Video, sys_get_temp_dir()));
+    } catch (DownloadException $exception) {
+        expect($exception->errorCode)->toBe('download_ytdlp_rate_limited')
+            ->and($exception->retryable)->toBeTrue();
+
+        return;
+    }
+
+    throw new \RuntimeException('Expected DownloadException was not thrown.');
+});
+
+test('ytdlp options builder applies configured cookies file to extraction, video, and audio options', function (): void {
+    $builder = new YtdlpOptionsBuilder(ytdlpTestConfig(cookiesFile: '/secrets/cookies.txt'));
+
+    expect($builder->extractionOptions()->toArray())->toContain('--cookies')->toContain('/secrets/cookies.txt')
+        ->and($builder->forPolicy(DownloadPolicy::Video)->toArray())->toContain('--cookies')
+        ->and($builder->forPolicy(DownloadPolicy::AudioOnly)->toArray())->toContain('--cookies');
+});
+
+test('ytdlp downloader redacts the cookies path from source.json provenance', function (): void {
+    $temp = sys_get_temp_dir() . '/stashd-ytdlp-' . bin2hex(random_bytes(4));
+    mkdir($temp, 0775, true);
+    $gateway = new StubYtdlpGateway();
+    $config = ytdlpTestConfig(cookiesFile: '/secrets/cookies.txt');
+    $downloader = new YtdlpDownloader(
+        config: $config,
+        gateway: $gateway,
+        options: new YtdlpOptionsBuilder($config),
+        sidecars: new VaultSidecarBuilder(),
+    );
+
+    $downloader->download(ytdlpDownloadRequest(DownloadPolicy::Video, $temp));
+
+    $source = json_decode(file_get_contents($temp . '/source.json'), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($source['result']['options'])->toContain('[REDACTED]')
+        ->and($source['result']['options'])->not->toContain('/secrets/cookies.txt');
+
+    array_map('unlink', glob($temp . '/*') ?: []);
+    rmdir($temp);
 });
 
 test('ytdlp downloader rejects missing output files', function (): void {
@@ -239,9 +363,14 @@ test('ytdlp downloader rejects missing output files', function (): void {
             return new YtdlpProbeResult(true, 'yt-dlp', '2026.01.01');
         }
 
-        public function extractInfo(string $url, string $workingDirectory): VideoInfo
+        public function extractInfo(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
         {
             return new VideoInfo(id: 'x', title: 'x');
+        }
+
+        public function extractPlaylist(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
+        {
+            throw new \RuntimeException('not called');
         }
 
         public function download(string $url, string $workingDirectory, Options $options, ?callable $onProgress = null): \Ytdlphp\DownloadResult

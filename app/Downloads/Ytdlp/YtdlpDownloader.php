@@ -85,7 +85,7 @@ final readonly class YtdlpDownloader implements DownloaderInterface
         $sourceUrl = $request->canonicalUri->toString();
 
         try {
-            $videoInfo = $this->gateway->extractInfo($sourceUrl, $request->tempDirectory);
+            $videoInfo = $this->gateway->extractInfo($sourceUrl, $request->tempDirectory, $this->options->extractionOptions());
             $downloadOptions = $this->options->forPolicy($request->downloadPolicy);
             $this->gateway->download($sourceUrl, $request->tempDirectory, $downloadOptions, $onProgress);
             $original = $this->resolveOriginalOutput($request->tempDirectory);
@@ -133,10 +133,13 @@ final readonly class YtdlpDownloader implements DownloaderInterface
                 $exception,
             );
         } catch (ProcessFailedException $exception) {
+            $retryableCode = $this->classifyRetryableFailure($exception->getMessage());
+
             throw DownloadException::withCode(
-                'download_ytdlp_failed',
+                $retryableCode ?? 'download_ytdlp_failed',
                 $this->redact($exception->getMessage()),
                 $exception,
+                retryable: $retryableCode !== null,
             );
         } catch (YtDlpException $exception) {
             throw $this->mapYtDlpException($exception);
@@ -157,7 +160,34 @@ final readonly class YtdlpDownloader implements DownloaderInterface
             return DownloadException::withCode('download_ytdlp_invalid_uri', $message, $exception);
         }
 
+        $retryableCode = $this->classifyRetryableFailure($exception->getMessage());
+
+        if ($retryableCode !== null) {
+            return DownloadException::withCode($retryableCode, $message, $exception, retryable: true);
+        }
+
         return DownloadException::withCode('download_ytdlp_failed', $message, $exception);
+    }
+
+    /**
+     * Detects YouTube's transient anti-automation responses so the caller can
+     * back off and retry instead of permanently failing the item. Matched
+     * against the raw (pre-redaction, pre-truncation) message so a long
+     * stderr can't push the pattern past redact()'s 500-char cutoff.
+     */
+    private function classifyRetryableFailure(string $rawMessage): ?string
+    {
+        $needle = str($rawMessage)->lower();
+
+        if ($needle->contains(['sign in to confirm', 'not a bot'])) {
+            return 'download_ytdlp_bot_check';
+        }
+
+        if ($needle->contains(['http error 429', 'too many requests'])) {
+            return 'download_ytdlp_rate_limited';
+        }
+
+        return null;
     }
 
     private function resolveOriginalOutput(string $tempDirectory): string
@@ -280,7 +310,7 @@ final readonly class YtdlpDownloader implements DownloaderInterface
                 'ytdlp_version' => $probe->version,
                 'format_profile' => $this->options->profileName($request->downloadPolicy),
                 'temp_output_path' => basename($tempOutputPath),
-                'options' => $downloadOptions->toArray(),
+                'options' => $this->redactOptions($downloadOptions->toArray()),
                 'extract_info' => $this->redactExtractInfo($videoInfo),
             ],
         );
@@ -296,6 +326,26 @@ final readonly class YtdlpDownloader implements DownloaderInterface
             container: 'json',
             sizeBytes: strlen($payload),
         );
+    }
+
+    /**
+     * yt-dlp CLI arguments are a flat list (`['--cookies', '/path', ...]`),
+     * not a keyed array -- the cookies jar path is the sensitive value here
+     * (it grants an authenticated YouTube session), so it's blanked before
+     * this list is embedded in source.json provenance.
+     *
+     * @param list<string> $arguments
+     * @return list<string>
+     */
+    private function redactOptions(array $arguments): array
+    {
+        foreach ($arguments as $index => $argument) {
+            if ($argument === '--cookies' && isset($arguments[$index + 1])) {
+                $arguments[$index + 1] = '[REDACTED]';
+            }
+        }
+
+        return $arguments;
     }
 
     /** @return array<string, mixed> */

@@ -68,7 +68,7 @@ final class JobRepository
     public function claimNextPending(StateTransitionService $transitions): ?JobRecord
     {
         $record = JobRecord::select()
-            ->where('state = ?', JobState::Pending)
+            ->where('state = ? AND (scheduledAt IS NULL OR scheduledAt <= ?)', JobState::Pending, DateTime::now(Timezone::UTC))
             ->orderBy('priority', Direction::ASC)
             ->orderBy('createdAt', Direction::ASC)
             ->first();

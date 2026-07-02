@@ -41,16 +41,34 @@ final readonly class YtdlpOptionsBuilder
         };
     }
 
+    public function extractionOptions(): Options
+    {
+        return $this->withCrossCutting(Options::create());
+    }
+
+    /**
+     * Flat listing for channel/playlist discovery -- id/title/url per entry
+     * without resolving each video individually, which for a large channel
+     * would mean one full extraction per video instead of one process call.
+     */
+    public function playlistOptions(): Options
+    {
+        return $this->withCrossCutting(Options::create())
+            ->option('--flat-playlist');
+    }
+
     private function videoOptions(): Options
     {
         return $this->withRetries(
-            Options::create()
-                ->format($this->config->videoFormatSelector)
-                ->output(self::OUTPUT_TEMPLATE)
-                ->mergeOutputFormat(MergeOutputFormat::Mp4, MergeOutputFormat::Mkv, MergeOutputFormat::Webm)
-                ->noPlaylist()
-                ->noWarnings()
-                ->option('--restrict-filenames'),
+            $this->withCrossCutting(
+                Options::create()
+                    ->format($this->config->videoFormatSelector)
+                    ->output(self::OUTPUT_TEMPLATE)
+                    ->mergeOutputFormat(MergeOutputFormat::Mp4, MergeOutputFormat::Mkv, MergeOutputFormat::Webm)
+                    ->noPlaylist()
+                    ->noWarnings()
+                    ->option('--restrict-filenames'),
+            ),
         );
     }
 
@@ -59,14 +77,16 @@ final readonly class YtdlpOptionsBuilder
         $format = AudioFormat::tryFrom($this->config->audioFormat) ?? AudioFormat::Mp3;
 
         return $this->withRetries(
-            Options::create()
-                ->extractAudio()
-                ->audioFormat($format)
-                ->audioQuality($this->config->audioQualityKbps)
-                ->output(self::OUTPUT_TEMPLATE)
-                ->noPlaylist()
-                ->noWarnings()
-                ->option('--restrict-filenames'),
+            $this->withCrossCutting(
+                Options::create()
+                    ->extractAudio()
+                    ->audioFormat($format)
+                    ->audioQuality($this->config->audioQualityKbps)
+                    ->output(self::OUTPUT_TEMPLATE)
+                    ->noPlaylist()
+                    ->noWarnings()
+                    ->option('--restrict-filenames'),
+            ),
         );
     }
 
@@ -82,5 +102,23 @@ final readonly class YtdlpOptionsBuilder
             ->option('--retries', '10')
             ->option('--fragment-retries', '10')
             ->option('--extractor-retries', '3');
+    }
+
+    /**
+     * Humanizing flags shared by every yt-dlp invocation (including plain
+     * metadata extraction, which is where bot-check walls are often hit
+     * first): an optional exported cookies jar and a pause between requests.
+     */
+    private function withCrossCutting(Options $options): Options
+    {
+        if ($this->config->cookiesFile !== null) {
+            $options = $options->cookies($this->config->cookiesFile);
+        }
+
+        if ($this->config->sleepRequestsSeconds > 0) {
+            $options = $options->sleepRequests($this->config->sleepRequestsSeconds);
+        }
+
+        return $options;
     }
 }

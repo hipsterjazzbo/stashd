@@ -36,9 +36,14 @@ final readonly class YtdlpGatewayImpl implements YtdlpGateway
         }
     }
 
-    public function extractInfo(string $url, string $workingDirectory): VideoInfo
+    public function extractInfo(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
     {
-        return $this->client($workingDirectory)->extractInfo($url);
+        return $this->client($workingDirectory)->extractInfo($url, $options);
+    }
+
+    public function extractPlaylist(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
+    {
+        return $this->client($workingDirectory)->extractPlaylist($url, $options);
     }
 
     public function download(string $url, string $workingDirectory, Options $options, ?callable $onProgress = null): \Ytdlphp\DownloadResult

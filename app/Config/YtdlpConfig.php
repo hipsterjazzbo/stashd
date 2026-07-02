@@ -15,6 +15,10 @@ final readonly class YtdlpConfig
         public string $videoFormatSelector,
         public string $audioFormat,
         public int $audioQualityKbps,
+        public int $minDelaySeconds = 0,
+        public int $maxDelaySeconds = 0,
+        public ?string $cookiesFile = null,
+        public float $sleepRequestsSeconds = 0.0,
     ) {
     }
 

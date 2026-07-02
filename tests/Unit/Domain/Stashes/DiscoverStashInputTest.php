@@ -19,38 +19,45 @@ use App\Providers\YouTube\YouTubeProvider;
 use App\Providers\YouTube\YouTubeRssDiscoveryStrategy;
 use App\Providers\YouTube\YouTubeRssParser;
 use App\Providers\YouTube\YouTubeVideoDiscovery;
+use App\Providers\YouTube\YouTubeYtdlpDiscoveryStrategy;
 use App\Providers\YouTube\YouTubeYtdlpDownloadStrategy;
 use App\Stashes\DiscoverStashInput;
 
-function discoverStashInputWithFixtures(?string $apiKey): DiscoverStashInput
+function discoverStashInputWithFixtures(?string $apiKey, bool $realDownloads = false): DiscoverStashInput
 {
     $fixturesDirectory = __DIR__ . '/../../../fixtures/providers/youtube/http';
     $map = json_decode((string) file_get_contents($fixturesDirectory . '/map.json'), true, flags: JSON_THROW_ON_ERROR);
     $http = new FixtureProviderHttpClient($fixturesDirectory, $map);
     $dataApiKey = new FixtureYouTubeDataApiKeyResolver($apiKey);
+    $ytdlpConfig = new YtdlpConfig(
+        binary: 'stub-yt-dlp',
+        timeoutSeconds: 60,
+        realDownloadsEnabledDefault: $realDownloads,
+        videoFormatSelector: 'best',
+        audioFormat: 'mp3',
+        audioQualityKbps: 128,
+    );
+    $ytdlpGateway = new StubYtdlpGateway();
+    $channelIds = new YouTubeChannelIdResolver($http);
 
     $youtubeProvider = new YouTubeProvider(
         dataApiKey: $dataApiKey,
         rssDiscovery: new YouTubeRssDiscoveryStrategy(
             http: $http,
-            channelIds: new YouTubeChannelIdResolver($http),
+            channelIds: $channelIds,
             parser: new YouTubeRssParser(),
             videos: new YouTubeVideoDiscovery($http),
         ),
         dataApiDiscovery: new YouTubeDataApiDiscoveryStrategy(dataApiKey: $dataApiKey, http: $http),
         dataApiMetadata: new YouTubeDataApiMetadataStrategy(dataApiKey: $dataApiKey, http: $http),
-        downloadAdapter: new YouTubeYtdlpDownloadStrategy(
-            config: new YtdlpConfig(
-                binary: 'stub-yt-dlp',
-                timeoutSeconds: 60,
-                realDownloadsEnabledDefault: false,
-                videoFormatSelector: 'best',
-                audioFormat: 'mp3',
-                audioQualityKbps: 128,
-            ),
-            gateway: new StubYtdlpGateway(),
+        downloadAdapter: new YouTubeYtdlpDownloadStrategy(config: $ytdlpConfig, gateway: $ytdlpGateway),
+        ytdlpDiscovery: new YouTubeYtdlpDiscoveryStrategy(
+            config: $ytdlpConfig,
+            gateway: $ytdlpGateway,
+            options: new \App\Downloads\Ytdlp\YtdlpOptionsBuilder($ytdlpConfig),
+            channelIds: $channelIds,
         ),
-        channelIds: new YouTubeChannelIdResolver($http),
+        channelIds: $channelIds,
     );
 
     $registry = new ProviderRegistry(new FakeProvider(), $youtubeProvider);
@@ -95,4 +102,15 @@ test('discover stash input falls back to rss for the initial backfill intent wit
     );
 
     expect($result->strategyKey)->toBe('youtube.rss');
+});
+
+test('discover stash input falls back to ytdlp discovery for the initial backfill intent without a key when ytdlp is enabled', function (): void {
+    $executor = discoverStashInputWithFixtures(apiKey: null, realDownloads: true);
+
+    $result = $executor->execute(
+        ['source_uri' => 'https://www.youtube.com/channel/UCStashdDemoCh0012345678'],
+        JobIntent::InitialBackfill,
+    );
+
+    expect($result->strategyKey)->toBe('youtube.ytdlp_discovery');
 });

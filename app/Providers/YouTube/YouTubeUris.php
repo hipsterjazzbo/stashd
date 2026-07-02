@@ -33,6 +33,16 @@ final class YouTubeUris
         return Uri::from(self::ORIGIN)->withPath('/feeds/videos.xml')->withQuery(playlist_id: $playlistId);
     }
 
+    public static function channelVideosPage(string $channelId): Uri
+    {
+        return Uri::from(self::ORIGIN)->withPath('/channel/' . $channelId . '/videos');
+    }
+
+    public static function playlistPage(string $playlistId): Uri
+    {
+        return Uri::from(self::ORIGIN)->withPath('/playlist')->withQuery(list: $playlistId);
+    }
+
     public static function handlePage(string $handle): Uri
     {
         return Uri::from(self::ORIGIN)->withPath('/@' . str($handle)->ltrim('@')->toString());

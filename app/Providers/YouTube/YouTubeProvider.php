@@ -26,6 +26,7 @@ final readonly class YouTubeProvider implements Provider
         private YouTubeDataApiDiscoveryStrategy $dataApiDiscovery,
         private YouTubeDataApiMetadataStrategy $dataApiMetadata,
         private YtdlpDownloadAdapter $downloadAdapter,
+        private YouTubeYtdlpDiscoveryStrategy $ytdlpDiscovery,
         private YouTubeChannelIdResolver $channelIds,
     ) {
     }
@@ -87,6 +88,14 @@ final readonly class YouTubeProvider implements Provider
                 supportsBackfill: true,
                 priority: 10,
             ),
+            new ProviderStrategy(
+                key: YouTubeYtdlpDiscoveryStrategy::STRATEGY_KEY,
+                purpose: StrategyPurpose::Discovery,
+                cost: StrategyCost::Medium,
+                supportsIncremental: false,
+                supportsBackfill: true,
+                priority: 20,
+            ),
         ];
     }
 
@@ -121,6 +130,7 @@ final readonly class YouTubeProvider implements Provider
         return match ($strategy->key) {
             YouTubeRssDiscoveryStrategy::STRATEGY_KEY => $this->rssDiscovery->discover($input),
             YouTubeDataApiDiscoveryStrategy::STRATEGY_KEY => $this->dataApiDiscovery->discover($input),
+            YouTubeYtdlpDiscoveryStrategy::STRATEGY_KEY => $this->ytdlpDiscovery->discover($input),
             default => throw new InvalidArgumentException("Unsupported YouTube discovery strategy: {$strategy->key}"),
         };
     }
@@ -132,6 +142,7 @@ final readonly class YouTubeProvider implements Provider
             YouTubeDataApiDiscoveryStrategy::STRATEGY_KEY => $this->dataApiKey->hasKey(),
             YouTubeDataApiMetadataStrategy::STRATEGY_KEY => $this->dataApiKey->hasKey(),
             YouTubeYtdlpDownloadStrategy::STRATEGY_KEY => $this->downloadAdapter->isAvailable(),
+            YouTubeYtdlpDiscoveryStrategy::STRATEGY_KEY => $this->ytdlpDiscovery->isAvailable(),
             default => false,
         };
     }
@@ -166,7 +177,7 @@ final readonly class YouTubeProvider implements Provider
     {
         return match ($strategy->key) {
             YouTubeDataApiMetadataStrategy::STRATEGY_KEY => $this->dataApiMetadata->enrich($input, $item),
-            YouTubeRssDiscoveryStrategy::STRATEGY_KEY => $item,
+            YouTubeRssDiscoveryStrategy::STRATEGY_KEY, YouTubeYtdlpDiscoveryStrategy::STRATEGY_KEY => $item,
             default => throw new ProviderException("Unsupported YouTube metadata strategy: {$strategy->key}", 'unsupported_metadata_strategy'),
         };
     }

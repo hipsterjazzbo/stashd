@@ -16,6 +16,9 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
 {
     private const int STALE_SECONDS = 120;
 
+    /** Backoff before retrying a rate-limited/bot-checked download, indexed by attempt number (capped at the last value). */
+    private const array RETRY_BACKOFF_SECONDS = [30, 120, 480];
+
     public function __construct(
         private JobRepository $jobs,
         private CommandRepository $commands,
@@ -79,8 +82,14 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
         try {
             $handler->handle($job, new JobHandlerContext($this));
         } catch (\App\Downloads\DownloadException $exception) {
-            $this->failJob($job, $exception->errorCode . ': ' . $exception->getMessage());
-            $this->activity->downloadFailed($job, $exception->errorCode, $exception->getMessage());
+            $error = $exception->errorCode . ': ' . $exception->getMessage();
+
+            if ($exception->retryable && $job->attempts < $job->maxAttempts) {
+                $this->retryJob($job, $error);
+            } else {
+                $this->failJob($job, $error);
+                $this->activity->downloadFailed($job, $exception->errorCode, $exception->getMessage());
+            }
         } catch (\App\Transcoding\TranscodeException $exception) {
             $this->failJob($job, $exception->errorCode . ': ' . $exception->getMessage());
             $this->activity->podcastAudioTranscodeFailed($job, $exception->errorCode, $exception->getMessage());
@@ -114,6 +123,22 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
         $job->heartbeatAt = DateTime::now(Timezone::UTC);
         $this->jobs->save($job);
         $this->publisher->jobProgress($job);
+    }
+
+    private function retryJob(JobRecord $job, string $error): void
+    {
+        if ($job->state !== JobState::Processing) {
+            return;
+        }
+
+        $index = min(max($job->attempts - 1, 0), count(self::RETRY_BACKOFF_SECONDS) - 1);
+
+        $job->lastError = $error;
+        $job->startedAt = null;
+        $job->heartbeatAt = null;
+        $job->scheduledAt = DateTime::now(Timezone::UTC)->plusSeconds(self::RETRY_BACKOFF_SECONDS[$index]);
+        $this->jobs->save($job);
+        $this->transitions->transitionJob($job, JobState::Pending);
     }
 
     private function failJob(JobRecord $job, string $error): void
