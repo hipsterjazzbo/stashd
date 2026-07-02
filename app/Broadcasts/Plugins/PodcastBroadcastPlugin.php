@@ -28,6 +28,7 @@ use App\Broadcasts\StashdBroadcast;
 use App\Broadcasts\UiControl;
 use App\Stashes\StashItemState;
 use App\System\State\StateTransitionService;
+use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
@@ -107,7 +108,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
                 continue;
             }
 
-            $mediaItem = $context->mediaItems[$stashItem->mediaItemId] ?? null;
+            $mediaItem = $context->mediaItems[(string) $stashItem->mediaItemId] ?? null;
             $item = $this->findOrCreateItem($context, $stashItem);
 
             if ($mediaItem === null) {
@@ -396,7 +397,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         return PodcastMediaKind::forBroadcast($context->broadcast);
     }
 
-    private function selectAsset(BroadcastContext $context, string $mediaItemId): ?\App\Broadcasts\Podcasts\PodcastAssetSelection
+    private function selectAsset(BroadcastContext $context, MediaItemId $mediaItemId): ?\App\Broadcasts\Podcasts\PodcastAssetSelection
     {
         return match ($this->preferredMediaKind($context)) {
             PodcastMediaKind::Audio => $this->assets->audioAsset($mediaItemId),

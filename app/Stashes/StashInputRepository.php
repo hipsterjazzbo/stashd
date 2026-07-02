@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Stashes;
 
-use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
 use InvalidArgumentException;
 use Tempest\Database\Direction;
@@ -23,7 +22,7 @@ final class StashInputRepository
     }
 
     public function create(
-        PrefixedUlid $stashId,
+        StashId $stashId,
         string $providerKey,
         StashInputType $inputType,
         string $sourceUri,
@@ -34,7 +33,7 @@ final class StashInputRepository
     ): StashInputRecord {
         $id = $this->ids->generate('input')->toString();
         $record = new StashInputRecord(
-            stashId: $stashId->toString(),
+            stashId: $stashId,
             providerKey: $providerKey,
             inputType: $inputType,
             sourceUri: $sourceUri,
@@ -55,9 +54,9 @@ final class StashInputRepository
             ?? throw new InvalidArgumentException('Failed to persist stash input record.');
     }
 
-    public function find(string $id): ?StashInputRecord
+    public function find(StashInputId $id): ?StashInputRecord
     {
-        return StashInputRecord::findById(new PrimaryKey($id));
+        return StashInputRecord::findById(new PrimaryKey($id->toString()));
     }
 
     public function save(StashInputRecord $record): StashInputRecord
@@ -83,10 +82,10 @@ final class StashInputRepository
     }
 
     /** @return list<StashInputRecord> */
-    public function listForStash(string $stashId): array
+    public function listForStash(StashId $stashId): array
     {
         return StashInputRecord::select()
-            ->where('stashId = ?', $stashId)
+            ->where('stashId = ?', $stashId->toString())
             ->orderBy('createdAt', Direction::ASC)
             ->all();
     }

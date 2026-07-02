@@ -60,9 +60,9 @@ final class MediaItemRepository
             ?? throw new InvalidArgumentException('Failed to persist media item record.');
     }
 
-    public function find(string|\Stringable $id): ?MediaItemRecord
+    public function find(MediaItemId $id): ?MediaItemRecord
     {
-        return MediaItemRecord::findById(new PrimaryKey((string) $id));
+        return MediaItemRecord::findById(new PrimaryKey($id->toString()));
     }
 
     public function findByProviderIdentity(string $providerKey, string $providerItemId): ?MediaItemRecord

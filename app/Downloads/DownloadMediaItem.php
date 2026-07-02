@@ -6,6 +6,7 @@ namespace App\Downloads;
 
 use App\Config\StashdConfig;
 use App\Providers\StashdUri;
+use App\Stashes\StashId;
 use App\Stashes\StashItemRepository;
 use App\Stashes\StashRepository;
 use App\Support\DurationSeconds;
@@ -19,6 +20,7 @@ use App\Vault\AssetRecord;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
+use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
 use App\Vault\MediaItemRepository;
 use App\Vault\MediaItemState;
@@ -53,8 +55,8 @@ final readonly class DownloadMediaItem
      * @param ?callable(\Ytdlphp\DownloadProgress): void $onProgress
      */
     public function execute(
-        PrefixedUlid $mediaItemId,
-        PrefixedUlid $stashId,
+        MediaItemId $mediaItemId,
+        StashId $stashId,
         PrefixedUlid $jobId,
         bool $force = false,
         ?callable $onProgress = null,
@@ -225,7 +227,7 @@ final readonly class DownloadMediaItem
         }
     }
 
-    private function createProcessingAsset(PrefixedUlid $mediaItemId, DownloadedFile $file): AssetRecord
+    private function createProcessingAsset(MediaItemId $mediaItemId, DownloadedFile $file): AssetRecord
     {
         $existing = $this->assets->findByMediaItemAndRole($mediaItemId, $file->role);
 

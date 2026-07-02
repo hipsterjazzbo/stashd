@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Vault;
 
+use App\Stashes\StashInputId;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
@@ -17,12 +18,12 @@ final class MediaItemSourceRecord
     public PrimaryKey $id;
 
     public function __construct(
-        public string $mediaItemId,
+        public MediaItemId $mediaItemId,
         public string $providerKey,
         public string $providerInputId,
         public string $discoveredUri,
         public DateTime $discoveredAt,
-        public ?string $stashInputId = null,
+        public ?StashInputId $stashInputId = null,
         public ?int $position = null,
         public ?int $rawPosition = null,
     ) {

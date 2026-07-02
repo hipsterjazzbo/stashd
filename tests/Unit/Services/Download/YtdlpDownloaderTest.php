@@ -14,7 +14,8 @@ use App\Downloads\Ytdlp\YtdlpOptionsBuilder;
 use App\Downloads\Ytdlp\YtdlpProbeResult;
 use App\Providers\StashdUri;
 use App\Stashes\DownloadPolicy;
-use App\Support\PrefixedUlid;
+use App\Stashes\StashId;
+use App\Vault\MediaItemId;
 use App\Vault\VaultSidecarBuilder;
 use Tempest\Process\Exceptions\ProcessHasTimedOut;
 use Tempest\Process\ProcessResult;
@@ -38,8 +39,8 @@ function ytdlpTestConfig(bool $enabled = true, ?string $cookiesFile = null): Ytd
 function ytdlpDownloadRequest(DownloadPolicy $policy, string $temp): DownloadRequest
 {
     return new DownloadRequest(
-        mediaItemId: PrefixedUlid::parse('media_01J00000000000000000000001'),
-        stashId: PrefixedUlid::parse('stash_01J00000000000000000000001'),
+        mediaItemId: MediaItemId::parse('media_01J00000000000000000000001'),
+        stashId: StashId::parse('stash_01J00000000000000000000001'),
         providerKey: 'youtube',
         providerItemId: 'demoVideo01',
         canonicalUri: StashdUri::parse('https://www.youtube.com/watch?v=dQw4w9WgXcQ'),

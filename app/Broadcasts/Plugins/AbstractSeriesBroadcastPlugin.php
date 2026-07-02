@@ -23,10 +23,12 @@ use App\Broadcasts\BroadcastVerifyResult;
 use App\Broadcasts\FileKind;
 use App\Broadcasts\HardlinkPublisher;
 use App\System\State\StateTransitionService;
+use App\Vault\AssetId;
 use App\Vault\AssetKind;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
+use App\Vault\MediaItemId;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
@@ -93,8 +95,8 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
         $seasonMapping = $context->seasonMapping();
 
         foreach ($this->contextFactory->publishableStashItems($context) as $stashItem) {
-            $vault = $context->vaultOriginals[$stashItem->mediaItemId] ?? null;
-            $mediaItem = $context->mediaItems[$stashItem->mediaItemId] ?? null;
+            $vault = $context->vaultOriginals[(string) $stashItem->mediaItemId] ?? null;
+            $mediaItem = $context->mediaItems[(string) $stashItem->mediaItemId] ?? null;
 
             if ($vault === null || $mediaItem === null || $vault->path === null) {
                 $skipped[] = (string) $stashItem->id;
@@ -103,7 +105,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
             }
 
             $position++;
-            $seasonOverride = $seasonMapping->seasonFor($stashItem->stashInputId);
+            $seasonOverride = $seasonMapping->seasonFor($stashItem->stashInputId?->toString());
             $season = $this->filenames->seasonFolder($stashItem, $seasonOverride);
             $filename = $profile->mediaServerEpisodeNaming
                 ? $this->filenames->mediaServerEpisodeFilename($stashItem, $mediaItem, $vault->path, $position, $seasonOverride)
@@ -113,7 +115,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
 
             $files[] = new BroadcastPlannedFile(
                 stashItemId: (string) $stashItem->id,
-                mediaItemId: $stashItem->mediaItemId,
+                mediaItemId: (string) $stashItem->mediaItemId,
                 sourceAssetId: (string) $vault->id,
                 sourcePath: $vault->path,
                 relativePath: $relative,
@@ -142,7 +144,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
                     absolutePath: $this->paths->broadcastFile($broadcastId, $season, $episodeNfoName),
                     content: $this->nfos->episodeNfo($stashItem, $mediaItem, $seasonNumber, $episodeNumber),
                     stashItemId: (string) $stashItem->id,
-                    mediaItemId: $stashItem->mediaItemId,
+                    mediaItemId: (string) $stashItem->mediaItemId,
                 );
             }
         }
@@ -390,7 +392,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
                 relativePath: $this->paths->relativeFile($filename),
                 absolutePath: $this->paths->broadcastFile($broadcastId, $filename),
                 content: '',
-                mediaItemId: $stashItem->mediaItemId,
+                mediaItemId: (string) $stashItem->mediaItemId,
             );
         }
 
@@ -404,7 +406,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
         }
 
         $thumbnail = $this->assets->findByMediaItemAndRole(
-            $sidecar->mediaItemId,
+            MediaItemId::parse($sidecar->mediaItemId),
             AssetRole::SourceThumbnail,
         );
 
@@ -436,7 +438,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
 
         if ($existing === null) {
             $asset = $this->assets->create(
-                mediaItemId: $mediaItemId,
+                mediaItemId: MediaItemId::parse($mediaItemId),
                 role: AssetRole::Hardlink,
                 kind: AssetKind::Video,
                 state: AssetState::Ready,
@@ -446,7 +448,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
             );
             $asset->broadcastId = $broadcastId;
             $asset->broadcastItemId = $broadcastItemId;
-            $asset->derivedFromAssetId = $sourceAssetId;
+            $asset->derivedFromAssetId = AssetId::parse($sourceAssetId);
             $this->assets->save($asset);
 
             return;
@@ -454,7 +456,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
 
         $existing->path = $path;
         $existing->relativePath = $relativePath;
-        $existing->derivedFromAssetId = $sourceAssetId;
+        $existing->derivedFromAssetId = AssetId::parse($sourceAssetId);
         $existing->sizeBytes = is_int($sizeBytes) ? $sizeBytes : $existing->sizeBytes;
         $existing->lastVerifiedAt = DateTime::now(Timezone::UTC);
         $existing->missingAt = null;

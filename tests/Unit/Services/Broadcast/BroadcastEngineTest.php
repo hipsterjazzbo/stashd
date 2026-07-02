@@ -47,8 +47,8 @@ test('broadcast filename builder produces safe readable names', function (): voi
     $builder = new BroadcastFilenameBuilder();
 
     expect($builder->seasonFolder(new \App\Stashes\StashItemRecord(
-        stashId: 's',
-        mediaItemId: 'm',
+        stashId: \App\Stashes\StashId::parse('stash_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
+        mediaItemId: \App\Vault\MediaItemId::parse('media_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
         state: \App\Stashes\StashItemState::Active,
         seasonNumber: 2,
     )))->toBe('Season 02');

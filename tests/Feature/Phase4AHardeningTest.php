@@ -8,9 +8,11 @@ use App\Config\StashdConfig;
 use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRepository;
 use App\System\Storage\StorageLocationState;
+use App\Vault\AssetId;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
+use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
 use App\Vault\MediaItemState;
 use App\Vault\VerifyAssetOutcome;
@@ -78,7 +80,10 @@ test('items and assets API responses use snake_case keys', function (): void {
         'mime_type',
         'size_bytes',
         'last_verified_at',
-    ])->not->toHaveKey('mediaItemId');
+    ])->not->toHaveKey('mediaItemId')
+        // media_item_id is a MediaItemId value object on the record -- must
+        // serialize as a plain string in API output, not leak as {"value": ...}.
+        ->and($assets->body['assets'][0]['media_item_id'])->toBe($mediaItemId);
 });
 
 test('vault sidecar json files contain normalized metadata and provenance', function (): void {
@@ -150,7 +155,7 @@ test('second download skips without overwriting vault original bytes', function 
 
     $assets = $this->container->get(AssetRepository::class)
         ->findByMediaItemAndRole(
-            \App\Support\PrefixedUlid::parse($mediaItemId),
+            MediaItemId::parse($mediaItemId),
             AssetRole::VaultOriginal,
         );
     expect($assets?->checksum)->toBe('sha256:' . $checksum);
@@ -206,14 +211,14 @@ test('asset verify detects checksum mismatch distinctly from missing files', fun
     $this->processAllJobs();
 
     $original = $assets->findByMediaItemAndRole(
-        \App\Support\PrefixedUlid::parse($mediaItemId),
+        MediaItemId::parse($mediaItemId),
         AssetRole::VaultOriginal,
     );
     file_put_contents((string) $original?->path, 'corrupted-by-test');
 
-    $outcome = $verify->verifyAsset(\App\Support\PrefixedUlid::parse((string) $original?->id));
+    $outcome = $verify->verifyAsset(AssetId::parse((string) $original?->id));
     $original = $assets->findByMediaItemAndRole(
-        \App\Support\PrefixedUlid::parse($mediaItemId),
+        MediaItemId::parse($mediaItemId),
         AssetRole::VaultOriginal,
     );
 
@@ -240,12 +245,12 @@ test('missing sidecar metadata does not mark media item missing', function (): v
     $this->processAllJobs();
 
     $metadata = $assets->findByMediaItemAndRole(
-        \App\Support\PrefixedUlid::parse($mediaItemId),
+        MediaItemId::parse($mediaItemId),
         AssetRole::MetadataJson,
     );
     unlink((string) $metadata?->path);
 
-    $outcome = $verify->verifyAsset(\App\Support\PrefixedUlid::parse((string) $metadata?->id));
+    $outcome = $verify->verifyAsset(AssetId::parse((string) $metadata?->id));
     $item = MediaItemRecord::findById(new \Tempest\Database\PrimaryKey($mediaItemId));
 
     expect($outcome)->toBe(VerifyAssetOutcome::Missing)
@@ -294,7 +299,7 @@ test('verify vault skips when storage root is unavailable', function (): void {
         ->and($command->body['command']['result']['checked'])->toBe(0);
 
     $original = $assets->findByMediaItemAndRole(
-        \App\Support\PrefixedUlid::parse($mediaItemId),
+        MediaItemId::parse($mediaItemId),
         AssetRole::VaultOriginal,
     );
     expect($original?->state)->toBe(AssetState::Ready);

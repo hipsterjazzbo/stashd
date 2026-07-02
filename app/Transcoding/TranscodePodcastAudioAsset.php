@@ -10,8 +10,10 @@ use App\System\State\StateTransitionService;
 use App\Transcoding\Ffmpeg\FfmpegAudioProfile;
 use App\Transcoding\Ffmpeg\FfmpegGateway;
 use App\Transcoding\Ffmpeg\FfmpegProgress;
+use App\Vault\AssetId;
 use App\Vault\AssetRepository;
 use App\Vault\AssetState;
+use App\Vault\MediaItemId;
 use App\Vault\MediaItemRepository;
 use App\Vault\MoveFileIntoVault;
 use App\Vault\StageDownloadFiles;
@@ -40,9 +42,9 @@ final readonly class TranscodePodcastAudioAsset
      * @param ?callable(FfmpegProgress): void $onProgress
      */
     public function execute(
-        PrefixedUlid $mediaItemId,
-        PrefixedUlid $sourceAssetId,
-        PrefixedUlid $audioAssetId,
+        MediaItemId $mediaItemId,
+        AssetId $sourceAssetId,
+        AssetId $audioAssetId,
         PrefixedUlid $jobId,
         ?callable $onProgress = null,
     ): TranscodePodcastAudioResult {
@@ -107,7 +109,7 @@ final readonly class TranscodePodcastAudioAsset
             $audioAsset->sizeBytes = is_int($sizeBytes) ? $sizeBytes : null;
             $audioAsset->checksum = $checksum;
             $audioAsset->durationSeconds = $source->durationSeconds;
-            $audioAsset->derivedFromAssetId = $sourceAssetId->toString();
+            $audioAsset->derivedFromAssetId = $sourceAssetId;
             $audioAsset->lastVerifiedAt = DateTime::now(Timezone::UTC);
             $this->assets->save($audioAsset);
             $this->transitions->transitionAsset($audioAsset, AssetState::Ready);

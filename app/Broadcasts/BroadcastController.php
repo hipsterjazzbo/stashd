@@ -13,7 +13,9 @@ use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
 use App\Stashes\DownloadPolicy;
+use App\Stashes\StashId;
 use App\Stashes\StashInputRepository;
+use App\Stashes\StashRecord;
 use App\Stashes\StashRepository;
 use App\Support\PrefixedUlid;
 use App\System\Storage\PathSanitizer;
@@ -58,7 +60,7 @@ final readonly class BroadcastController
     #[Get('/api/v1/stashes/{stashId}/broadcasts')]
     public function index(string $stashId): Json
     {
-        $stash = $this->stashes->find($stashId);
+        $stash = $this->findStash($stashId);
 
         if ($stash === null) {
             return $this->notFound('Stash not found.');
@@ -75,7 +77,7 @@ final readonly class BroadcastController
     #[Post('/api/v1/stashes/{stashId}/broadcasts')]
     public function create(string $stashId, Request $request): Json
     {
-        $stash = $this->stashes->find($stashId);
+        $stash = $this->findStash($stashId);
 
         if ($stash === null) {
             return $this->notFound('Stash not found.');
@@ -200,7 +202,7 @@ final readonly class BroadcastController
 
         $validInputIds = array_map(
             static fn ($input): string => (string) $input->id,
-            $this->stashInputs->listForStash($broadcast->stashId),
+            $this->stashInputs->listForStash(StashId::parse($broadcast->stashId)),
         );
 
         $mapping = [];
@@ -295,6 +297,11 @@ final readonly class BroadcastController
         $plugin = BroadcastPluginRegistry::findByKey($type);
 
         return $plugin !== null && $plugin->plugin->supportedFileKinds() === [FileKind::Video];
+    }
+
+    private function findStash(string $id): ?StashRecord
+    {
+        return StashId::isValid($id) ? $this->stashes->find(StashId::parse($id)) : null;
     }
 
     private function notFound(string $message): Json

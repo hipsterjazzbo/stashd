@@ -11,6 +11,7 @@ use App\Stashes\DownloadPolicy;
 use App\Stashes\StashRecord;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
+use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
 use Tempest\Http\Status;
 
@@ -61,7 +62,7 @@ test('youtube item.download uses ytdlp stub and ingests into vault when enabled'
 
     $assets = $this->container->get(\App\Vault\AssetRepository::class)
         ->findByMediaItemAndRole(
-            \App\Support\PrefixedUlid::parse($mediaItemId),
+            MediaItemId::parse($mediaItemId),
             AssetRole::VaultOriginal,
         );
     expect($assets?->state)->toBe(AssetState::Ready)
@@ -132,7 +133,7 @@ test('ytdlp download failure leaves no ready vault original', function (): void 
 
     $assets = $this->container->get(\App\Vault\AssetRepository::class)
         ->findByMediaItemAndRole(
-            \App\Support\PrefixedUlid::parse($mediaItemId),
+            MediaItemId::parse($mediaItemId),
             AssetRole::VaultOriginal,
         );
 

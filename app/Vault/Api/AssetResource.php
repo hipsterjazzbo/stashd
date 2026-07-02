@@ -27,12 +27,12 @@ final readonly class AssetResource implements Arrayable
     {
         return ApiJson::encode([
             'id' => (string) $this->asset->id,
-            'mediaItemId' => $this->asset->mediaItemId,
+            'mediaItemId' => $this->asset->mediaItemId === null ? null : (string) $this->asset->mediaItemId,
             'broadcastId' => $this->asset->broadcastId,
             'role' => $this->asset->role->value,
             'kind' => $this->asset->kind->value,
             'state' => $this->asset->state->value,
-            'derivedFromAssetId' => $this->asset->derivedFromAssetId,
+            'derivedFromAssetId' => $this->asset->derivedFromAssetId === null ? null : (string) $this->asset->derivedFromAssetId,
             'path' => $this->asset->path,
             'relativePath' => $this->asset->relativePath,
             'mimeType' => $this->asset->mimeType,

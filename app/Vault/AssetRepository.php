@@ -22,7 +22,7 @@ final class AssetRepository
     }
 
     public function create(
-        string|\Stringable $mediaItemId,
+        MediaItemId $mediaItemId,
         AssetRole $role,
         AssetKind $kind,
         AssetState $state = AssetState::Pending,
@@ -39,7 +39,7 @@ final class AssetRepository
             role: $role,
             kind: $kind,
             state: $state,
-            mediaItemId: (string) $mediaItemId,
+            mediaItemId: $mediaItemId,
             path: $path,
             relativePath: $relativePath,
             mimeType: $mimeType,
@@ -59,9 +59,9 @@ final class AssetRepository
             ?? throw new InvalidArgumentException('Failed to persist asset record.');
     }
 
-    public function find(string|\Stringable $id): ?AssetRecord
+    public function find(AssetId $id): ?AssetRecord
     {
-        return AssetRecord::findById(new PrimaryKey((string) $id));
+        return AssetRecord::findById(new PrimaryKey($id->toString()));
     }
 
     public function save(AssetRecord $record): AssetRecord
@@ -72,18 +72,18 @@ final class AssetRepository
         return $record;
     }
 
-    public function findByMediaItemAndRole(string|\Stringable $mediaItemId, AssetRole $role): ?AssetRecord
+    public function findByMediaItemAndRole(MediaItemId $mediaItemId, AssetRole $role): ?AssetRecord
     {
         return AssetRecord::select()
-            ->where('mediaItemId = ? AND role = ?', (string) $mediaItemId, $role)
+            ->where('mediaItemId = ? AND role = ?', $mediaItemId->toString(), $role)
             ->first();
     }
 
     /** @return list<AssetRecord> */
-    public function listForMediaItem(string|\Stringable $mediaItemId): array
+    public function listForMediaItem(MediaItemId $mediaItemId): array
     {
         return AssetRecord::select()
-            ->where('mediaItemId = ?', (string) $mediaItemId)
+            ->where('mediaItemId = ?', $mediaItemId->toString())
             ->all();
     }
 

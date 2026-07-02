@@ -7,9 +7,9 @@ namespace Tests\Feature;
 use App\Config\StashdConfig;
 use App\Stashes\DownloadPolicy;
 use App\Stashes\StashRecord;
-use App\Support\PrefixedUlid;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
+use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
 use App\Vault\MediaItemState;
 use Tempest\Http\Status;
@@ -99,7 +99,7 @@ test('retry download does not corrupt existing vault assets', function (): void 
 
     $assets = $this->container->get(\App\Vault\AssetRepository::class)
         ->findByMediaItemAndRole(
-            PrefixedUlid::parse($mediaItemId),
+            MediaItemId::parse($mediaItemId),
             AssetRole::VaultOriginal,
         );
     expect($assets?->state)->toBe(AssetState::Ready)
@@ -120,7 +120,7 @@ test('system.verify_vault marks missing files without touching storage-unavailab
     $this->processAllJobs();
 
     $original = $assets->findByMediaItemAndRole(
-        PrefixedUlid::parse($mediaItemId),
+        MediaItemId::parse($mediaItemId),
         AssetRole::VaultOriginal,
     );
     $path = $original?->path;
@@ -138,7 +138,7 @@ test('system.verify_vault marks missing files without touching storage-unavailab
         ->and($command->body['command']['result']['missing'])->toBeGreaterThan(0);
 
     $original = $assets->findByMediaItemAndRole(
-        PrefixedUlid::parse($mediaItemId),
+        MediaItemId::parse($mediaItemId),
         AssetRole::VaultOriginal,
     );
     expect($original?->state)->toBe(AssetState::Missing);

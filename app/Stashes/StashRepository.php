@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Stashes;
 
 use App\Support\PrefixedUlidGenerator;
+use App\Vault\MediaItemId;
 use App\Vault\MediaItemRepository;
 use App\Vault\MediaItemSourceRepository;
 use InvalidArgumentException;
@@ -60,9 +61,9 @@ final class StashRepository
             ?? throw new InvalidArgumentException('Failed to persist stash record.');
     }
 
-    public function find(string|\Stringable $id): ?StashRecord
+    public function find(StashId $id): ?StashRecord
     {
-        return StashRecord::findById(new PrimaryKey((string) $id));
+        return StashRecord::findById(new PrimaryKey($id->toString()));
     }
 
     public function findBySlug(string $slug): ?StashRecord
@@ -161,14 +162,14 @@ final class StashRepository
      */
     public function delete(StashRecord $stash): void
     {
-        $stashId = (string) $stash->id;
+        $stashId = StashId::parse((string) $stash->id);
 
         foreach ($this->stashItems->listForStash($stashId) as $item) {
             $item->delete();
         }
 
         foreach ($this->stashInputs->listForStash($stashId) as $input) {
-            $this->mediaItemSources->deleteForStashInput((string) $input->id);
+            $this->mediaItemSources->deleteForStashInput(StashInputId::parse((string) $input->id));
             $input->delete();
         }
 
@@ -183,10 +184,10 @@ final class StashRepository
      */
     public function deleteImpact(StashRecord $stash): array
     {
-        $stashId = (string) $stash->id;
+        $stashId = StashId::parse((string) $stash->id);
 
         $mediaItemIds = array_values(array_unique(array_map(
-            static fn (StashItemRecord $item): string => $item->mediaItemId,
+            static fn (StashItemRecord $item): string => (string) $item->mediaItemId,
             $this->stashItems->listForStash($stashId),
         )));
 
@@ -197,14 +198,14 @@ final class StashRepository
         $otherStashIdsByMediaItemId = [];
 
         foreach ($this->stashItems->listForMediaItemsExcludingStash($mediaItemIds, $stashId) as $otherItem) {
-            $otherStashIdsByMediaItemId[$otherItem->mediaItemId][$otherItem->stashId] = true;
+            $otherStashIdsByMediaItemId[(string) $otherItem->mediaItemId][(string) $otherItem->stashId] = true;
         }
 
         $stashNamesById = [];
 
         foreach ($otherStashIdsByMediaItemId as $otherStashIds) {
             foreach (array_keys($otherStashIds) as $otherStashId) {
-                $stashNamesById[$otherStashId] ??= $this->find($otherStashId)?->name ?? 'Unknown stash';
+                $stashNamesById[$otherStashId] ??= $this->find(StashId::parse($otherStashId))?->name ?? 'Unknown stash';
             }
         }
 
@@ -212,7 +213,7 @@ final class StashRepository
         $orphanedItems = [];
 
         foreach ($mediaItemIds as $mediaItemId) {
-            $title = $this->mediaItems->find($mediaItemId)?->title ?? $mediaItemId;
+            $title = $this->mediaItems->find(MediaItemId::parse($mediaItemId))?->title ?? $mediaItemId;
             $otherStashIds = array_keys($otherStashIdsByMediaItemId[$mediaItemId] ?? []);
 
             if ($otherStashIds === []) {

@@ -8,7 +8,8 @@ use App\Downloads\DownloadRequest;
 use App\Downloads\DownloadResult;
 use App\Providers\StashdUri;
 use App\Stashes\DownloadPolicy;
-use App\Support\PrefixedUlid;
+use App\Stashes\StashId;
+use App\Vault\MediaItemId;
 use App\Vault\VaultSidecarBuilder;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
@@ -17,8 +18,8 @@ test('vault sidecar builder produces normalized metadata and source json', funct
     $builder = new VaultSidecarBuilder();
     $capturedAt = DateTime::parse('2026-06-16T12:00:00+00:00', Timezone::UTC);
     $request = new DownloadRequest(
-        mediaItemId: PrefixedUlid::parse('media_01J00000000000000000000001'),
-        stashId: PrefixedUlid::parse('stash_01J00000000000000000000001'),
+        mediaItemId: MediaItemId::parse('media_01J00000000000000000000001'),
+        stashId: StashId::parse('stash_01J00000000000000000000001'),
         providerKey: 'fake',
         providerItemId: 'demo-episode-1',
         canonicalUri: StashdUri::fake('item/demo-episode-1'),
@@ -52,8 +53,8 @@ test('vault sidecar builder redacts secret-like tokens in sensitive fields', fun
     $capturedAt = DateTime::parse('2026-06-16T12:00:00+00:00', Timezone::UTC);
     $token = str_repeat('x', 40);
     $request = new DownloadRequest(
-        mediaItemId: PrefixedUlid::parse('media_01J00000000000000000000001'),
-        stashId: PrefixedUlid::parse('stash_01J00000000000000000000001'),
+        mediaItemId: MediaItemId::parse('media_01J00000000000000000000001'),
+        stashId: StashId::parse('stash_01J00000000000000000000001'),
         providerKey: 'fake',
         providerItemId: 'demo-episode-1',
         canonicalUri: StashdUri::parse('fake://item/demo'),

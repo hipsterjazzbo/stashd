@@ -10,12 +10,12 @@ use App\Broadcasts\Plugins\PodcastBroadcastPlugin;
 use App\Config\StashdConfig;
 use App\Stashes\StashItemRecord;
 use App\Stashes\StashItemState;
-use App\Support\PrefixedUlid;
 use App\System\Activity\ActivityEventRecord;
 use App\Vault\AssetKind;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
+use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
 use Tempest\Database\PrimaryKey;
 use Tempest\Http\Status;
@@ -180,7 +180,7 @@ test('audio podcast triggers a transcode fallback instead of failing for video o
 
     $reloadedItem = BroadcastItemRecord::findById(new PrimaryKey((string) $item->id));
     $audioAsset = $this->container->get(AssetRepository::class)
-        ->findByMediaItemAndRole(PrefixedUlid::parse($mediaItemId), AssetRole::PodcastAudio);
+        ->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::PodcastAudio);
 
     expect($reloadedItem?->lastError)->toBeNull()
         ->and($reloadedItem?->state)->toBe(\App\Broadcasts\BroadcastItemState::Ready)
@@ -362,14 +362,14 @@ test('funding link detection only scans descriptions of items included in the fe
     $config = $this->container->get(StashdConfig::class);
 
     foreach (StashItemRecord::select()->where('stashId = ?', $stashId)->all() as $stashItem) {
-        if ($stashItem->mediaItemId === $mediaItemId) {
+        if ((string) $stashItem->mediaItemId === $mediaItemId) {
             continue;
         }
 
         $stashItem->state = StashItemState::Hidden;
         $stashItem->save();
 
-        $hiddenMedia = MediaItemRecord::findById(new PrimaryKey($stashItem->mediaItemId));
+        $hiddenMedia = MediaItemRecord::findById(new PrimaryKey((string) $stashItem->mediaItemId));
         $hiddenMedia->description = 'Hidden episode funding: https://www.patreon.com/hidden';
         $hiddenMedia->save();
     }
@@ -411,7 +411,7 @@ function podcastFeedReadyStash(\Tests\IntegrationTestCase $test, string $channel
 {
     [$headers, $stashId, $mediaItemId] = $test->bootstrapFakeDownloadStash($channel);
     foreach (StashItemRecord::select()->where('stashId = ?', $stashId)->all() as $stashItem) {
-        if ($stashItem->mediaItemId === $mediaItemId) {
+        if ((string) $stashItem->mediaItemId === $mediaItemId) {
             continue;
         }
 
@@ -445,7 +445,7 @@ function podcastFeedCreateAsset(
     file_put_contents($path, $contents);
 
     $assets->create(
-        mediaItemId: PrefixedUlid::parse($mediaItemId),
+        mediaItemId: MediaItemId::parse($mediaItemId),
         role: AssetRole::VaultOriginal,
         kind: $kind,
         state: AssetState::Ready,

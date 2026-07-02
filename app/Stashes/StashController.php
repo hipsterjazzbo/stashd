@@ -14,7 +14,6 @@ use App\Http\Routing\AllowApiClients;
 use App\Stashes\Api\StashInputResource;
 use App\Stashes\Api\StashItemResource;
 use App\Stashes\Api\StashResource;
-use App\Support\PrefixedUlid;
 use App\System\Activity\ActivityEventService;
 use App\Vault\AssetRepository;
 use App\Vault\MediaItemRepository;
@@ -107,7 +106,7 @@ final readonly class StashController
     #[Get('/api/v1/stashes/{id}')]
     public function show(string $id): Json
     {
-        $stash = $this->stashes->find(PrefixedUlid::parse($id));
+        $stash = $this->findStash($id);
 
         if ($stash === null) {
             return $this->notFound('Stash not found.');
@@ -121,15 +120,15 @@ final readonly class StashController
     #[Get('/api/v1/stashes/{id}/items')]
     public function items(string $id): Json
     {
-        $stash = $this->stashes->find($id);
+        $stash = $this->findStash($id);
 
         if ($stash === null) {
             return $this->notFound('Stash not found.');
         }
 
-        $stashItems = $this->stashItems->listForStash($id);
+        $stashItems = $this->stashItems->listForStash(StashId::parse((string) $stash->id));
         $mediaItemIds = array_values(array_unique(array_map(
-            static fn ($item): string => $item->mediaItemId,
+            static fn ($item): string => (string) $item->mediaItemId,
             $stashItems,
         )));
 
@@ -140,8 +139,8 @@ final readonly class StashController
             'items' => array_map(
                 static fn ($item): array => StashItemResource::fromRecord(
                     $item,
-                    $mediaItemsById[$item->mediaItemId] ?? null,
-                    $totalSizeByMediaItem[$item->mediaItemId] ?? null,
+                    $mediaItemsById[(string) $item->mediaItemId] ?? null,
+                    $totalSizeByMediaItem[(string) $item->mediaItemId] ?? null,
                 )->toArray(),
                 $stashItems,
             ),
@@ -151,7 +150,7 @@ final readonly class StashController
     #[Get('/api/v1/stashes/{id}/inputs')]
     public function inputs(string $id): Json
     {
-        $stash = $this->stashes->find($id);
+        $stash = $this->findStash($id);
 
         if ($stash === null) {
             return $this->notFound('Stash not found.');
@@ -160,7 +159,7 @@ final readonly class StashController
         return new Json([
             'inputs' => array_map(
                 static fn ($input): array => StashInputResource::fromRecord($input)->toArray(),
-                $this->stashInputs->listForStash($id),
+                $this->stashInputs->listForStash(StashId::parse((string) $stash->id)),
             ),
         ]);
     }
@@ -168,7 +167,7 @@ final readonly class StashController
     #[Post('/api/v1/stashes/{id}/inputs')]
     public function addInput(string $id, Request $request): Json
     {
-        if ($this->stashes->find($id) === null) {
+        if ($this->findStash($id) === null) {
             return $this->notFound('Stash not found.');
         }
 
@@ -199,7 +198,7 @@ final readonly class StashController
     #[Patch('/api/v1/stashes/{id}')]
     public function update(string $id, Request $request): Json
     {
-        $stash = $this->stashes->find($id);
+        $stash = $this->findStash($id);
 
         if ($stash === null) {
             return $this->notFound('Stash not found.');
@@ -264,7 +263,7 @@ final readonly class StashController
     #[Delete('/api/v1/stashes/{id}')]
     public function delete(string $id): Json
     {
-        $stash = $this->stashes->find($id);
+        $stash = $this->findStash($id);
 
         if ($stash === null) {
             return $this->notFound('Stash not found.');
@@ -278,7 +277,7 @@ final readonly class StashController
     #[Get('/api/v1/stashes/{id}/delete-impact')]
     public function deleteImpact(string $id): Json
     {
-        $stash = $this->stashes->find($id);
+        $stash = $this->findStash($id);
 
         if ($stash === null) {
             return $this->notFound('Stash not found.');
@@ -287,6 +286,11 @@ final readonly class StashController
         return new Json([
             'delete_impact' => ApiJson::encode($this->stashes->deleteImpact($stash)),
         ]);
+    }
+
+    private function findStash(string $id): ?StashRecord
+    {
+        return StashId::isValid($id) ? $this->stashes->find(StashId::parse($id)) : null;
     }
 
     private function notFound(string $message): Json

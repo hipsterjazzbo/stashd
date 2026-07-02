@@ -9,10 +9,12 @@ use App\Transcoding\Ffmpeg\FfmpegGateway;
 use App\Transcoding\Ffmpeg\StubFfmpegGateway;
 use App\Transcoding\TranscodeException;
 use App\Transcoding\TranscodePodcastAudioAsset;
+use App\Vault\AssetId;
 use App\Vault\AssetKind;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
+use App\Vault\MediaItemId;
 use App\Vault\MediaItemRepository;
 
 test('a successful transcode produces a ready derived audio asset', function (): void {
@@ -24,17 +26,17 @@ test('a successful transcode produces a ready derived audio asset', function ():
 
     $executor = $this->container->get(TranscodePodcastAudioAsset::class);
     $result = $executor->execute(
-        mediaItemId: PrefixedUlid::parse($mediaItemId),
-        sourceAssetId: PrefixedUlid::parse($videoAssetId),
-        audioAssetId: PrefixedUlid::parse($audioAssetId),
+        mediaItemId: MediaItemId::parse($mediaItemId),
+        sourceAssetId: AssetId::parse($videoAssetId),
+        audioAssetId: AssetId::parse($audioAssetId),
         jobId: PrefixedUlid::parse('job_01J00000000000000000000099'),
     );
 
-    $audioAsset = $this->container->get(AssetRepository::class)->find(PrefixedUlid::parse($audioAssetId));
+    $audioAsset = $this->container->get(AssetRepository::class)->find(AssetId::parse($audioAssetId));
 
     expect($gateway->transcodeCalls)->toBe(1)
         ->and($audioAsset->state)->toBe(AssetState::Ready)
-        ->and($audioAsset->derivedFromAssetId)->toBe($videoAssetId)
+        ->and((string) $audioAsset->derivedFromAssetId)->toBe($videoAssetId)
         ->and($audioAsset->mimeType)->toBe('audio/mpeg')
         ->and($audioAsset->container)->toBe('mp3')
         ->and($audioAsset->path)->not->toBeNull()
@@ -52,18 +54,18 @@ test('re-entry on an already ready asset short-circuits without transcoding agai
 
     $executor = $this->container->get(TranscodePodcastAudioAsset::class);
     $executor->execute(
-        mediaItemId: PrefixedUlid::parse($mediaItemId),
-        sourceAssetId: PrefixedUlid::parse($videoAssetId),
-        audioAssetId: PrefixedUlid::parse($audioAssetId),
+        mediaItemId: MediaItemId::parse($mediaItemId),
+        sourceAssetId: AssetId::parse($videoAssetId),
+        audioAssetId: AssetId::parse($audioAssetId),
         jobId: PrefixedUlid::parse('job_01J00000000000000000000098'),
     );
 
     expect($gateway->transcodeCalls)->toBe(1);
 
     $executor->execute(
-        mediaItemId: PrefixedUlid::parse($mediaItemId),
-        sourceAssetId: PrefixedUlid::parse($videoAssetId),
-        audioAssetId: PrefixedUlid::parse($audioAssetId),
+        mediaItemId: MediaItemId::parse($mediaItemId),
+        sourceAssetId: AssetId::parse($videoAssetId),
+        audioAssetId: AssetId::parse($audioAssetId),
         jobId: PrefixedUlid::parse('job_01J00000000000000000000097'),
     );
 
@@ -81,13 +83,13 @@ test('a failed transcode leaves the asset Failed and marks temp staging failed',
     $jobId = PrefixedUlid::parse('job_01J00000000000000000000096');
 
     expect(fn () => $executor->execute(
-        mediaItemId: PrefixedUlid::parse($mediaItemId),
-        sourceAssetId: PrefixedUlid::parse($videoAssetId),
-        audioAssetId: PrefixedUlid::parse($audioAssetId),
+        mediaItemId: MediaItemId::parse($mediaItemId),
+        sourceAssetId: AssetId::parse($videoAssetId),
+        audioAssetId: AssetId::parse($audioAssetId),
         jobId: $jobId,
     ))->toThrow(TranscodeException::class);
 
-    $audioAsset = $this->container->get(AssetRepository::class)->find(PrefixedUlid::parse($audioAssetId));
+    $audioAsset = $this->container->get(AssetRepository::class)->find(AssetId::parse($audioAssetId));
     $config = $this->container->get(\App\Config\StashdConfig::class);
     $tempDirectory = rtrim($config->tempPath(), '/') . '/downloads/' . $jobId->toString();
 
@@ -115,7 +117,7 @@ function transcodeExecutorTestFixture(MediaItemRepository $mediaItems, AssetRepo
     file_put_contents($tempPath, 'fake-video-bytes');
 
     $videoAsset = $assets->create(
-        mediaItemId: PrefixedUlid::parse((string) $media->id),
+        mediaItemId: MediaItemId::parse((string) $media->id),
         role: AssetRole::VaultOriginal,
         kind: AssetKind::Video,
         state: AssetState::Ready,
@@ -123,7 +125,7 @@ function transcodeExecutorTestFixture(MediaItemRepository $mediaItems, AssetRepo
     );
 
     $audioAsset = $assets->create(
-        mediaItemId: PrefixedUlid::parse((string) $media->id),
+        mediaItemId: MediaItemId::parse((string) $media->id),
         role: AssetRole::PodcastAudio,
         kind: AssetKind::Audio,
         state: AssetState::Pending,

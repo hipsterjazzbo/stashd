@@ -35,7 +35,7 @@ final readonly class AssetVerifyCommandHandler implements CommandHandler
             throw InvalidCommandPayload::withErrors(['asset_id is required.']);
         }
 
-        if ($this->assets->find(PrefixedUlid::parse($assetId)) === null) {
+        if (! AssetId::isValid($assetId) || $this->assets->find(AssetId::parse($assetId)) === null) {
             throw InvalidCommandPayload::withErrors(['Asset not found.']);
         }
     }

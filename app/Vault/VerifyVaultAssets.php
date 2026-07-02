@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Vault;
 
-use App\Support\PrefixedUlid;
 use App\System\State\StateTransitionService;
 use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRepository;
@@ -62,7 +61,7 @@ final readonly class VerifyVaultAssets
         );
     }
 
-    public function verifyAsset(PrefixedUlid $assetId): VerifyAssetOutcome
+    public function verifyAsset(AssetId $assetId): VerifyAssetOutcome
     {
         $asset = $this->assets->find($assetId);
 
@@ -143,7 +142,7 @@ final readonly class VerifyVaultAssets
             return;
         }
 
-        $mediaItem = $this->mediaItems->find(PrefixedUlid::parse($asset->mediaItemId));
+        $mediaItem = $this->mediaItems->find($asset->mediaItemId);
 
         if ($mediaItem === null) {
             return;
@@ -162,7 +161,7 @@ final readonly class VerifyVaultAssets
             return;
         }
 
-        $mediaItem = $this->mediaItems->find(PrefixedUlid::parse($asset->mediaItemId));
+        $mediaItem = $this->mediaItems->find($asset->mediaItemId);
 
         if ($mediaItem === null) {
             return;

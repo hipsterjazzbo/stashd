@@ -269,7 +269,7 @@ test('scheduler creates preflight commands for due automatic stash inputs', func
 
     $stash = $stashRepo->create('Scheduler Stash', 'scheduler-stash');
     $inputRepo->create(
-        stashId: \App\Support\PrefixedUlid::parse((string) $stash->id),
+        stashId: \App\Stashes\StashId::parse((string) $stash->id),
         providerKey: 'fake',
         inputType: \App\Stashes\StashInputType::Channel,
         sourceUri: 'fake://channel/scheduler-demo',

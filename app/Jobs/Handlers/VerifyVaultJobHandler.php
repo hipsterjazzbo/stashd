@@ -18,6 +18,7 @@ use App\Support\PrefixedUlid;
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
 use App\System\State\StateTransitionService;
+use App\Vault\AssetId;
 use App\Vault\VerifyVaultAssets;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
@@ -50,7 +51,7 @@ final readonly class VerifyVaultJobHandler implements JobHandler
             : json_decode($job->payloadJson, true, flags: JSON_THROW_ON_ERROR);
 
         if (isset($payload['asset_id']) && is_string($payload['asset_id']) && $payload['asset_id'] !== '') {
-            $outcome = $this->verify->verifyAsset(PrefixedUlid::parse($payload['asset_id']));
+            $outcome = $this->verify->verifyAsset(AssetId::parse($payload['asset_id']));
             $result = [
                 'scope' => 'asset',
                 'asset_id' => $payload['asset_id'],

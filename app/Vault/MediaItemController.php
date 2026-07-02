@@ -10,6 +10,7 @@ use App\Broadcasts\BroadcastRepository;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
 use App\Stashes\Api\StashResource;
+use App\Stashes\StashId;
 use App\Stashes\StashItemRepository;
 use App\Stashes\StashRepository;
 use App\Support\PrefixedUlid;
@@ -48,7 +49,7 @@ final readonly class MediaItemController
     #[Get('/api/v1/items/{id}')]
     public function show(string $id): Json
     {
-        $item = $this->mediaItems->find(PrefixedUlid::parse($id));
+        $item = $this->findMediaItem($id);
 
         if ($item === null) {
             return $this->notFound();
@@ -62,13 +63,13 @@ final readonly class MediaItemController
     #[Get('/api/v1/items/{id}/assets')]
     public function assets(string $id): Json
     {
-        $mediaItemId = PrefixedUlid::parse($id);
-        $mediaItem = $this->mediaItems->find($mediaItemId);
+        $mediaItem = $this->findMediaItem($id);
 
         if ($mediaItem === null) {
             return $this->notFound();
         }
 
+        $mediaItemId = MediaItemId::parse((string) $mediaItem->id);
         $assets = $this->assets->listForMediaItem($mediaItemId);
 
         $vaultOriginal = $this->assets->findByMediaItemAndRole($mediaItemId, AssetRole::VaultOriginal);
@@ -103,19 +104,21 @@ final readonly class MediaItemController
     #[Get('/api/v1/items/{id}/stashes')]
     public function stashes(string $id): Json
     {
-        $mediaItemId = PrefixedUlid::parse($id);
+        $mediaItem = $this->findMediaItem($id);
 
-        if ($this->mediaItems->find($mediaItemId) === null) {
+        if ($mediaItem === null) {
             return $this->notFound();
         }
 
+        $mediaItemId = MediaItemId::parse((string) $mediaItem->id);
+
         $stashIds = array_values(array_unique(array_map(
-            static fn ($stashItem): string => $stashItem->stashId,
+            static fn ($stashItem): string => (string) $stashItem->stashId,
             $this->stashItems->listForMediaItem($mediaItemId),
         )));
 
         $stashes = array_filter(array_map(
-            fn (string $stashId) => $this->stashes->find(PrefixedUlid::parse($stashId)),
+            fn (string $stashId) => $this->stashes->find(StashId::parse($stashId)),
             $stashIds,
         ));
 
@@ -131,11 +134,13 @@ final readonly class MediaItemController
     #[Get('/api/v1/items/{id}/broadcasts')]
     public function broadcasts(string $id): Json
     {
-        $mediaItemId = PrefixedUlid::parse($id);
+        $mediaItem = $this->findMediaItem($id);
 
-        if ($this->mediaItems->find($mediaItemId) === null) {
+        if ($mediaItem === null) {
             return $this->notFound();
         }
+
+        $mediaItemId = MediaItemId::parse((string) $mediaItem->id);
 
         $broadcastIds = array_values(array_unique(array_map(
             static fn ($broadcastItem): string => $broadcastItem->broadcastId,
@@ -153,6 +158,11 @@ final readonly class MediaItemController
                 array_values($broadcasts),
             ),
         ]);
+    }
+
+    private function findMediaItem(string $id): ?MediaItemRecord
+    {
+        return MediaItemId::isValid($id) ? $this->mediaItems->find(MediaItemId::parse($id)) : null;
     }
 
     private function notFound(): Json

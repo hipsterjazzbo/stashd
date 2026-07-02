@@ -406,8 +406,8 @@ the live status tracker, so "what's left" never again needs a tour of `docs/plan
   replacing raw `PrefixedUlid`/string at boundaries; pass loaded records instead of IDs where the
   caller already has them, keep raw strings only at HTTP/DB/serialization boundaries. Split by
   domain (auth / stashes-vault / broadcasts / jobs-commands / system-storage-activity) if too large
-  for one pass. **Auth domain done as the vertical proof; stashes-vault / broadcasts / jobs-commands /
-  system-storage-activity still pending.** Built the shared plumbing all future domains reuse: abstract
+  for one pass. **Auth and stashes-vault domains done; broadcasts / jobs-commands / system-storage-activity
+  still pending.** Built the shared plumbing all future domains reuse: abstract
   `App\Support\Ids\PrefixedId` (wraps the existing `PrefixedUlid` for prefix/ULID validation instead of
   reimplementing it) plus a single auto-discovered `PrefixedIdCaster`/`PrefixedIdSerializer` pair
   (Tempest's `DynamicCaster`/`ConfigurableCaster`/`DynamicSerializer`, matched by property type, not a
@@ -428,8 +428,41 @@ the live status tracker, so "what's left" never again needs a tour of `docs/plan
   `->toString()` — the caster only fixes hydration/persistence, not raw bound-param binding, which goes
   through PDO directly and doesn't accept objects. Added `ApiTokenTypedIdTest.php` covering the caster
   priority fix and the where-lookup binding as a standing regression test, not just a one-off debug
-  script. `docs/plans/stronger-record-types.md`'s Entity Identity References prompt has the domain
-  breakdown and the full ID-class inventory for the remaining domains.
+  script.
+  Stashes-vault domain: added `StashId`, `StashInputId`, `StashItemId`, `MediaItemId`, `MediaItemSourceId`,
+  `AssetId` (each a two-line `PrefixedId` subclass, no new caster/serializer needed). Converted
+  `StashInputRecord::$stashId`, `StashItemRecord::$stashId`/`$mediaItemId`/`$stashInputId`,
+  `MediaItemSourceRecord::$mediaItemId`/`$stashInputId`, `AssetRecord::$mediaItemId`/`$derivedFromAssetId`.
+  Deliberately left `AssetRecord::$broadcastId`/`$broadcastItemId` as raw strings (Broadcasts domain,
+  future slice) and all provider-identity strings untouched per the plan's own guidance. Added
+  `PrefixedId::isValid()` so route/job-payload boundary parsing can return a clean validation error for
+  malformed IDs instead of an uncaught exception — several controllers/command-handlers already did
+  `PrefixedUlid::parse($rawId)` inline with no guard, which is fine for a generic ID (throws either way)
+  but became a real behavior gap once IDs are prefix-specific (a wrong-but-valid-shaped ID needs its own
+  rejection path). This slice's actual work was mostly *consumers* of the six converted entities, not the
+  six records/repositories themselves — Stashes-internal code was clean, but the Broadcasts, Downloads,
+  Transcoding, and Vault-verification code that reads `StashItemRecord`/`AssetRecord`/etc. needed the same
+  fix repeated across ~15 files (`BroadcastContextFactory`, `BroadcastController`, both series/podcast
+  broadcast plugins, `PodcastAssetSelector`, `PodcastTranscodeFallback`, `DownloadMediaItem`,
+  `TranscodePodcastAudioAsset`, `VerifyVaultAssets`, job handlers) — PHPStan (level max, `app/` only)
+  caught all of those exhaustively once run project-wide; a single-file or single-domain `phpstan analyse`
+  run does not check for baseline entries that went stale from a change elsewhere, so the full
+  `composer test:static` was needed to catch already-fixed files whose baseline suppressions no longer
+  matched. **Two bug classes PHPStan structurally cannot see, both real, both found only by the full test
+  suite (`tests/` isn't scanned)**: (1) API Resource classes (`StashItemResource`, `AssetResource`,
+  `StashInputResource`) were emitting the typed ID object directly into JSON output instead of an explicit
+  string — `'stashId' => $this->item->stashId` used to work when the property was a plain string, and nothing
+  about the type change makes that assignment a static error, it just silently serializes as `{"value":
+  "..."}` instead of a plain string, breaking the public API contract. (2) test fixtures comparing a
+  now-typed property against a raw string with `===`/`!==` (`if ($stashItem->mediaItemId === $mediaItemId)`)
+  silently always evaluate to the "not equal" branch — no error, no warning, just wrong behavior (one fixture
+  helper used this to decide which stash items to hide, and got it backwards for every item). Grepped the
+  whole `tests/` tree for both patterns after finding the first instance of each, rather than fixing them
+  one crash at a time. Added `StashItemTypedIdTest.php` (insert → multi-column where-lookup → reload) and
+  value-shape assertions in two existing feature tests (`Phase4AHardeningTest`, `Phase6StashesVaultTest`)
+  proving the API output is a plain string, not just present.
+  `docs/plans/stronger-record-types.md`'s Entity Identity References prompt has the domain breakdown and
+  the full ID-class inventory for the remaining domains.
 - [ ] URL & Filesystem Path Values — rename `StashdUri` → `StashdUrl`, move `fake://` support out of
   production URL handling into fake-provider-only URL classes, add YouTube-specific URL classes
   (`YouTubeChannelUrl`/`YouTubeVideoUrl`/`YouTubePlaylistUrl`) behind a marshaller, and introduce

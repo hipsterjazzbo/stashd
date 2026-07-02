@@ -17,10 +17,12 @@ use App\Jobs\JobProgressUpdate;
 use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
+use App\Stashes\StashId;
 use App\Support\PrefixedUlid;
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
 use App\System\State\StateTransitionService;
+use App\Vault\MediaItemId;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Duration;
 use Tempest\DateTime\Timezone;
@@ -55,8 +57,8 @@ final readonly class DownloadJobHandler implements JobHandler
             ? []
             : json_decode($job->payloadJson, true, flags: JSON_THROW_ON_ERROR);
 
-        $mediaItemId = PrefixedUlid::parse((string) ($payload['media_item_id'] ?? ''));
-        $stashId = PrefixedUlid::parse((string) ($payload['stash_id'] ?? ''));
+        $mediaItemId = MediaItemId::parse((string) ($payload['media_item_id'] ?? ''));
+        $stashId = StashId::parse((string) ($payload['stash_id'] ?? ''));
         $force = (bool) ($payload['force'] ?? false);
 
         try {

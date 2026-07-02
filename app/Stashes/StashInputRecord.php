@@ -17,7 +17,7 @@ final class StashInputRecord
     public PrimaryKey $id;
 
     public function __construct(
-        public string $stashId,
+        public StashId $stashId,
         public string $providerKey,
         public StashInputType $inputType,
         public string $sourceUri,

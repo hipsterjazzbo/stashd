@@ -6,14 +6,15 @@ namespace App\Downloads;
 
 use App\Providers\StashdUri;
 use App\Stashes\DownloadPolicy;
-use App\Support\PrefixedUlid;
+use App\Stashes\StashId;
+use App\Vault\MediaItemId;
 use Tempest\DateTime\DateTime;
 
 final readonly class DownloadRequest
 {
     public function __construct(
-        public PrefixedUlid $mediaItemId,
-        public PrefixedUlid $stashId,
+        public MediaItemId $mediaItemId,
+        public StashId $stashId,
         public string $providerKey,
         public string $providerItemId,
         public StashdUri $canonicalUri,

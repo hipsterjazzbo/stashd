@@ -25,6 +25,8 @@ use App\System\Event\EventPublisher;
 use App\System\State\StateTransitionService;
 use App\Transcoding\Ffmpeg\FfmpegProgress;
 use App\Transcoding\TranscodePodcastAudioAsset;
+use App\Vault\AssetId;
+use App\Vault\MediaItemId;
 use RuntimeException;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Duration;
@@ -61,9 +63,9 @@ final readonly class TranscodePodcastAudioJobHandler implements JobHandler
             ? []
             : json_decode($job->payloadJson, true, flags: JSON_THROW_ON_ERROR);
 
-        $mediaItemId = PrefixedUlid::parse((string) ($payload['media_item_id'] ?? ''));
-        $sourceAssetId = PrefixedUlid::parse((string) ($payload['source_asset_id'] ?? ''));
-        $audioAssetId = PrefixedUlid::parse((string) ($payload['asset_id'] ?? ''));
+        $mediaItemId = MediaItemId::parse((string) ($payload['media_item_id'] ?? ''));
+        $sourceAssetId = AssetId::parse((string) ($payload['source_asset_id'] ?? ''));
+        $audioAssetId = AssetId::parse((string) ($payload['asset_id'] ?? ''));
 
         $lastForwardedAt = microtime(true);
 

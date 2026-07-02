@@ -8,9 +8,11 @@ use App\Broadcasts\BroadcastFilenameBuilder;
 use App\Broadcasts\BroadcastLifecycleService;
 use App\Broadcasts\HardlinkPublisher;
 use App\Config\StashdConfig;
+use App\Stashes\StashId;
 use App\Stashes\StashItemRecord;
 use App\System\Activity\ActivityEventRecord;
 use App\Vault\AssetRole;
+use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
 use Tempest\Http\Status;
 
@@ -280,8 +282,8 @@ test('broadcast commands emit activity events', function (): void {
 test('broadcast filename builder rejects path traversal segments', function (): void {
     $builder = new BroadcastFilenameBuilder();
     $stashItem = new StashItemRecord(
-        stashId: 'stash_test',
-        mediaItemId: 'media_test',
+        stashId: StashId::parse('stash_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
+        mediaItemId: MediaItemId::parse('media_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
         state: \App\Stashes\StashItemState::Active,
         displayTitle: '../../etc/passwd',
     );

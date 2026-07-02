@@ -25,7 +25,7 @@ final class AssetRecord
         public AssetRole $role,
         public AssetKind $kind,
         public AssetState $state,
-        public ?string $mediaItemId = null,
+        public ?MediaItemId $mediaItemId = null,
         public ?string $broadcastId = null,
         public ?string $broadcastItemId = null,
         public ?string $path = null,
@@ -40,7 +40,7 @@ final class AssetRecord
         #[CastWith(DurationSecondsCaster::class)]
         #[SerializeWith(DurationSecondsSerializer::class)]
         public ?Duration $durationSeconds = null,
-        public ?string $derivedFromAssetId = null,
+        public ?AssetId $derivedFromAssetId = null,
         public ?DateTime $lastVerifiedAt = null,
         public ?DateTime $missingAt = null,
         public ?string $missingReason = null,

@@ -12,7 +12,9 @@ use App\Commands\InvalidCommandPayload;
 use App\Jobs\JobIntent;
 use App\Jobs\JobRepository;
 use App\Support\PrefixedUlid;
+use App\Vault\AssetId;
 use App\Vault\AssetRepository;
+use App\Vault\MediaItemId;
 use App\Vault\MediaItemRepository;
 
 final readonly class AssetTranscodePodcastAudioCommandHandler implements CommandHandler
@@ -38,15 +40,15 @@ final readonly class AssetTranscodePodcastAudioCommandHandler implements Command
             throw InvalidCommandPayload::withErrors(['media_item_id, source_asset_id, and asset_id are required.']);
         }
 
-        if ($this->mediaItems->find($payload['media_item_id']) === null) {
+        if (! MediaItemId::isValid($payload['media_item_id']) || $this->mediaItems->find(MediaItemId::parse($payload['media_item_id'])) === null) {
             throw InvalidCommandPayload::withErrors(['Media item not found.']);
         }
 
-        if ($this->assets->find(PrefixedUlid::parse($payload['source_asset_id'])) === null) {
+        if (! AssetId::isValid($payload['source_asset_id']) || $this->assets->find(AssetId::parse($payload['source_asset_id'])) === null) {
             throw InvalidCommandPayload::withErrors(['Source asset not found.']);
         }
 
-        if ($this->assets->find(PrefixedUlid::parse($payload['asset_id'])) === null) {
+        if (! AssetId::isValid($payload['asset_id']) || $this->assets->find(AssetId::parse($payload['asset_id'])) === null) {
             throw InvalidCommandPayload::withErrors(['Target asset not found.']);
         }
     }
@@ -77,7 +79,7 @@ final readonly class AssetTranscodePodcastAudioCommandHandler implements Command
         return [];
     }
 
-    /** @return array<string, mixed> */
+    /** @return array<string, string> */
     private function normalizedPayload(array $options): array
     {
         return [

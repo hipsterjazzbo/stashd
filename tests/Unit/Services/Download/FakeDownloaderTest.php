@@ -8,7 +8,8 @@ use App\Downloads\DownloadRequest;
 use App\Downloads\Fake\FakeDownloader;
 use App\Providers\StashdUri;
 use App\Stashes\DownloadPolicy;
-use App\Support\PrefixedUlid;
+use App\Stashes\StashId;
+use App\Vault\MediaItemId;
 use App\Vault\VaultSidecarBuilder;
 
 test('fake downloader writes deterministic files to temp directory', function (): void {
@@ -17,8 +18,8 @@ test('fake downloader writes deterministic files to temp directory', function ()
 
     $downloader = new FakeDownloader(new VaultSidecarBuilder());
     $request = new DownloadRequest(
-        mediaItemId: PrefixedUlid::parse('media_01J00000000000000000000001'),
-        stashId: PrefixedUlid::parse('stash_01J00000000000000000000001'),
+        mediaItemId: MediaItemId::parse('media_01J00000000000000000000001'),
+        stashId: StashId::parse('stash_01J00000000000000000000001'),
         providerKey: 'fake',
         providerItemId: 'demo-episode-1',
         canonicalUri: StashdUri::fake('item/demo-episode-1'),
@@ -41,8 +42,8 @@ test('fake downloader writes deterministic files to temp directory', function ()
 test('fake downloader rejects metadata-only policy', function (): void {
     $downloader = new FakeDownloader(new VaultSidecarBuilder());
     $request = new DownloadRequest(
-        mediaItemId: PrefixedUlid::parse('media_01J00000000000000000000001'),
-        stashId: PrefixedUlid::parse('stash_01J00000000000000000000001'),
+        mediaItemId: MediaItemId::parse('media_01J00000000000000000000001'),
+        stashId: StashId::parse('stash_01J00000000000000000000001'),
         providerKey: 'fake',
         providerItemId: 'demo-episode-1',
         canonicalUri: StashdUri::fake('item/demo-episode-1'),

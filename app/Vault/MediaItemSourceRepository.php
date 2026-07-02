@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Vault;
 
-use App\Support\PrefixedUlid;
+use App\Stashes\StashInputId;
 use App\Support\PrefixedUlidGenerator;
 use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
@@ -22,21 +22,21 @@ final class MediaItemSourceRepository
     }
 
     public function create(
-        PrefixedUlid $mediaItemId,
+        MediaItemId $mediaItemId,
         string $providerKey,
         string $providerInputId,
         string $discoveredUri,
-        ?PrefixedUlid $stashInputId = null,
+        ?StashInputId $stashInputId = null,
         ?int $position = null,
     ): MediaItemSourceRecord {
         $id = $this->ids->generate('source')->toString();
         $record = new MediaItemSourceRecord(
-            mediaItemId: $mediaItemId->toString(),
+            mediaItemId: $mediaItemId,
             providerKey: $providerKey,
             providerInputId: $providerInputId,
             discoveredUri: $discoveredUri,
             discoveredAt: DateTime::now(Timezone::UTC),
-            stashInputId: $stashInputId?->toString(),
+            stashInputId: $stashInputId,
             position: $position,
         );
         $record->id = new PrimaryKey($id);
@@ -48,18 +48,18 @@ final class MediaItemSourceRepository
     }
 
     public function findForMediaItemAndInput(
-        PrefixedUlid $mediaItemId,
-        PrefixedUlid $stashInputId,
+        MediaItemId $mediaItemId,
+        StashInputId $stashInputId,
     ): ?MediaItemSourceRecord {
         return MediaItemSourceRecord::select()
             ->where('mediaItemId = ? AND stashInputId = ?', $mediaItemId->toString(), $stashInputId->toString())
             ->first();
     }
 
-    public function deleteForStashInput(string|\Stringable $stashInputId): void
+    public function deleteForStashInput(StashInputId $stashInputId): void
     {
         $sources = MediaItemSourceRecord::select()
-            ->where('stashInputId = ?', (string) $stashInputId)
+            ->where('stashInputId = ?', $stashInputId->toString())
             ->all();
 
         foreach ($sources as $source) {

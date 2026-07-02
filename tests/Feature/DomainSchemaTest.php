@@ -73,13 +73,13 @@ test('stash item enforces stash and media item relationship uniqueness', functio
     $mediaItem = $media->create('fake', 'rel-item', 'fake://item/rel-item', 'Rel Item');
 
     $items->create(
-        stashId: \App\Support\PrefixedUlid::parse((string) $stash->id),
-        mediaItemId: \App\Support\PrefixedUlid::parse((string) $mediaItem->id),
+        stashId: \App\Stashes\StashId::parse((string) $stash->id),
+        mediaItemId: \App\Vault\MediaItemId::parse((string) $mediaItem->id),
     );
 
     expect(fn () => $items->create(
-        stashId: \App\Support\PrefixedUlid::parse((string) $stash->id),
-        mediaItemId: \App\Support\PrefixedUlid::parse((string) $mediaItem->id),
+        stashId: \App\Stashes\StashId::parse((string) $stash->id),
+        mediaItemId: \App\Vault\MediaItemId::parse((string) $mediaItem->id),
     ))->toThrow(\Tempest\Database\Exceptions\QueryWasInvalid::class);
 });
 
@@ -122,7 +122,7 @@ test('repository smoke creates stash with input media item stash item and broadc
     $broadcasts = $this->container->get(\App\Broadcasts\BroadcastRepository::class);
 
     $stash = $stashes->create('Demo', 'demo-stash');
-    $stashId = \App\Support\PrefixedUlid::parse((string) $stash->id);
+    $stashId = \App\Stashes\StashId::parse((string) $stash->id);
 
     $input = $inputs->create(
         stashId: $stashId,
@@ -143,13 +143,13 @@ test('repository smoke creates stash with input media item stash item and broadc
 
     $stashItem = $items->create(
         stashId: $stashId,
-        mediaItemId: \App\Support\PrefixedUlid::parse((string) $mediaItem->id),
-        stashInputId: \App\Support\PrefixedUlid::parse((string) $input->id),
+        mediaItemId: \App\Vault\MediaItemId::parse((string) $mediaItem->id),
+        stashInputId: \App\Stashes\StashInputId::parse((string) $input->id),
         position: 1,
     );
 
     $broadcast = $broadcasts->create(
-        stashId: $stashId,
+        stashId: \App\Support\PrefixedUlid::parse($stashId->toString()),
         type: 'jellyfin',
         name: 'Demo Series',
         slug: 'demo-series',
@@ -160,7 +160,7 @@ test('repository smoke creates stash with input media item stash item and broadc
         ->and(MediaItemRecord::findById($mediaItem->id))->not->toBeNull()
         ->and(StashItemRecord::findById($stashItem->id))->not->toBeNull()
         ->and(BroadcastRecord::findById($broadcast->id))->not->toBeNull()
-        ->and($stashItem->stashId)->toBe((string) $stash->id)
+        ->and((string) $stashItem->stashId)->toBe((string) $stash->id)
         ->and($broadcast->stashId)->toBe((string) $stash->id);
 });
 

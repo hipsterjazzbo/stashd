@@ -91,49 +91,7 @@ parameters:
 			path: app/Broadcasts/BroadcastContext.php
 
 		-
-			message: '#^Cannot access property \$mediaItemId on mixed\.$#'
-			identifier: property.nonObject
-			count: 6
-			path: app/Broadcasts/BroadcastContextFactory.php
-
-		-
-			message: '#^Parameter \#1 \$value of static method App\\Support\\PrefixedUlid\:\:parse\(\) expects string, mixed given\.$#'
-			identifier: argument.type
-			count: 2
-			path: app/Broadcasts/BroadcastContextFactory.php
-
-		-
-			message: '#^Parameter \$mediaItems of class App\\Broadcasts\\BroadcastContext constructor expects array\<string, App\\Vault\\MediaItemRecord\>, array\<App\\Vault\\MediaItemRecord\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Broadcasts/BroadcastContextFactory.php
-
-		-
-			message: '#^Parameter \$stashItems of class App\\Broadcasts\\BroadcastContext constructor expects list\<App\\Stashes\\StashItemRecord\>, array\<mixed\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Broadcasts/BroadcastContextFactory.php
-
-		-
-			message: '#^Parameter \$vaultOriginals of class App\\Broadcasts\\BroadcastContext constructor expects array\<string, App\\Vault\\AssetRecord\|null\>, array\<App\\Vault\\AssetRecord\|null\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Broadcasts/BroadcastContextFactory.php
-
-		-
-			message: '#^Possibly invalid array key type mixed\.$#'
-			identifier: offsetAccess.invalidOffset
-			count: 4
-			path: app/Broadcasts/BroadcastContextFactory.php
-
-		-
 			message: '#^Property App\\Broadcasts\\BroadcastContextFactory\:\:\$broadcasts is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: app/Broadcasts/BroadcastContextFactory.php
-
-		-
-			message: '#^Property App\\Broadcasts\\BroadcastContextFactory\:\:\$stashItems is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
 			path: app/Broadcasts/BroadcastContextFactory.php
@@ -1813,12 +1771,6 @@ parameters:
 			path: app/System/Wiring/ProviderHttpClientInitializer.php
 
 		-
-			message: '#^Cannot cast mixed to string\.$#'
-			identifier: cast.string
-			count: 3
-			path: app/Transcoding/AssetTranscodePodcastAudioCommandHandler.php
-
-		-
 			message: '#^Method App\\Transcoding\\AssetTranscodePodcastAudioCommandHandler\:\:extras\(\) has parameter \$options with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -1831,21 +1783,9 @@ parameters:
 			path: app/Transcoding/AssetTranscodePodcastAudioCommandHandler.php
 
 		-
-			message: '#^Parameter \#1 \$id of method App\\Vault\\MediaItemRepository\:\:find\(\) expects string\|Stringable, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Transcoding/AssetTranscodePodcastAudioCommandHandler.php
-
-		-
-			message: '#^Parameter \#1 \$value of static method App\\Support\\PrefixedUlid\:\:parse\(\) expects string, mixed given\.$#'
-			identifier: argument.type
+			message: '#^Cannot cast mixed to string\.$#'
+			identifier: cast.string
 			count: 3
-			path: app/Transcoding/AssetTranscodePodcastAudioCommandHandler.php
-
-		-
-			message: '#^Property App\\Commands\\CommandRecord\:\:\$targetId \(string\|null\) does not accept mixed\.$#'
-			identifier: assign.propertyType
-			count: 1
 			path: app/Transcoding/AssetTranscodePodcastAudioCommandHandler.php
 
 		-

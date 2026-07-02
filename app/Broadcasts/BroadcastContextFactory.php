@@ -4,16 +4,15 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
+use App\Stashes\StashId;
 use App\Stashes\StashItemRepository;
 use App\Stashes\StashItemState;
 use App\Stashes\StashRepository;
-use App\Support\PrefixedUlid;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
 use App\Vault\MediaItemRepository;
 use App\Vault\MediaItemState;
-use Tempest\Database\Direction;
 
 final readonly class BroadcastContextFactory
 {
@@ -28,36 +27,34 @@ final readonly class BroadcastContextFactory
 
     public function build(BroadcastRecord $broadcast): BroadcastContext
     {
-        $stashId = $broadcast->stashId;
+        $stashId = StashId::parse($broadcast->stashId);
 
         $stash = $this->stashes->find($stashId)
             ?? throw BroadcastException::withCode('stash_not_found', 'Stash not found.');
 
-        $stashItems = \App\Stashes\StashItemRecord::select()
-            ->where('stashId = ?', $broadcast->stashId)
-            ->orderBy('position', Direction::ASC)
-            ->all();
+        $stashItems = $this->stashItems->listForStash($stashId);
 
         $mediaItems = [];
         $vaultOriginals = [];
 
         foreach ($stashItems as $stashItem) {
-            $mediaItem = $this->mediaItems->find(PrefixedUlid::parse($stashItem->mediaItemId));
+            $mediaItemId = (string) $stashItem->mediaItemId;
+            $mediaItem = $this->mediaItems->find($stashItem->mediaItemId);
 
             if ($mediaItem === null) {
                 continue;
             }
 
-            $mediaItems[$stashItem->mediaItemId] = $mediaItem;
+            $mediaItems[$mediaItemId] = $mediaItem;
 
             if ($mediaItem->state !== MediaItemState::Ready) {
-                $vaultOriginals[$stashItem->mediaItemId] = null;
+                $vaultOriginals[$mediaItemId] = null;
 
                 continue;
             }
 
             $vaultOriginal = $this->assets->findByMediaItemAndRole(
-                PrefixedUlid::parse($stashItem->mediaItemId),
+                $stashItem->mediaItemId,
                 AssetRole::VaultOriginal,
             );
 
@@ -66,12 +63,12 @@ final readonly class BroadcastContextFactory
                 || $vaultOriginal->state !== AssetState::Ready
                 || $vaultOriginal->path === null
             ) {
-                $vaultOriginals[$stashItem->mediaItemId] = null;
+                $vaultOriginals[$mediaItemId] = null;
 
                 continue;
             }
 
-            $vaultOriginals[$stashItem->mediaItemId] = $vaultOriginal;
+            $vaultOriginals[$mediaItemId] = $vaultOriginal;
         }
 
         return new BroadcastContext(
@@ -93,7 +90,7 @@ final readonly class BroadcastContextFactory
                 continue;
             }
 
-            $vault = $context->vaultOriginals[$stashItem->mediaItemId] ?? null;
+            $vault = $context->vaultOriginals[(string) $stashItem->mediaItemId] ?? null;
 
             if ($vault === null) {
                 continue;

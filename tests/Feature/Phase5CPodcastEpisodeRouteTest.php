@@ -16,6 +16,7 @@ use App\Vault\AssetKind;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
+use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
 use App\Vault\MediaItemState;
 use Tempest\Database\PrimaryKey;
@@ -783,7 +784,7 @@ function podcastEpisodeReadyStash(\Tests\IntegrationTestCase $test, string $chan
     [$headers, $stashId, $mediaItemId] = $test->bootstrapFakeDownloadStash($channel);
 
     foreach (StashItemRecord::select()->where('stashId = ?', $stashId)->all() as $stashItem) {
-        if ($stashItem->mediaItemId === $mediaItemId) {
+        if ((string) $stashItem->mediaItemId === $mediaItemId) {
             continue;
         }
 
@@ -818,7 +819,7 @@ function podcastEpisodeCreateAsset(
     file_put_contents($path, $contents);
 
     $assets->create(
-        mediaItemId: PrefixedUlid::parse($mediaItemId),
+        mediaItemId: MediaItemId::parse($mediaItemId),
         role: AssetRole::VaultOriginal,
         kind: $kind,
         state: AssetState::Ready,

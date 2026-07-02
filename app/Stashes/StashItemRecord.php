@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Stashes;
 
+use App\Vault\MediaItemId;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
@@ -17,10 +18,10 @@ final class StashItemRecord
     public PrimaryKey $id;
 
     public function __construct(
-        public string $stashId,
-        public string $mediaItemId,
+        public StashId $stashId,
+        public MediaItemId $mediaItemId,
         public StashItemState $state,
-        public ?string $stashInputId = null,
+        public ?StashInputId $stashInputId = null,
         public ?int $position = null,
         public ?int $seasonNumber = null,
         public ?int $episodeNumber = null,

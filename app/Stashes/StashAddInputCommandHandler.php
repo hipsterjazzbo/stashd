@@ -36,7 +36,7 @@ final readonly class StashAddInputCommandHandler implements CommandHandler
             throw InvalidCommandPayload::withErrors(['stash_id is required.']);
         }
 
-        if ($this->stashes->find($stashId) === null) {
+        if (! StashId::isValid($stashId) || $this->stashes->find(StashId::parse($stashId)) === null) {
             throw InvalidCommandPayload::withErrors(['Stash not found.']);
         }
 

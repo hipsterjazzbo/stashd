@@ -104,7 +104,10 @@ test('GET /api/v1/stashes/{id}/inputs lists stash inputs', function (): void {
         ->assertStatus(Status::OK);
 
     expect($response->body['inputs'])->toHaveCount(1)
-        ->and($response->body['inputs'][0])->toHaveKeys(['id', 'stash_id', 'provider_key', 'source_uri', 'state']);
+        ->and($response->body['inputs'][0])->toHaveKeys(['id', 'stash_id', 'provider_key', 'source_uri', 'state'])
+        // stash_id is a StashId value object on the record -- must serialize
+        // as a plain string in API output, not leak as {"value": ...}.
+        ->and($response->body['inputs'][0]['stash_id'])->toBe($stashId);
 });
 
 test('GET /api/v1/items lists media items across stashes', function (): void {

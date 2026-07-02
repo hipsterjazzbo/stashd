@@ -205,7 +205,7 @@ test('add input with video policy automatically downloads items without a manual
         expect($media?->state)->toBe(MediaItemState::Ready);
 
         $original = $assets->findByMediaItemAndRole(
-            \App\Support\PrefixedUlid::parse((string) $stashItem->mediaItemId),
+            $stashItem->mediaItemId,
             AssetRole::VaultOriginal,
         );
         expect($original?->state)->toBe(AssetState::Ready);

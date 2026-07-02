@@ -33,7 +33,7 @@ final readonly class StashInputResource implements Arrayable
 
         $encoded = ApiJson::encode([
             'id' => (string) $this->input->id,
-            'stashId' => $this->input->stashId,
+            'stashId' => (string) $this->input->stashId,
             'providerKey' => $this->input->providerKey,
             'inputType' => $this->input->inputType->value,
             'sourceUri' => $this->input->sourceUri,

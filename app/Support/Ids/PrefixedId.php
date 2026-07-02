@@ -33,6 +33,11 @@ abstract readonly class PrefixedId implements Stringable
         return new static($value);
     }
 
+    public static function isValid(string $value): bool
+    {
+        return PrefixedUlid::isValid($value) && PrefixedUlid::parse($value)->prefix === static::PREFIX;
+    }
+
     public function toString(): string
     {
         return $this->value;

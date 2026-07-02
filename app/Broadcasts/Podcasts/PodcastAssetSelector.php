@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Broadcasts\Podcasts;
 
-use App\Support\PrefixedUlid;
 use App\Vault\AssetKind;
 use App\Vault\AssetRecord;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
+use App\Vault\MediaItemId;
 
 final readonly class PodcastAssetSelector
 {
@@ -19,7 +19,7 @@ final readonly class PodcastAssetSelector
     ) {
     }
 
-    public function audioAsset(string $mediaItemId): ?PodcastAssetSelection
+    public function audioAsset(MediaItemId $mediaItemId): ?PodcastAssetSelection
     {
         foreach ($this->candidateAssets($mediaItemId) as $asset) {
             if ($asset->kind !== AssetKind::Audio) {
@@ -38,7 +38,7 @@ final readonly class PodcastAssetSelector
         return null;
     }
 
-    public function videoAsset(string $mediaItemId): ?PodcastAssetSelection
+    public function videoAsset(MediaItemId $mediaItemId): ?PodcastAssetSelection
     {
         foreach ($this->candidateAssets($mediaItemId) as $asset) {
             if ($asset->kind !== AssetKind::Video) {
@@ -64,9 +64,9 @@ final readonly class PodcastAssetSelector
      * separate from {@see videoAsset()}, which is video-media-kind-specific
      * and must not be touched/reused here.
      */
-    public function videoOriginalForAudioFallback(string $mediaItemId): ?AssetRecord
+    public function videoOriginalForAudioFallback(MediaItemId $mediaItemId): ?AssetRecord
     {
-        foreach ($this->assets->listForMediaItem(PrefixedUlid::parse($mediaItemId)) as $asset) {
+        foreach ($this->assets->listForMediaItem($mediaItemId) as $asset) {
             if (
                 $asset->role === AssetRole::VaultOriginal
                 && $asset->kind === AssetKind::Video
@@ -82,10 +82,10 @@ final readonly class PodcastAssetSelector
     }
 
     /** @return list<AssetRecord> */
-    private function candidateAssets(string $mediaItemId): array
+    private function candidateAssets(MediaItemId $mediaItemId): array
     {
         $assets = array_filter(
-            $this->assets->listForMediaItem(PrefixedUlid::parse($mediaItemId)),
+            $this->assets->listForMediaItem($mediaItemId),
             static fn (AssetRecord $asset): bool => $asset->state === AssetState::Ready
                 && $asset->path !== null
                 && is_file($asset->path)

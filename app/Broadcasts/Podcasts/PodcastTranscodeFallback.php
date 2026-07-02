@@ -6,11 +6,12 @@ namespace App\Broadcasts\Podcasts;
 
 use App\Commands\CommandDispatchService;
 use App\Commands\CommandType;
-use App\Support\PrefixedUlid;
+use App\Vault\AssetId;
 use App\Vault\AssetKind;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
+use App\Vault\MediaItemId;
 
 /**
  * Decides whether a missing podcast episode asset can be generated instead of
@@ -26,7 +27,7 @@ final readonly class PodcastTranscodeFallback
     }
 
     /** Returns a BroadcastItemRecord.lastError code, or null if no fallback applies. */
-    public function triggerIfNeeded(string $mediaItemId, PodcastMediaKind $kind): ?string
+    public function triggerIfNeeded(MediaItemId $mediaItemId, PodcastMediaKind $kind): ?string
     {
         return match ($kind) {
             PodcastMediaKind::Audio => $this->triggerAudioTranscode($mediaItemId),
@@ -39,10 +40,9 @@ final readonly class PodcastTranscodeFallback
         };
     }
 
-    private function triggerAudioTranscode(string $mediaItemId): ?string
+    private function triggerAudioTranscode(MediaItemId $mediaItemId): ?string
     {
-        $mediaItemUlid = PrefixedUlid::parse($mediaItemId);
-        $existingAudio = $this->assets->findByMediaItemAndRole($mediaItemUlid, AssetRole::PodcastAudio);
+        $existingAudio = $this->assets->findByMediaItemAndRole($mediaItemId, AssetRole::PodcastAudio);
 
         if ($existingAudio !== null && in_array($existingAudio->state, [AssetState::Pending, AssetState::Processing], true)) {
             return 'podcast_audio_transcode_pending';
@@ -59,16 +59,16 @@ final readonly class PodcastTranscodeFallback
         }
 
         $audioAsset = $this->assets->create(
-            mediaItemId: $mediaItemUlid,
+            mediaItemId: $mediaItemId,
             role: AssetRole::PodcastAudio,
             kind: AssetKind::Audio,
             state: AssetState::Pending,
         );
-        $audioAsset->derivedFromAssetId = (string) $videoOriginal->id;
+        $audioAsset->derivedFromAssetId = AssetId::parse((string) $videoOriginal->id);
         $this->assets->save($audioAsset);
 
         $this->dispatch->dispatch(CommandType::AssetTranscodePodcastAudio, [
-            'media_item_id' => $mediaItemId,
+            'media_item_id' => $mediaItemId->toString(),
             'source_asset_id' => (string) $videoOriginal->id,
             'asset_id' => (string) $audioAsset->id,
         ]);

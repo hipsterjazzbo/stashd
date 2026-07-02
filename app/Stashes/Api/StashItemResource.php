@@ -31,9 +31,9 @@ final readonly class StashItemResource implements Arrayable
     {
         return ApiJson::encode([
             'id' => (string) $this->item->id,
-            'stashId' => $this->item->stashId,
-            'mediaItemId' => $this->item->mediaItemId,
-            'stashInputId' => $this->item->stashInputId,
+            'stashId' => (string) $this->item->stashId,
+            'mediaItemId' => (string) $this->item->mediaItemId,
+            'stashInputId' => $this->item->stashInputId === null ? null : (string) $this->item->stashInputId,
             'state' => $this->item->state->value,
             'position' => $this->item->position,
             'seasonNumber' => $this->item->seasonNumber,

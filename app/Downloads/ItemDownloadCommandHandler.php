@@ -11,9 +11,11 @@ use App\Commands\CommandType;
 use App\Commands\InvalidCommandPayload;
 use App\Jobs\JobIntent;
 use App\Jobs\JobRepository;
+use App\Stashes\StashId;
 use App\Stashes\StashItemRepository;
 use App\Stashes\StashRepository;
 use App\Support\PrefixedUlid;
+use App\Vault\MediaItemId;
 use App\Vault\MediaItemRepository;
 
 final readonly class ItemDownloadCommandHandler implements CommandHandler
@@ -41,15 +43,15 @@ final readonly class ItemDownloadCommandHandler implements CommandHandler
             throw InvalidCommandPayload::withErrors(['media_item_id and stash_id are required.']);
         }
 
-        if ($this->mediaItems->find($mediaItemId) === null) {
+        if (! MediaItemId::isValid($mediaItemId) || $this->mediaItems->find(MediaItemId::parse($mediaItemId)) === null) {
             throw InvalidCommandPayload::withErrors(['Media item not found.']);
         }
 
-        if ($this->stashes->find($stashId) === null) {
+        if (! StashId::isValid($stashId) || $this->stashes->find(StashId::parse($stashId)) === null) {
             throw InvalidCommandPayload::withErrors(['Stash not found.']);
         }
 
-        if ($this->stashItems->findByStashAndMediaItem($stashId, $mediaItemId) === null) {
+        if ($this->stashItems->findByStashAndMediaItem(StashId::parse($stashId), MediaItemId::parse($mediaItemId)) === null) {
             throw InvalidCommandPayload::withErrors(['Media item is not part of the requested stash.']);
         }
     }
