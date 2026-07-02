@@ -305,25 +305,84 @@ Full task breakdown (T1-T20) in `docs/plans/phase-6-slice-6/plan.md`; `docs/plan
 - [x] Docker smoke: audio_podcast rebuild + public feed.xml + public episode route (full fetch, `Range` request → 206, unknown item token → 404)
 - [x] Docker smoke docs: first-run and no-build reuse workflow (`docs/runtime/docker-smoke.md`)
 - [x] Docker entrypoint: auto-generate and persist `SIGNING_KEY` under `/data/.env` on first boot, symlinked into the app root (`docker/entrypoint.sh` `ensure_signing_key`); operator-supplied `SIGNING_KEY` env var takes precedence and skips generation; verified unchanged across restart, full container recreation, and the override path (`tests/docker/smoke.sh`)
-- [ ] Multi-arch image build
+- [x] Multi-arch image build — turned into a bigger fix than the name suggests:
+  - **`Dockerfile`**: the `yt-dlp` release asset it downloaded (`.../releases/latest/download/yt-dlp`)
+    is an amd64-only PyInstaller build; an arm64 image would have shipped a yt-dlp binary that
+    can't execute at all. Now selects `yt-dlp` vs `yt-dlp_linux_aarch64` off the auto-populated
+    `TARGETARCH` build arg.
+  - **Bigger blocker found while verifying the fix**: `composer.json` pinned `hazel/ytdlphp` as a
+    `path` repository at `/home/hazel/Projects/ytdlphp` — a sibling directory that only exists on
+    one machine. This meant `docker build` (any platform, not just arm64) had never actually
+    succeeded outside that machine, including in the `composer test:docker-smoke` release gate.
+    Fixed at the source: pushed `hipsterjazzbo/ytdlphp`'s unpushed commits, tagged `v1.0.2`, and
+    switched `composer.json` to a `vcs` repository (`hazel/ytdlphp: ^1.0.2`) resolved over git —
+    works from any machine/CI runner now. `composer.lock` regenerated accordingly.
+  - **Second latent bug found once the image finally built and booted for real**: `tests/docker/smoke.sh`
+    POSTs `{"type":"jellyfin_series",...}` for its NFO/SxxExxx-naming assertions, but the
+    broadcast-plugin-architecture migration (`6d5607c`) unified that under the single key
+    `"jellyfin"` (`JellyfinBroadcastPlugin::broadcastKey()`) — the smoke test was never updated
+    and has been failing at that step ever since, just never noticed because the build never got
+    that far before. Fixed the stale type string.
+  - **New**: `.github/workflows/docker-image.yml` — first CI in the repo. PRs build both
+    `linux/amd64`/`linux/arm64` targets (no push, no registry creds needed) as an ongoing
+    regression check against exactly the kind of silent breakage found above; pushes to `main`
+    publish an `edge` tag, `v*` tags publish versioned + `latest` tags, all to
+    `ghcr.io/stashd/stashd` per `docs/Stashd-Engineering-Specification.md`'s registry/tag scheme.
+  - **Verified**: amd64 build + the full `tests/docker/smoke.sh` suite pass end-to-end locally
+    (first time, from a truly clean checkout). **Not verified locally**: the arm64 build leg —
+    this sandbox's Docker has no QEMU/binfmt emulation registered, and installing it requires a
+    privileged container the sandbox correctly declined to run unprompted. Correctness there rests
+    on code inspection (the `TARGETARCH` case statement, official multi-arch base images) plus the
+    new CI workflow, which runs on a GitHub-hosted runner with proper QEMU setup.
 - [x] Static analysis — PHPStan `level: max` against `app/` (`phpstan.neon`, `composer test:static`); 435 pre-existing findings baselined (`phpstan-baseline.neon`) rather than fixed inline — mostly `mixed`-typed returns from the ORM's generic `select()`/`first()`/`all()` (no Tempest-specific PHPStan extension exists to type these properly) plus untyped `array` options params on command/job handlers. New code must pass clean; the baseline is for pre-existing debt, not an escape hatch.
-- [ ] Filesystem integration tests — deferred separately; existing real-disk coverage (hardlink probing, real tmp-dir writes across several Pest tests, Docker smoke) may already cover this reasonably well. Revisit gaps (permission-denied, disk-full, cross-device hardlink-to-copy fallback, concurrent access) if/when actually prioritized.
+- [x] Filesystem integration tests — audited the four named gaps against real code, not assumption:
+  - **Cross-device hardlink-to-copy fallback**: real gap, now covered.
+    `MoveFileIntoVaultTest.php` (new — the class had zero dedicated tests before this,
+    only indirect exercise via the download→vault Feature flow) adds a happy-path rename,
+    refuse-to-overwrite, missing-directory-creation, and a genuine `EXDEV` rename failure
+    via `/dev/shm` vs `sys_get_temp_dir()` (two real devices, not mocked) proving
+    `MoveFileIntoVault`'s `rename()`→`copy()+fsync()+unlink()` fallback actually fires.
+    Self-skips with a clear reason if the environment doesn't offer two devices. Note:
+    `HardlinkPublisher` (Vault→Broadcast) has no copy fallback by design — it fails loudly
+    with `broadcast_hardlink_unavailable` instead (`docs/storage/README.md`) — so this gap
+    only applied to `MoveFileIntoVault` (staging→Vault), not the Broadcast side.
+  - **Permission-denied**: real gap, now covered where the environment allows it.
+    `FilesystemProbeTest.php` and `BootstrapAndHealthTest.php` each add a `chmod(0o555)`
+    unwritable-directory case, asserting `storage_root_unwritable`/`StorageLocationState::Unwritable`
+    instead of the happy-path-only coverage that existed before. Both self-skip with a clear
+    reason when running as a user that bypasses permission bits (root — true for local/Docker
+    dev today), rather than asserting something that isn't actually being tested.
+  - **Disk-full**: not covered, deliberately. No portable way to simulate `ENOSPC` without a
+    loop-mounted filesystem requiring privileges CI/dev containers don't reliably have; the
+    existing `LowSpace` detector (`StorageCapabilityChecker`) reads real `disk_free_space`/
+    `disk_total_space` ratios with no injectable seam. Not worth building one for a threshold
+    check this simple — revisit only if a real incident makes it worth the infrastructure.
+  - **Concurrent access**: not covered, deliberately — not a real scenario. The job worker is
+    a single serial process by design (confirmed in the backfill-resilience work); there is no
+    code path today where two processes write the same file at once. A synthetic concurrency
+    test would test a scenario the app doesn't have, not a gap in the app.
 - [x] Tech debt: unused `JobIntent`/`CommandType` enum cases — `RoutineDiscovery`, `MetadataCapture`, `MetadataRefresh`, `Repair` (`JobIntent`) and `StashSync`, `StashBackfill`, `ItemRefreshMetadata`, `SystemPruneTemp` (`CommandType`) had zero references outside their own enum declarations; deleted. `JobIntent::Enrich` looked equally dead but stays deliberately — `Phase2ExecutionTest` uses it as the fixture intent with no registered job handler, to prove the worker fails a job cleanly rather than silently dropping it; now commented in `JobIntent.php` so it doesn't get flagged as dead code again. `JobIntent::InitialBackfill` was already wired up (Phase 6 Slice 6, `eae9171`), not part of this cleanup.
-- [ ] Tech debt: `RawMetadataSnapshotRecord` table/record exists but is never instantiated — scaffolding for a not-yet-scoped provenance feature.
+- [x] Tech debt: `RawMetadataSnapshotRecord` table/record exists but is never instantiated — scaffolding for a not-yet-scoped provenance feature. Confirmed zero call sites; its `MetadataSnapshotType` cases (`MetadataCapture`/`MetadataRefresh`) mirror the `JobIntent` cases already deleted as dead code above, so no feature was ever going to write to it. Deleted `RawMetadataSnapshotRecord`; dropped the table via a new forward migration (`DropRawMetadataSnapshots`, mirrors `DropUserUsername`'s pattern) rather than editing the already-shipped `CreateDomainSchema` migration. `MetadataSnapshotType` enum stays — `CreateDomainSchema`'s `snapshotType` column still references it by class, so deleting it would break replaying migration history on a fresh database; commented to explain why it's not dead despite having no readers.
 - [ ] Max concurrent downloads is not explicitly enforced in code — naturally satisfied today by the single serial `worker` process; revisit if workers are ever scaled beyond one.
-- [ ] Tech debt: no full-channel discovery fallback when no YouTube Data API key is configured —
-  `YouTubeProvider::discoveryStrategies()` only registers RSS (`StrategyCost::Low`, ~15-item RSS-feed
-  ceiling) and Data API (`StrategyCost::Medium`, gated on `hasKey()`); without a key, RSS is the only
-  option `ProviderStrategySelector` can ever pick. yt-dlp can already enumerate a full channel
-  (`YtDlp::extractAll()`/`extractPlaylist()` in `vendor/hazel/ytdlphp`) but `App\Downloads\Ytdlp\YtdlpGateway`
-  only exposes `extractInfo()` (single video) — would need a new gateway method plus a
-  `DiscoveryStrategyHandler` implementation (mirror `YouTubeRssDiscoveryStrategy`), registered with a
-  cost above RSS's `Low` and gated on yt-dlp binary availability (mirror
-  `YouTubeYtdlpDownloadStrategy::isAvailable()`'s `realDownloadsEnabled() && probe()->available` check).
-  `StrategySelectionOptions::preferHighestCapability` is already `true` for `JobIntent::InitialBackfill`
-  (`app/Stashes/DiscoverStashInput.php`), so a higher-cost strategy would be auto-preferred for
-  full-backfill commits with zero selector changes. No existing fixtures for ytdlp-shaped discovery
-  output (existing ytdlp tests stub `VideoInfo` objects directly, not fixture files) — would need new ones.
+- [x] Tech debt: no full-channel discovery fallback when no YouTube Data API key is configured —
+  added `YouTubeYtdlpDiscoveryStrategy` (`app/Providers/YouTube/YouTubeYtdlpDiscoveryStrategy.php`,
+  key `youtube.ytdlp_discovery`), registered in `YouTubeProvider::discoveryStrategies()` at
+  `StrategyCost::Medium`/`priority: 20` — deliberately tied in cost with Data API (`priority: 10`)
+  rather than adding a new `StrategyCost` enum case between `Low` and `Medium`; the selector's existing
+  cost-then-priority tie-break already gives the exact wanted ordering (Data API wins ties when both
+  are available, RSS still wins every non-`preferHighestCapability` pick since it stays `Low`) without
+  touching a cross-provider enum. Availability gates identically to
+  `YouTubeYtdlpDownloadStrategy::isAvailable()` (`realDownloadsEnabled() && probe()->available`) — not
+  purely on binary presence — so it respects the same real-network kill switch as downloads and stays
+  off by default in tests/CI. Uses `YtdlpGateway::extractPlaylist()` (new method, `-J` single-JSON
+  playlist dump) with `--flat-playlist` (new `YtdlpOptionsBuilder::playlistOptions()`, also carries the
+  cookies/`--sleep-requests` resilience flags from the backfill-hardening pass) rather than
+  `extractAll()` — `extractAll()` resolves full metadata per video, which for a large channel would be
+  slow and exactly the rate-limit/bot-detection risk the resilience pass was hardening against; flat
+  listing is one process call regardless of channel size, at the cost of only id/title/duration/
+  thumbnail per entry (full metadata still comes later via the per-video download path). New
+  `YouTubeUris::channelVideosPage()`/`playlistPage()` builders for the URLs yt-dlp needs (feed/API
+  builders weren't reusable — yt-dlp needs the actual page URL, not a feed URL).
 
 ## Phase 8 — Stronger typing & Tempest-native refactor (ongoing, not gating v1)
 
@@ -352,9 +411,32 @@ the live status tracker, so "what's left" never again needs a tour of `docs/plan
   production URL handling into fake-provider-only URL classes, add YouTube-specific URL classes
   (`YouTubeChannelUrl`/`YouTubeVideoUrl`/`YouTubePlaylistUrl`) behind a marshaller, and introduce
   filesystem path value objects kept separate from URLs (vault/broadcast/storage/temp-download paths)
-- [ ] Sensitive Record Properties — `#[Hidden]` guardrails on `UserRecord::$passwordHash`,
-  `ApiTokenRecord::$tokenHash`, `SecretRecord::$encryptedValue`/`$nonce`, `*::$tokenSecretId`
-  columns, etc. — a guardrail against accidental leaks, not a replacement for explicit Resource DTOs
+- [x] Sensitive Record Properties — `#[Hidden]` (`Tempest\Mapper\Hidden`) applied to
+  `UserRecord::$passwordHash`, `ApiTokenRecord::$tokenHash`, `SecretRecord::$encryptedValue`/`$nonce`/
+  `$metadataJson`, `ProviderAccountRecord::$secretId`, `MediaServerConnectionRecord::$tokenSecretId`,
+  `BroadcastRecord::$tokenSecretId`, `BroadcastItemRecord::$tokenSecretId`. Confirmed via vendor source
+  that `#[Hidden]` excludes a property from *both* the default auto-detected `SELECT` column list
+  (`::select()`/`::findById()`/`::find()`/`::all()` with no explicit columns) and generic object→array
+  serialization — the first-party way to still fetch a hidden column is `->include('column')` on the
+  select builder (`SelectQueryBuilder::include()`, built for exactly this).
+  `ApiTokenRecord::$tokenPreview`/`BroadcastRecord::$tokenPreview`/`BroadcastItemRecord::$tokenPreview`
+  reviewed and deliberately left visible — they're safe-by-design preview values already exposed
+  through explicit Resource DTOs; hiding them would only add friction, not reduce risk.
+  Fixed every repository method whose result flowed into a hidden-field read: the "front door" finders
+  (`UserRepository::findByEmail`, `SecretRepository::findByKey`, `*Repository::find`) *and*, less
+  obviously, **list methods** (`BroadcastRepository::listForStash`/`listPodcastBroadcastsWithFeedToken`,
+  `BroadcastItemRepository::listForBroadcast`/`findByBroadcastAndStashItem`) and **each affected
+  repository's own internal `create()` re-fetch** (`BroadcastRepository`/`BroadcastItemRepository`
+  `create()` insert-then-`findById()` pattern) — both categories were missed by an initial
+  read-site-mapping pass that only traced *external* callers of repository methods and excluded each
+  record's own repository file from the search, which is exactly backwards: a repository's internal
+  `create()`/list methods are just as likely to feed a hidden-field read downstream as any external
+  caller. Caught only by tracing every actual read of `->tokenSecretId` etc. back through the full
+  call chain and by the full test suite (initially 45 failures: real 500s on podcast broadcast/item
+  creation, not just the expected direct-property-access test breakage). Added `ApiResourceSerializationTest.php`
+  cases proving the guardrail mechanism itself (not just app-level non-leakage): a hidden property is
+  absent from `map($record)->toArray()`, and reading it off a record loaded via the plain default
+  select throws `Tempest\Database\Exceptions\ValueWasMissing` rather than silently returning stale data.
 - [ ] Semantic Scalar Values — `Tempest\DateTime\Duration` for `durationSeconds`/`progressEtaSeconds`,
   a `ByteSize` value object for `sizeBytes`/`freeBytes`/`totalBytes`, enums for bounded strings like
   `StorageLocationRecord::$role`
