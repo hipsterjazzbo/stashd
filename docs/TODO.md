@@ -406,7 +406,30 @@ the live status tracker, so "what's left" never again needs a tour of `docs/plan
   replacing raw `PrefixedUlid`/string at boundaries; pass loaded records instead of IDs where the
   caller already has them, keep raw strings only at HTTP/DB/serialization boundaries. Split by
   domain (auth / stashes-vault / broadcasts / jobs-commands / system-storage-activity) if too large
-  for one pass.
+  for one pass. **Auth domain done as the vertical proof; stashes-vault / broadcasts / jobs-commands /
+  system-storage-activity still pending.** Built the shared plumbing all future domains reuse: abstract
+  `App\Support\Ids\PrefixedId` (wraps the existing `PrefixedUlid` for prefix/ULID validation instead of
+  reimplementing it) plus a single auto-discovered `PrefixedIdCaster`/`PrefixedIdSerializer` pair
+  (Tempest's `DynamicCaster`/`ConfigurableCaster`/`DynamicSerializer`, matched by property type, not a
+  per-ID-type `#[CastWith]` attribute) — so adding a new ID class for another domain is just a two-line
+  subclass, no new caster/serializer file. Converted `ApiTokenRecord::$userId` from `string` to `UserId`
+  (a real persisted FK, proving insert → where-lookup → reload, not just boundary parsing) and tightened
+  `UserRepository::findById()`/`ApiTokenRepository::create()`/`listForUser()`/`revoke()` from generic
+  `PrefixedUlid`/`string` to the specific `UserId`/`ApiTokenId` types, per the spec's "tighten repository
+  signatures" rule — this is what lets PHPStan catch misuse instead of a `Stringable`-typed ID silently
+  flowing into every `string $id` call site. **Sharp gotcha, worth knowing before doing another domain**:
+  a fresh `PrefixedIdCaster` with default priority was silently shadowed by Tempest's built-in
+  `ObjectCaster` (`#[Priority(Priority::HIGH)]`, which accepts *any* class-typed property) — every typed
+  ID got hydrated through generic array-to-object mapping instead of string parsing, leaving the
+  `readonly` `$value` property flat-out uninitialized until first read (surfaced as `Cannot use object of
+  type Tempest\View\GenericView as array` on nearly every HTTP test, because token resolution runs on
+  every authenticated request). Fixed with `#[Priority(Priority::HIGHEST)]` on `PrefixedIdCaster`. Also
+  confirmed (and preserved) that raw `->where('col = ?', $typedId)` bindings still need an explicit
+  `->toString()` — the caster only fixes hydration/persistence, not raw bound-param binding, which goes
+  through PDO directly and doesn't accept objects. Added `ApiTokenTypedIdTest.php` covering the caster
+  priority fix and the where-lookup binding as a standing regression test, not just a one-off debug
+  script. `docs/plans/stronger-record-types.md`'s Entity Identity References prompt has the domain
+  breakdown and the full ID-class inventory for the remaining domains.
 - [ ] URL & Filesystem Path Values — rename `StashdUri` → `StashdUrl`, move `fake://` support out of
   production URL handling into fake-provider-only URL classes, add YouTube-specific URL classes
   (`YouTubeChannelUrl`/`YouTubeVideoUrl`/`YouTubePlaylistUrl`) behind a marshaller, and introduce

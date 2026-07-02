@@ -18,7 +18,7 @@ final class ApiTokenRecord
     public PrimaryKey $id;
 
     public function __construct(
-        public string $userId,
+        public UserId $userId,
         public string $name,
         #[Hidden]
         public string $tokenHash,

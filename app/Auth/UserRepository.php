@@ -30,9 +30,9 @@ final class UserRepository
         return UserRecord::select()->where('email = ?', $email)->include('passwordHash')->first();
     }
 
-    public function findById(string $id): ?UserRecord
+    public function findById(UserId $id): ?UserRecord
     {
-        return UserRecord::findById(new PrimaryKey($id));
+        return UserRecord::findById(new PrimaryKey($id->toString()));
     }
 
     public function createAdmin(string $email, string $passwordHash): UserRecord

@@ -205,7 +205,7 @@ test('revoked bearer token is rejected even when session cookie would authentica
     $created = $auth->createApiToken($owner, 'revoke-with-session');
     $headers = ['Authorization' => 'Bearer ' . $created['token']];
 
-    $auth->revokeApiToken($owner, \App\Support\PrefixedUlid::parse($created['id']));
+    $auth->revokeApiToken($owner, \App\Auth\ApiTokenId::parse($created['id']));
 
     $this->http->get('/api/v1/auth/me', headers: $headers)->assertStatus(Status::UNAUTHORIZED);
 });

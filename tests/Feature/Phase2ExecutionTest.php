@@ -258,7 +258,7 @@ test('api token uses stashd_pat prefix and supports lookup and revoke', function
     $headers = ['Authorization' => 'Bearer ' . $created['token']];
     $this->http->get('/api/v1/auth/me', headers: $headers)->assertOk();
 
-    $auth->revokeApiToken($user, \App\Support\PrefixedUlid::parse($created['id']));
+    $auth->revokeApiToken($user, \App\Auth\ApiTokenId::parse($created['id']));
     $this->http->get('/api/v1/auth/me', headers: $headers)->assertStatus(Status::UNAUTHORIZED);
 });
 

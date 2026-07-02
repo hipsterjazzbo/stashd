@@ -6,7 +6,6 @@ namespace App\Auth;
 
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
-use App\Support\PrefixedUlid;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 use Tempest\Http\Cookie\CookieManager;
@@ -178,7 +177,7 @@ final readonly class AuthController
     public function revokeToken(string $tokenId): Json
     {
         $user = $this->context->requireUser();
-        $this->auth->revokeApiToken($user, PrefixedUlid::parse($tokenId));
+        $this->auth->revokeApiToken($user, ApiTokenId::parse($tokenId));
 
         return new Json(['ok' => true]);
     }

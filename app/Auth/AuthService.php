@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Auth;
 
-use App\Support\PrefixedUlid;
 use RuntimeException;
 use SensitiveParameter;
 use Tempest\DateTime\DateTime;
@@ -138,9 +137,9 @@ final readonly class AuthService
 
     public function revokeWebSessionTokens(UserRecord $user): void
     {
-        foreach ($this->tokens->listForUser(PrefixedUlid::parse((string) $user->id)) as $token) {
+        foreach ($this->tokens->listForUser(UserId::parse((string) $user->id)) as $token) {
             if ($token->name === self::WEB_SESSION_TOKEN_NAME) {
-                $this->tokens->revoke(PrefixedUlid::parse((string) $token->id));
+                $this->tokens->revoke(ApiTokenId::parse((string) $token->id));
             }
         }
     }
@@ -150,7 +149,7 @@ final readonly class AuthService
     {
         $plainToken = 'stashd_pat_' . bin2hex(random_bytes(24));
         $record = $this->tokens->create(
-            userId: PrefixedUlid::parse((string) $user->id),
+            userId: UserId::parse((string) $user->id),
             name: $name,
             tokenHash: hash('sha256', $plainToken),
             tokenPreview: substr($plainToken, 0, 20) . '…',
@@ -170,7 +169,7 @@ final readonly class AuthService
     public function listApiTokens(UserRecord $user): array
     {
         $tokens = array_filter(
-            $this->tokens->listForUser(PrefixedUlid::parse((string) $user->id)),
+            $this->tokens->listForUser(UserId::parse((string) $user->id)),
             static fn ($token): bool => $token->name !== self::WEB_SESSION_TOKEN_NAME,
         );
 
@@ -188,11 +187,11 @@ final readonly class AuthService
         ));
     }
 
-    public function revokeApiToken(UserRecord $user, PrefixedUlid $tokenId): void
+    public function revokeApiToken(UserRecord $user, ApiTokenId $tokenId): void
     {
-        $record = \App\Auth\ApiTokenRecord::findById(new \Tempest\Database\PrimaryKey($tokenId->toString()));
+        $record = ApiTokenRecord::findById(new \Tempest\Database\PrimaryKey($tokenId->toString()));
 
-        if ($record === null || $record->userId !== (string) $user->id) {
+        if ($record === null || (string) $record->userId !== (string) $user->id) {
             return;
         }
 

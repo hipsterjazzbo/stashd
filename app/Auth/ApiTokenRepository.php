@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Auth;
 
-use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
 use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
@@ -22,7 +21,7 @@ final class ApiTokenRepository
     }
 
     public function create(
-        PrefixedUlid $userId,
+        UserId $userId,
         string $name,
         string $tokenHash,
         string $tokenPreview,
@@ -32,7 +31,7 @@ final class ApiTokenRepository
         $id = $this->ids->generate('token')->toString();
         $now = DateTime::now(Timezone::UTC);
         $record = new ApiTokenRecord(
-            userId: $userId->toString(),
+            userId: $userId,
             name: $name,
             tokenHash: $tokenHash,
             tokenPreview: $tokenPreview,
@@ -56,7 +55,7 @@ final class ApiTokenRepository
     }
 
     /** @return list<ApiTokenRecord> */
-    public function listForUser(PrefixedUlid $userId): array
+    public function listForUser(UserId $userId): array
     {
         return ApiTokenRecord::select()
             ->where('userId = ? AND revokedAt IS NULL', $userId->toString())
@@ -64,7 +63,7 @@ final class ApiTokenRepository
             ->all();
     }
 
-    public function revoke(PrefixedUlid $tokenId): void
+    public function revoke(ApiTokenId $tokenId): void
     {
         $record = ApiTokenRecord::findById(new PrimaryKey($tokenId->toString()));
 
