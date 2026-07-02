@@ -6,6 +6,7 @@ namespace App\Vault\Api;
 
 use App\Http\Api\ApiJson;
 use App\Support\Arrayable;
+use App\Support\DurationSeconds;
 use App\Vault\MediaItemRecord;
 
 final readonly class MediaItemResource implements Arrayable
@@ -33,7 +34,7 @@ final readonly class MediaItemResource implements Arrayable
             'upstreamState' => $this->item->upstreamState->value,
             'contentType' => $this->item->contentType,
             'creatorName' => $this->item->creatorName,
-            'durationSeconds' => $this->item->durationSeconds,
+            'durationSeconds' => DurationSeconds::toSeconds($this->item->durationSeconds),
             'publishedAt' => $this->item->publishedAt,
             'thumbnailUri' => $this->item->thumbnailUri,
             'lastSeenUpstreamAt' => $this->item->lastSeenUpstreamAt,

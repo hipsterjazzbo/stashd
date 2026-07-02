@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\System\Event;
 
 use App\Jobs\JobRecord;
+use App\Support\DurationSeconds;
 use App\System\Activity\ActivityEventRecord;
 use App\System\Secret\SecretsService;
 
@@ -36,7 +37,7 @@ final readonly class EventPublisher
             'progress_total' => $job->progressTotal,
             'progress_percent' => $job->progressPercent,
             'progress_label' => $job->progressLabel,
-            'progress_eta_seconds' => $job->progressEtaSeconds,
+            'progress_eta_seconds' => DurationSeconds::toSeconds($job->progressEtaSeconds),
             'progress_rate' => $job->progressRate,
         ]);
     }

@@ -39,7 +39,7 @@ final class CreateFoundationSchema implements MigratesUp
     {
         return $this->prefixedIdTable('storage_locations')
             ->enum('key', StorageLocationKey::class)
-            ->string('role')
+            ->enum('role', StorageLocationKey::class)
             ->string('label')
             ->text('path')
             ->enum('state', StorageLocationState::class, default: StorageLocationState::Missing)

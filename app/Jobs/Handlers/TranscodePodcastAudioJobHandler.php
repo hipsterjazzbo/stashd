@@ -27,6 +27,7 @@ use App\Transcoding\Ffmpeg\FfmpegProgress;
 use App\Transcoding\TranscodePodcastAudioAsset;
 use RuntimeException;
 use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Duration;
 use Tempest\DateTime\Timezone;
 
 final readonly class TranscodePodcastAudioJobHandler implements JobHandler
@@ -97,7 +98,7 @@ final readonly class TranscodePodcastAudioJobHandler implements JobHandler
 
         $job->progressPercent = 100.0;
         $job->progressLabel = 'Podcast audio ready';
-        $job->progressEtaSeconds = 0;
+        $job->progressEtaSeconds = Duration::zero();
         $job->finishedAt = DateTime::now(Timezone::UTC);
         $this->jobs->save($job);
         $context->progress($job, JobProgressUpdate::ofPercent(100.0, $job->progressLabel, 0));

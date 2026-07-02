@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Support\DurationSecondsCaster;
+use App\Support\DurationSecondsSerializer;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
 use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Duration;
+use Tempest\Mapper\CastWith;
+use Tempest\Mapper\SerializeWith;
 
 #[Table(name: 'jobs')]
 final class JobRecord
@@ -34,7 +39,9 @@ final class JobRecord
         public ?float $progressPercent = null,
         public ?string $progressLabel = null,
         public ?float $progressRate = null,
-        public ?int $progressEtaSeconds = null,
+        #[CastWith(DurationSecondsCaster::class)]
+        #[SerializeWith(DurationSecondsSerializer::class)]
+        public ?Duration $progressEtaSeconds = null,
         public ?string $lastError = null,
         public ?string $payloadJson = null,
         public ?DateTime $createdAt = null,

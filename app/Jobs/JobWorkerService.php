@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Commands\CommandRepository;
 use App\Commands\CommandState;
+use App\Support\DurationSeconds;
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
 use App\System\State\StateTransitionService;
@@ -118,7 +119,7 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
         $job->progressTotal = $update->total;
         $job->progressPercent = $update->percent;
         $job->progressLabel = $update->label;
-        $job->progressEtaSeconds = $update->etaSeconds;
+        $job->progressEtaSeconds = DurationSeconds::toDuration($update->etaSeconds);
         $job->progressRate = $update->rate;
         $job->heartbeatAt = DateTime::now(Timezone::UTC);
         $this->jobs->save($job);

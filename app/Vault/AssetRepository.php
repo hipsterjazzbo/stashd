@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Vault;
 
+use App\Support\DurationSeconds;
 use App\Support\PrefixedUlidGenerator;
 use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
@@ -45,7 +46,7 @@ final class AssetRepository
             container: $container,
             sizeBytes: $sizeBytes,
             checksum: $checksum,
-            durationSeconds: $durationSeconds,
+            durationSeconds: DurationSeconds::toDuration($durationSeconds),
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);

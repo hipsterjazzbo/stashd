@@ -22,6 +22,7 @@ use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
 use App\System\State\StateTransitionService;
 use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Duration;
 use Tempest\DateTime\Timezone;
 use Ytdlphp\DownloadProgress;
 
@@ -114,7 +115,7 @@ final readonly class DownloadJobHandler implements JobHandler
 
             $job->progressPercent = 100.0;
             $job->progressLabel = $result->skipped ? 'Download skipped (already in Vault)' : 'Download complete';
-            $job->progressEtaSeconds = 0;
+            $job->progressEtaSeconds = Duration::zero();
             $job->finishedAt = DateTime::now(Timezone::UTC);
             $this->jobs->save($job);
             $context->progress($job, JobProgressUpdate::ofPercent(100.0, $job->progressLabel, 0));

@@ -6,6 +6,7 @@ namespace App\Vault\Api;
 
 use App\Http\Api\ApiJson;
 use App\Support\Arrayable;
+use App\Support\DurationSeconds;
 use App\Vault\AssetRecord;
 use App\Vault\AssetRegenerationGuidance;
 
@@ -38,7 +39,7 @@ final readonly class AssetResource implements Arrayable
             'container' => $this->asset->container,
             'sizeBytes' => $this->asset->sizeBytes,
             'checksum' => $this->asset->checksum,
-            'durationSeconds' => $this->asset->durationSeconds,
+            'durationSeconds' => DurationSeconds::toSeconds($this->asset->durationSeconds),
             'lastVerifiedAt' => $this->asset->lastVerifiedAt,
             'missingAt' => $this->asset->missingAt,
             'missingReason' => $this->asset->missingReason,

@@ -7,6 +7,7 @@ namespace App\Jobs\Api;
 use App\Http\Api\ApiJson;
 use App\Jobs\JobRecord;
 use App\Support\Arrayable;
+use App\Support\DurationSeconds;
 
 final readonly class JobResource implements Arrayable
 {
@@ -40,7 +41,7 @@ final readonly class JobResource implements Arrayable
             'progressTotal' => $this->job->progressTotal,
             'progressPercent' => $this->job->progressPercent,
             'progressLabel' => $this->job->progressLabel,
-            'progressEtaSeconds' => $this->job->progressEtaSeconds,
+            'progressEtaSeconds' => DurationSeconds::toSeconds($this->job->progressEtaSeconds),
             'progressRate' => $this->job->progressRate,
             'lastError' => $this->job->lastError,
             'payload' => $this->decodeJson($this->job->payloadJson),

@@ -59,7 +59,7 @@ final readonly class StorageCapabilityChecker
 
         $record = $this->locations->upsert(
             key: $key,
-            role: $key->value,
+            role: $key,
             label: ucfirst($key->value),
             path: $path,
             state: $state,

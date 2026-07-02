@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Vault;
 
 use App\Providers\StashdUri;
+use App\Support\DurationSeconds;
 use App\Support\PrefixedUlidGenerator;
 use InvalidArgumentException;
 use Tempest\Database\Direction;
@@ -43,7 +44,7 @@ final class MediaItemRepository
             state: $state,
             upstreamState: UpstreamState::Available,
             description: $description,
-            durationSeconds: $durationSeconds,
+            durationSeconds: DurationSeconds::toDuration($durationSeconds),
             publishedAt: $publishedAt,
             thumbnailUri: $thumbnailUri instanceof StashdUri ? $thumbnailUri->toString() : $thumbnailUri,
             contentType: $contentType,

@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace App\Vault;
 
+use App\Support\DurationSecondsCaster;
+use App\Support\DurationSecondsSerializer;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
 use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Duration;
+use Tempest\Mapper\CastWith;
+use Tempest\Mapper\SerializeWith;
 
 #[Table(name: 'assets')]
 final class AssetRecord
@@ -32,7 +37,9 @@ final class AssetRecord
         public ?string $language = null,
         public ?int $sizeBytes = null,
         public ?string $checksum = null,
-        public ?int $durationSeconds = null,
+        #[CastWith(DurationSecondsCaster::class)]
+        #[SerializeWith(DurationSecondsSerializer::class)]
+        public ?Duration $durationSeconds = null,
         public ?string $derivedFromAssetId = null,
         public ?DateTime $lastVerifiedAt = null,
         public ?DateTime $missingAt = null,

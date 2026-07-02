@@ -18,7 +18,7 @@ final class StorageLocationRecord
 
     public function __construct(
         public StorageLocationKey $key,
-        public string $role,
+        public StorageLocationKey $role,
         public string $label,
         public string $path,
         public StorageLocationState $state,

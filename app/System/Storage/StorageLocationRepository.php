@@ -22,7 +22,7 @@ final class StorageLocationRepository
 
     public function upsert(
         StorageLocationKey $key,
-        string $role,
+        StorageLocationKey $role,
         string $label,
         string $path,
         StorageLocationState $state,

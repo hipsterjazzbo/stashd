@@ -269,7 +269,7 @@ test('verify vault skips when storage root is unavailable', function (): void {
 
     $storage->upsert(
         key: StorageLocationKey::Vault,
-        role: 'vault',
+        role: StorageLocationKey::Vault,
         label: 'Vault',
         path: $config->vaultPath(),
         state: StorageLocationState::Unavailable,
@@ -307,7 +307,7 @@ test('download rejects unavailable temp storage with explicit error', function (
 
     $storage->upsert(
         key: StorageLocationKey::Temp,
-        role: 'temp',
+        role: StorageLocationKey::Temp,
         label: 'Temp',
         path: $config->tempPath(),
         state: StorageLocationState::Unwritable,

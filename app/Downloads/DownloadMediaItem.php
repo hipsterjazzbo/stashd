@@ -8,6 +8,7 @@ use App\Config\StashdConfig;
 use App\Providers\StashdUri;
 use App\Stashes\StashItemRepository;
 use App\Stashes\StashRepository;
+use App\Support\DurationSeconds;
 use App\Support\PrefixedUlid;
 use App\System\State\StateTransitionService;
 use App\System\Storage\StorageLocationKey;
@@ -109,7 +110,7 @@ final readonly class DownloadMediaItem
                 downloadPolicy: $stash->downloadPolicy,
                 tempDirectory: $tempDirectory,
                 force: $force,
-                durationSeconds: $mediaItem->durationSeconds,
+                durationSeconds: DurationSeconds::toSeconds($mediaItem->durationSeconds),
                 thumbnailUri: $mediaItem->thumbnailUri !== null ? StashdUri::parse($mediaItem->thumbnailUri) : null,
                 title: $mediaItem->title,
                 publishedAt: $mediaItem->publishedAt,
@@ -333,7 +334,7 @@ final readonly class DownloadMediaItem
         $asset->container = $file->container;
         $asset->sizeBytes = $sizeBytes;
         $asset->checksum = $checksum;
-        $asset->durationSeconds = $file->durationSeconds;
+        $asset->durationSeconds = DurationSeconds::toDuration($file->durationSeconds);
         $asset->lastVerifiedAt = DateTime::now(Timezone::UTC);
         $asset->missingAt = null;
         $asset->missingReason = null;

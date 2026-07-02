@@ -437,9 +437,33 @@ the live status tracker, so "what's left" never again needs a tour of `docs/plan
   cases proving the guardrail mechanism itself (not just app-level non-leakage): a hidden property is
   absent from `map($record)->toArray()`, and reading it off a record loaded via the plain default
   select throws `Tempest\Database\Exceptions\ValueWasMissing` rather than silently returning stale data.
-- [ ] Semantic Scalar Values — `Tempest\DateTime\Duration` for `durationSeconds`/`progressEtaSeconds`,
-  a `ByteSize` value object for `sizeBytes`/`freeBytes`/`totalBytes`, enums for bounded strings like
-  `StorageLocationRecord::$role`
+- [x] Semantic Scalar Values — `Tempest\DateTime\Duration` applied to `JobRecord::$progressEtaSeconds`,
+  `MediaItemRecord::$durationSeconds`, `AssetRecord::$durationSeconds` via new `App\Support\DurationSecondsCaster`/
+  `DurationSecondsSerializer` (`#[CastWith]`/`#[SerializeWith]`) — the first use of that Tempest mechanism
+  anywhere in this codebase (the prior "Stable JSON Properties" slice used the unrelated `#[SerializeAs]`
+  path for `ApiTokenScopes`). Proved the mechanism on one property first (`progressEtaSeconds`, with a
+  dedicated insert-then-update-then-reload test) before expanding, since neither Tempest nor this repo had
+  an existing scalar-backed-value-object precedent to lean on. Confirmed by reading `InsertQueryBuilder`/
+  `UpdateQueryBuilder` that the serializer fires on both insert and `$record->save()` update, and that
+  nullable properties short-circuit to `null` before the caster/serializer ever runs (so neither needs
+  null-handling itself). Storage stays a plain `INTEGER` column — the caster/serializer only bridges the
+  PHP-object boundary, no migration changes. Kept the `*Seconds` property names (no rename to `duration`)
+  and kept API JSON output (`duration_seconds`, `progress_eta_seconds`) as plain integers via a new
+  `App\Support\DurationSeconds::toSeconds()`/`toDuration()` helper used at every Resource/DTO/event-payload
+  boundary — repository `create()` methods still accept plain `?int` and convert internally, so every
+  existing caller (providers, discovery, fake fixtures, ffmpeg/ytdlp DTOs) needed zero changes.
+  `StorageLocationRecord::$role` retyped from `string` to the existing `StorageLocationKey` enum rather than
+  adding a new enum: it was write-only and 100% redundant with `$key` (`StorageCapabilityChecker::checkRoot()`
+  always set `role: $key->value`, and nothing in the app ever read `->role`), so reusing `StorageLocationKey`
+  closed a real duplication bug and satisfied "enum for a bounded string" with no new type. `ByteSize`
+  deliberately **not** built: `sizeBytes`/`freeBytes`/`totalBytes` have no unit ambiguity Duration-style
+  seconds do, no normalization/behavior to encode beyond what the property name already documents, and
+  formatting is already client-side-only (`dashboard.view.php`'s `formatBytes()`). A `ByteSize` wrapping an
+  int and serializing straight back to an int would mostly buy blast radius: `StorageCapabilityChecker::checkRoot()`
+  does live `$freeBytes / $totalBytes` ratio arithmetic that a wrapper would force unwrapping at, for no
+  corresponding safety gain. `JobRecord::$progressPercent`, `AssetRecord::$mimeType`/`$language`, and
+  `MediaItemRecord::$contentType` were named as candidates in `docs/plans/stronger-record-types.md` but not
+  in this checklist line itself — left as plain scalars, revisit as a separate slice if desired.
 - [ ] Later Encryption Annotation Review — investigate `#[Encrypted]` as a future `SecretsService`
   simplification; deliberately not combined with the `#[Hidden]` slice above
 - [ ] Later Naming Review — audit whether `*Record` should remain the persistence-marker suffix

@@ -7,6 +7,7 @@ namespace App\Stashes\Api;
 use App\Http\Api\ApiJson;
 use App\Stashes\StashItemRecord;
 use App\Support\Arrayable;
+use App\Support\DurationSeconds;
 use App\Vault\MediaItemRecord;
 
 final readonly class StashItemResource implements Arrayable
@@ -51,7 +52,7 @@ final readonly class StashItemResource implements Arrayable
                 'title' => $this->mediaItem->title,
                 'state' => $this->mediaItem->state->value,
                 'thumbnailUri' => $this->mediaItem->thumbnailUri,
-                'durationSeconds' => $this->mediaItem->durationSeconds,
+                'durationSeconds' => DurationSeconds::toSeconds($this->mediaItem->durationSeconds),
                 'contentType' => $this->mediaItem->contentType,
             ],
             'totalAssetSizeBytes' => $this->totalAssetSizeBytes,

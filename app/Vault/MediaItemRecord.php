@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace App\Vault;
 
+use App\Support\DurationSecondsCaster;
+use App\Support\DurationSecondsSerializer;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
 use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Duration;
+use Tempest\Mapper\CastWith;
+use Tempest\Mapper\SerializeWith;
 
 #[Table(name: 'media_items')]
 final class MediaItemRecord
@@ -26,7 +31,9 @@ final class MediaItemRecord
         public ?string $description = null,
         public ?string $creatorName = null,
         public ?string $creatorProviderId = null,
-        public ?int $durationSeconds = null,
+        #[CastWith(DurationSecondsCaster::class)]
+        #[SerializeWith(DurationSecondsSerializer::class)]
+        public ?Duration $durationSeconds = null,
         public ?DateTime $publishedAt = null,
         public ?string $thumbnailUri = null,
         public ?string $contentType = null,

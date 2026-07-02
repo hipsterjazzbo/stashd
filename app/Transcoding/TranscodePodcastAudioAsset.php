@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Transcoding;
 
+use App\Support\DurationSeconds;
 use App\Support\PrefixedUlid;
 use App\System\State\StateTransitionService;
 use App\Transcoding\Ffmpeg\FfmpegAudioProfile;
@@ -62,7 +63,7 @@ final readonly class TranscodePodcastAudioAsset
                 mediaItemId: $mediaItemId->toString(),
                 assetId: $audioAssetId->toString(),
                 sizeBytes: $audioAsset->sizeBytes,
-                durationSeconds: $audioAsset->durationSeconds,
+                durationSeconds: DurationSeconds::toSeconds($audioAsset->durationSeconds),
             );
         }
 
@@ -85,7 +86,7 @@ final readonly class TranscodePodcastAudioAsset
                 sourcePath: $source->path,
                 destinationPath: $tempPath,
                 profile: FfmpegAudioProfile::v1Default(),
-                totalSeconds: $source->durationSeconds,
+                totalSeconds: DurationSeconds::toSeconds($source->durationSeconds),
                 onProgress: $onProgress,
             );
 
@@ -117,7 +118,7 @@ final readonly class TranscodePodcastAudioAsset
                 mediaItemId: $mediaItemId->toString(),
                 assetId: $audioAssetId->toString(),
                 sizeBytes: $audioAsset->sizeBytes,
-                durationSeconds: $audioAsset->durationSeconds,
+                durationSeconds: DurationSeconds::toSeconds($audioAsset->durationSeconds),
             );
         } catch (\Throwable $throwable) {
             $this->tempStaging->markFailed($tempDirectory);
