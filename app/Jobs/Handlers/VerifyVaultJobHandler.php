@@ -45,9 +45,7 @@ final readonly class VerifyVaultJobHandler implements JobHandler
         $this->transitions->transitionCommand($command, CommandState::Running);
         $context->heartbeat($job);
 
-        $payload = $job->payloadJson === null
-            ? []
-            : json_decode($job->payloadJson, true, flags: JSON_THROW_ON_ERROR);
+        $payload = $job->payload ?? [];
 
         if (isset($payload['asset_id']) && is_string($payload['asset_id']) && $payload['asset_id'] !== '') {
             $outcome = $this->verify->verifyAsset(AssetId::parse($payload['asset_id']));
@@ -61,7 +59,7 @@ final readonly class VerifyVaultJobHandler implements JobHandler
             $result = ['scope' => 'vault', ...$verifyResult->toArray()];
         }
 
-        $command->resultJson = json_encode($result, JSON_THROW_ON_ERROR);
+        $command->result = $result;
         $this->commands->save($command);
 
         $job->progressCurrent = 1;

@@ -70,7 +70,7 @@ final readonly class BroadcastTriggerService
         }
 
         $existing = $this->triggers->findEnabledScanTrigger(
-            BroadcastId::parse((string) $broadcast->id),
+            BroadcastId::fromPrimaryKey($broadcast->id),
             $type,
         );
 
@@ -79,7 +79,7 @@ final readonly class BroadcastTriggerService
         }
 
         return $this->triggers->create(
-            broadcastId: BroadcastId::parse((string) $broadcast->id),
+            broadcastId: BroadcastId::fromPrimaryKey($broadcast->id),
             type: $type,
             settings: ['mediaServerConnectionId' => $connectionId],
         );
@@ -93,7 +93,7 @@ final readonly class BroadcastTriggerService
             return new BroadcastTriggerResult(0, 0, 0, []);
         }
 
-        $connectionId = $trigger->settingsJson?->mediaServerConnectionId ?? '';
+        $connectionId = $trigger->settings?->mediaServerConnectionId ?? '';
 
         if ($connectionId === '') {
             return new BroadcastTriggerResult(0, 0, 0, []);
@@ -124,7 +124,7 @@ final readonly class BroadcastTriggerService
         }
 
         $run = $this->triggerRuns->create(
-            triggerId: BroadcastTriggerId::parse((string) $trigger->id),
+            triggerId: BroadcastTriggerId::fromPrimaryKey($trigger->id),
             reason: $reason,
         );
         $this->transitionRun($run, BroadcastTriggerRunState::Processing);
@@ -209,13 +209,7 @@ final readonly class BroadcastTriggerService
     /** @return array<string, mixed> */
     private function broadcastSettings(BroadcastRecord $broadcast): array
     {
-        if ($broadcast->settingsJson === null) {
-            return [];
-        }
-
-        $decoded = json_decode($broadcast->settingsJson, true);
-
-        return is_array($decoded) ? $decoded : [];
+        return $broadcast->settings ?? [];
     }
 
     private function markTriggerFailed(\App\Broadcasts\BroadcastTriggerRecord $trigger, string $error): void

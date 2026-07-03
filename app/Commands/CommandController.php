@@ -90,7 +90,7 @@ final readonly class CommandController
             'command' => CommandResource::fromRecord($command)->toArray(),
             'jobs' => array_map(
                 static fn ($job): array => JobResource::fromRecord($job)->toArray(),
-                $this->jobs->listForCommand(CommandId::parse((string) $command->id)),
+                $this->jobs->listForCommand(CommandId::fromPrimaryKey($command->id)),
             ),
         ]);
     }

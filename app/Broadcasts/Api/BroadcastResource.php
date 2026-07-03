@@ -30,7 +30,7 @@ final readonly class BroadcastResource implements Arrayable
             'name' => $this->broadcast->name,
             'slug' => $this->broadcast->slug,
             'state' => $this->broadcast->state->value,
-            'settings' => $this->decodeJson($this->broadcast->settingsJson),
+            'settings' => $this->broadcast->settings,
             'lastPlannedAt' => $this->broadcast->lastPlannedAt,
             'lastBuiltAt' => $this->broadcast->lastBuiltAt,
             'lastVerifiedAt' => $this->broadcast->lastVerifiedAt,
@@ -59,15 +59,4 @@ final readonly class BroadcastResource implements Arrayable
         return $encoded;
     }
 
-    /** @return array<string, mixed>|null */
-    private function decodeJson(?string $json): ?array
-    {
-        if ($json === null) {
-            return null;
-        }
-
-        $decoded = json_decode($json, true);
-
-        return is_array($decoded) ? $decoded : null;
-    }
 }

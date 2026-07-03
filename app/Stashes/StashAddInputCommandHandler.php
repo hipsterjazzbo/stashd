@@ -53,13 +53,13 @@ final readonly class StashAddInputCommandHandler implements CommandHandler
             throw InvalidCommandPayload::withErrors(['Preflight command not found.']);
         }
 
-        if ($command->state !== CommandState::Completed || $command->resultJson === null) {
+        if ($command->state !== CommandState::Completed || $command->result === null) {
             throw InvalidCommandPayload::withErrors(['Preflight command must be completed with stored results.']);
         }
 
-        $result = json_decode($command->resultJson, true);
+        $result = $command->result;
 
-        if (! is_array($result) || trim((string) ($result['source_uri'] ?? '')) === '') {
+        if (trim((string) ($result['source_uri'] ?? '')) === '') {
             throw InvalidCommandPayload::withErrors(['Preflight result is missing its resolved source.']);
         }
 
@@ -82,14 +82,14 @@ final readonly class StashAddInputCommandHandler implements CommandHandler
     {
         $stashId = trim((string) ($options['stashId'] ?? $options['stash_id'] ?? ''));
         $preflightCommandId = trim((string) ($options['preflightCommandId'] ?? $options['preflight_command_id'] ?? ''));
-        $commandId = CommandId::parse((string) $command->id);
+        $commandId = CommandId::fromPrimaryKey($command->id);
         $payload = [
             'stash_id' => $stashId,
             'preflight_command_id' => $preflightCommandId,
             'options' => is_array($options['options'] ?? null) ? $options['options'] : [],
         ];
 
-        $command->optionsJson = json_encode($payload, JSON_THROW_ON_ERROR);
+        $command->options = $payload;
         $command->targetType = 'stash';
         $command->targetId = $stashId;
         $this->commands->save($command);

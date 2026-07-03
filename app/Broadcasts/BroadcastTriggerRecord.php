@@ -21,7 +21,7 @@ final class BroadcastTriggerRecord
         public BroadcastTriggerType $type,
         public bool $enabled,
         public BroadcastTriggerState $state,
-        public ?MediaServerScanTriggerSettings $settingsJson = null,
+        public ?MediaServerScanTriggerSettings $settings = null,
         public ?DateTime $lastTriggeredAt = null,
         public ?DateTime $lastSuccessAt = null,
         public ?DateTime $lastFailureAt = null,

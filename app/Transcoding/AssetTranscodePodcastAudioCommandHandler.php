@@ -56,9 +56,9 @@ final readonly class AssetTranscodePodcastAudioCommandHandler implements Command
 
     public function createJobs(CommandRecord $command, array $options): array
     {
-        $commandId = CommandId::parse((string) $command->id);
+        $commandId = CommandId::fromPrimaryKey($command->id);
         $payload = $this->normalizedPayload($options);
-        $command->optionsJson = json_encode($payload, JSON_THROW_ON_ERROR);
+        $command->options = $payload;
         $command->targetType = 'asset';
         $command->targetId = $payload['asset_id'];
         $this->commands->save($command);
@@ -80,13 +80,19 @@ final readonly class AssetTranscodePodcastAudioCommandHandler implements Command
         return [];
     }
 
-    /** @return array<string, string> */
+    /**
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, string>
+     */
     private function normalizedPayload(array $options): array
     {
+        $string = static fn (mixed $value): string => is_string($value) ? trim($value) : '';
+
         return [
-            'media_item_id' => trim((string) ($options['mediaItemId'] ?? $options['media_item_id'] ?? '')),
-            'source_asset_id' => trim((string) ($options['sourceAssetId'] ?? $options['source_asset_id'] ?? '')),
-            'asset_id' => trim((string) ($options['assetId'] ?? $options['asset_id'] ?? '')),
+            'media_item_id' => $string($options['mediaItemId'] ?? $options['media_item_id'] ?? null),
+            'source_asset_id' => $string($options['sourceAssetId'] ?? $options['source_asset_id'] ?? null),
+            'asset_id' => $string($options['assetId'] ?? $options['asset_id'] ?? null),
         ];
     }
 }

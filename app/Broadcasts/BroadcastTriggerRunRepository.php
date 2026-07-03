@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Broadcasts;
 
 use App\Support\PrefixedUlidGenerator;
-use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
@@ -37,14 +36,7 @@ final class BroadcastTriggerRunRepository
 
         query(BroadcastTriggerRunRecord::class)->insert($record)->execute();
 
-        return BroadcastTriggerRunRecord::findById(new PrimaryKey($id))
-            ?? throw new InvalidArgumentException('Failed to persist broadcast trigger run.');
-    }
-
-    public function save(BroadcastTriggerRunRecord $record): BroadcastTriggerRunRecord
-    {
-        $record->save();
-
         return $record;
     }
+
 }

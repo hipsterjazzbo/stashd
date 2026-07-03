@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Broadcasts;
 
 use App\Support\PrefixedUlidGenerator;
-use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
@@ -33,7 +32,7 @@ final class BroadcastTriggerRepository
             type: $type,
             enabled: $enabled,
             state: $state,
-            settingsJson: MediaServerScanTriggerSettings::fromArray($settings),
+            settings: MediaServerScanTriggerSettings::fromArray($settings),
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);
@@ -42,8 +41,7 @@ final class BroadcastTriggerRepository
 
         query(BroadcastTriggerRecord::class)->insert($record)->execute();
 
-        return BroadcastTriggerRecord::findById(new PrimaryKey($id))
-            ?? throw new InvalidArgumentException('Failed to persist broadcast trigger.');
+        return $record;
     }
 
     public function save(BroadcastTriggerRecord $record): BroadcastTriggerRecord

@@ -23,7 +23,7 @@ final class ApiTokenRecord
         #[Hidden]
         public string $tokenHash,
         public ?string $tokenPreview = null,
-        public ?ApiTokenScopes $scopesJson = null,
+        public ?ApiTokenScopes $scopes = null,
         public ?DateTime $lastUsedAt = null,
         public ?DateTime $expiresAt = null,
         public ?DateTime $createdAt = null,

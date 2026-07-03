@@ -126,7 +126,7 @@ final readonly class StashController
             return $this->notFound('Stash not found.');
         }
 
-        $stashItems = $this->stashItems->listForStash(StashId::parse((string) $stash->id));
+        $stashItems = $this->stashItems->listForStash(StashId::fromPrimaryKey($stash->id));
         $mediaItemIds = array_values(array_unique(array_map(
             static fn ($item): string => (string) $item->mediaItemId,
             $stashItems,
@@ -159,7 +159,7 @@ final readonly class StashController
         return new Json([
             'inputs' => array_map(
                 static fn ($input): array => StashInputResource::fromRecord($input)->toArray(),
-                $this->stashInputs->listForStash(StashId::parse((string) $stash->id)),
+                $this->stashInputs->listForStash(StashId::fromPrimaryKey($stash->id)),
             ),
         ]);
     }

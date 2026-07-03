@@ -36,7 +36,7 @@ final readonly class BootstrapService
         $command = $this->commands->create(CommandType::SystemBoot);
         $job = $this->jobs->create(
             intent: JobIntent::Boot,
-            commandId: CommandId::parse((string) $command->id),
+            commandId: CommandId::fromPrimaryKey($command->id),
             entityType: 'system',
             payload: ['phase' => 'boot'],
         );

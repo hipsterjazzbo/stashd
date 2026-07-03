@@ -276,7 +276,7 @@ final readonly class YtdlpDownloader implements DownloaderInterface
         );
 
         $path = $this->tempPath($request, 'metadata.json');
-        $payload = $this->sidecars->metadataJson($enriched, $capturedAt);
+        $payload = $this->sidecars->metadata($enriched, $capturedAt);
         file_put_contents($path, $payload);
 
         return new DownloadedFile(

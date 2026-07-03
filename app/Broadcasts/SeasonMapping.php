@@ -6,7 +6,7 @@ namespace App\Broadcasts;
 
 /**
  * Optional `stash_input_id -> season` assignment for series-style broadcasts,
- * stored under the `season_mapping` key of `BroadcastRecord.settingsJson`.
+ * stored under the `season_mapping` key of `BroadcastRecord.settings`.
  *
  * Stash input ids are opaque identifiers, not DTO field names, so they must
  * stay out of the snake/camel API boundary transform — see
@@ -20,7 +20,7 @@ final readonly class SeasonMapping
     ) {
     }
 
-    /** @param array<string, mixed> $settings decoded BroadcastRecord.settingsJson */
+    /** @param array<string, mixed> $settings decoded BroadcastRecord.settings */
     public static function fromBroadcastSettings(array $settings): self
     {
         $raw = $settings['season_mapping'] ?? null;

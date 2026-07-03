@@ -7,7 +7,6 @@ namespace App\Commands;
 use App\Auth\UserId;
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
-use InvalidArgumentException;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
@@ -23,6 +22,7 @@ final class CommandRepository
     ) {
     }
 
+    /** @param array<string, mixed>|null $options */
     public function create(
         CommandType $type,
         ?string $targetType = null,
@@ -36,7 +36,7 @@ final class CommandRepository
             state: CommandState::Accepted,
             targetType: $targetType,
             targetId: $targetId?->toString(),
-            optionsJson: $options === null ? null : json_encode($options, JSON_THROW_ON_ERROR),
+            options: $options,
             createdByUserId: $createdByUserId,
         );
         $record->id = new PrimaryKey($id);
@@ -46,13 +46,12 @@ final class CommandRepository
 
         query(CommandRecord::class)->insert($record)->execute();
 
-        return CommandRecord::findById(new PrimaryKey($id))
-            ?? throw new InvalidArgumentException('Failed to persist command record.');
+        return $record;
     }
 
     public function find(CommandId $id): ?CommandRecord
     {
-        return CommandRecord::findById(new PrimaryKey($id->toString()));
+        return CommandRecord::findById($id->toPrimaryKey());
     }
 
     public function save(CommandRecord $record): CommandRecord

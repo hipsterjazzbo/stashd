@@ -6,7 +6,6 @@ namespace App\Vault;
 
 use App\Stashes\StashInputId;
 use App\Support\PrefixedUlidGenerator;
-use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
@@ -43,8 +42,7 @@ final class MediaItemSourceRepository
 
         query(MediaItemSourceRecord::class)->insert($record)->execute();
 
-        return MediaItemSourceRecord::findById(new PrimaryKey($id))
-            ?? throw new InvalidArgumentException('Failed to persist media item source record.');
+        return $record;
     }
 
     public function findForMediaItemAndInput(

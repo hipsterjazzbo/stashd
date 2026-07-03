@@ -22,6 +22,7 @@ final class JobRecord
 
     public PrimaryKey $id;
 
+    /** @param array<string, mixed>|null $payload */
     public function __construct(
         public ?CommandId $commandId,
         public JobIntent $intent,
@@ -44,7 +45,7 @@ final class JobRecord
         #[SerializeWith(DurationSecondsSerializer::class)]
         public ?Duration $progressEtaSeconds = null,
         public ?string $lastError = null,
-        public ?string $payloadJson = null,
+        public ?array $payload = null,
         public ?DateTime $createdAt = null,
         public ?DateTime $updatedAt = null,
     ) {

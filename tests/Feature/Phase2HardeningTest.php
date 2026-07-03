@@ -138,7 +138,7 @@ test('sse job failed notifications redact secrets in last_error', function (): v
         ->orderBy('createdAt', \Tempest\Database\Direction::DESC)
         ->first();
 
-    $payload = json_decode($notification->payloadJson, true, flags: JSON_THROW_ON_ERROR);
+    $payload = $notification->payload;
     expect($payload['last_error'])->not->toContain('stashd_pat_')
         ->and($payload['last_error'])->toContain('[REDACTED]');
 });

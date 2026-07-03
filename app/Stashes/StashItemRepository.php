@@ -6,7 +6,6 @@ namespace App\Stashes;
 
 use App\Support\PrefixedUlidGenerator;
 use App\Vault\MediaItemId;
-use InvalidArgumentException;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
@@ -48,13 +47,12 @@ final class StashItemRepository
 
         query(StashItemRecord::class)->insert($record)->execute();
 
-        return StashItemRecord::findById(new PrimaryKey($id))
-            ?? throw new InvalidArgumentException('Failed to persist stash item record.');
+        return $record;
     }
 
     public function find(StashItemId $id): ?StashItemRecord
     {
-        return StashItemRecord::findById(new PrimaryKey($id->toString()));
+        return StashItemRecord::findById($id->toPrimaryKey());
     }
 
     public function findByStashAndMediaItem(StashId $stashId, MediaItemId $mediaItemId): ?StashItemRecord

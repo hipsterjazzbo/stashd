@@ -47,15 +47,13 @@ final readonly class PreflightJobHandler implements JobHandler
         $context->heartbeat($job);
         $context->progress($job, JobProgressUpdate::ofSteps(0, 1, 'Running preflight'));
 
-        $payload = $job->payloadJson === null
-            ? []
-            : json_decode($job->payloadJson, true, flags: JSON_THROW_ON_ERROR);
+        $payload = $job->payload ?? [];
 
         $result = $this->executor->execute($payload);
         $reviewUrl = rtrim($this->config->publicUrl, '/') . '/api/v1/stashes/preflight/' . (string) $command->id . '/review';
         $resultArray = $result->toResultArray($reviewUrl);
 
-        $command->resultJson = json_encode($resultArray, JSON_THROW_ON_ERROR);
+        $command->result = $resultArray;
         $this->commands->save($command);
 
         $job->progressCurrent = $result->estimatedItemCount;

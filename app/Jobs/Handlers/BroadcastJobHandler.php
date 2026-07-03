@@ -49,9 +49,7 @@ final readonly class BroadcastJobHandler implements JobHandler
         $this->transitions->transitionCommand($command, CommandState::Running);
         $context->heartbeat($job);
 
-        $payload = $job->payloadJson === null
-            ? []
-            : json_decode($job->payloadJson, true, flags: JSON_THROW_ON_ERROR);
+        $payload = $job->payload ?? [];
 
         $broadcastId = BroadcastId::parse((string) ($payload['broadcast_id'] ?? ''));
         $action = (string) ($payload['action'] ?? 'rebuild');
@@ -76,7 +74,7 @@ final readonly class BroadcastJobHandler implements JobHandler
                 default => throw BroadcastException::withCode('broadcast_action_unsupported', 'Unsupported broadcast action.'),
             };
 
-            $command->resultJson = json_encode($result, JSON_THROW_ON_ERROR);
+            $command->result = $result;
             $this->commands->save($command);
 
             $job->progressCurrent = $job->progressTotal;

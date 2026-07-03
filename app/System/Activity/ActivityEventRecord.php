@@ -16,6 +16,7 @@ final class ActivityEventRecord
 
     public PrimaryKey $id;
 
+    /** @param array<string, mixed>|null $metadata */
     public function __construct(
         public ActivityLevel $level,
         public string $type,
@@ -28,7 +29,7 @@ final class ActivityEventRecord
         public ?string $jobId = null,
         public ?string $commandId = null,
         public ?string $groupKey = null,
-        public ?string $metadataJson = null,
+        public ?array $metadata = null,
         public ?DateTime $createdAt = null,
     ) {
     }

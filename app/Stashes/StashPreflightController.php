@@ -84,9 +84,7 @@ final readonly class StashPreflightController
             ], Status::NOT_FOUND);
         }
 
-        $preflight = $command->resultJson === null
-            ? null
-            : json_decode($command->resultJson, true, flags: JSON_THROW_ON_ERROR);
+        $preflight = $command->result;
 
         $reviewUrl = is_array($preflight) ? ($preflight['review_url'] ?? null) : null;
 

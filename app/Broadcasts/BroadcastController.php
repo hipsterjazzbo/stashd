@@ -226,7 +226,7 @@ final readonly class BroadcastController
             $settings['season_mapping'] = $mapping;
         }
 
-        $broadcast->settingsJson = $settings === [] ? null : json_encode($settings, JSON_THROW_ON_ERROR);
+        $broadcast->settings = $settings === [] ? null : $settings;
         $this->broadcasts->save($broadcast);
 
         return new Json([
@@ -237,13 +237,7 @@ final readonly class BroadcastController
     /** @return array<string, mixed> */
     private function decodeSettings(BroadcastRecord $broadcast): array
     {
-        if ($broadcast->settingsJson === null) {
-            return [];
-        }
-
-        $decoded = json_decode($broadcast->settingsJson, true);
-
-        return is_array($decoded) ? $decoded : [];
+        return $broadcast->settings ?? [];
     }
 
     private function validationError(string $message): Json

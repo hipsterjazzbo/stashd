@@ -28,23 +28,21 @@ final readonly class CommandResource implements Arrayable
             'state' => $this->command->state->value,
             'targetType' => $this->command->targetType,
             'targetId' => $this->command->targetId,
-            'options' => $this->decodeJson($this->command->optionsJson),
-            'result' => $this->decodeJson($this->command->resultJson),
+            'options' => $this->encodeForApi($this->command->options),
+            'result' => $this->encodeForApi($this->command->result),
             'createdByUserId' => $this->command->createdByUserId === null ? null : (string) $this->command->createdByUserId,
             'createdAt' => $this->command->createdAt,
             'updatedAt' => $this->command->updatedAt,
         ]);
     }
 
-    /** @return array<string, mixed>|null */
-    private function decodeJson(?string $json): ?array
+    /**
+     * @param array<string, mixed>|null $data
+     *
+     * @return array<string, mixed>|null
+     */
+    private function encodeForApi(?array $data): ?array
     {
-        if ($json === null) {
-            return null;
-        }
-
-        $decoded = json_decode($json, true);
-
-        return is_array($decoded) ? ApiJson::encode($decoded) : null;
+        return $data === null ? null : ApiJson::encode($data);
     }
 }

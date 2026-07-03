@@ -17,6 +17,7 @@ final class SecretRecord
 
     public PrimaryKey $id;
 
+    /** @param array<string, mixed>|null $metadata */
     public function __construct(
         public string $key,
         public SecretType $type,
@@ -25,7 +26,7 @@ final class SecretRecord
         #[Hidden]
         public string $nonce,
         #[Hidden]
-        public ?string $metadataJson = null,
+        public ?array $metadata = null,
         public ?DateTime $lastUsedAt = null,
         public ?DateTime $revokedAt = null,
         public ?DateTime $createdAt = null,

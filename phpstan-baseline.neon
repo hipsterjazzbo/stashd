@@ -43,12 +43,6 @@ parameters:
 			path: app/Auth/UserRepository.php
 
 		-
-			message: '#^Method App\\Broadcasts\\Api\\BroadcastResource\:\:decodeJson\(\) should return array\<string, mixed\>\|null but returns array\<mixed, mixed\>\|null\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Broadcasts/Api/BroadcastResource.php
-
-		-
 			message: '#^Cannot cast mixed to string\.$#'
 			identifier: cast.string
 			count: 1
@@ -85,12 +79,6 @@ parameters:
 			path: app/Broadcasts/BroadcastCommandHandler.php
 
 		-
-			message: '#^Method App\\Broadcasts\\BroadcastContext\:\:settings\(\) should return array\<string, mixed\> but returns array\<mixed\>\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Broadcasts/BroadcastContext.php
-
-		-
 			message: '#^Property App\\Broadcasts\\BroadcastContextFactory\:\:\$broadcasts is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
@@ -100,12 +88,6 @@ parameters:
 			message: '#^Cannot cast mixed to string\.$#'
 			identifier: cast.string
 			count: 3
-			path: app/Broadcasts/BroadcastController.php
-
-		-
-			message: '#^Method App\\Broadcasts\\BroadcastController\:\:decodeSettings\(\) should return array\<string, mixed\> but returns array\<mixed\>\.$#'
-			identifier: return.type
-			count: 1
 			path: app/Broadcasts/BroadcastController.php
 
 		-
@@ -229,12 +211,6 @@ parameters:
 			path: app/Broadcasts/BroadcastPluginRegistry.php
 
 		-
-			message: '#^Method App\\Broadcasts\\BroadcastRepository\:\:create\(\) has parameter \$settings with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Broadcasts/BroadcastRepository.php
-
-		-
 			message: '#^Method App\\Broadcasts\\BroadcastRepository\:\:findByStashAndSlug\(\) should return App\\Broadcasts\\BroadcastRecord\|null but returns mixed\.$#'
 			identifier: return.type
 			count: 1
@@ -280,12 +256,6 @@ parameters:
 			message: '#^Cannot cast mixed to string\.$#'
 			identifier: cast.string
 			count: 2
-			path: app/Broadcasts/BroadcastTriggerService.php
-
-		-
-			message: '#^Method App\\Broadcasts\\BroadcastTriggerService\:\:broadcastSettings\(\) should return array\<string, mixed\> but returns array\<mixed\>\.$#'
-			identifier: return.type
-			count: 1
 			path: app/Broadcasts/BroadcastTriggerService.php
 
 		-
@@ -379,12 +349,6 @@ parameters:
 			path: app/Broadcasts/Plugins/AbstractSeriesBroadcastPlugin.php
 
 		-
-			message: '#^Method App\\Broadcasts\\Plugins\\PodcastBroadcastPlugin\:\:settings\(\) should return array\<string, mixed\> but returns array\<mixed\>\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Broadcasts/Plugins/PodcastBroadcastPlugin.php
-
-		-
 			message: '#^Property App\\Broadcasts\\Plugins\\PodcastBroadcastPlugin\:\:\$contextFactory is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
@@ -467,12 +431,6 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: app/Commands/CommandHandler.php
-
-		-
-			message: '#^Method App\\Commands\\CommandRepository\:\:create\(\) has parameter \$options with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Commands/CommandRepository.php
 
 		-
 			message: '#^Method App\\Commands\\CommandRepository\:\:listRecent\(\) should return list\<App\\Commands\\CommandRecord\> but returns array\<App\\Commands\\CommandRecord\>\.$#'
@@ -697,24 +655,6 @@ parameters:
 			path: app/Http/Api/ApiJson.php
 
 		-
-			message: '#^Cannot access offset ''options'' on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: app/Jobs/Handlers/AddInputJobHandler.php
-
-		-
-			message: '#^Cannot access offset ''preflight_command_id'' on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: app/Jobs/Handlers/AddInputJobHandler.php
-
-		-
-			message: '#^Cannot access offset ''stash_id'' on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: app/Jobs/Handlers/AddInputJobHandler.php
-
-		-
 			message: '#^Cannot cast mixed to string\.$#'
 			identifier: cast.string
 			count: 2
@@ -725,18 +665,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: app/Jobs/Handlers/AddInputJobHandler.php
-
-		-
-			message: '#^Cannot access offset ''action'' on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: app/Jobs/Handlers/BroadcastJobHandler.php
-
-		-
-			message: '#^Cannot access offset ''broadcast_id'' on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: app/Jobs/Handlers/BroadcastJobHandler.php
 
 		-
 			message: '#^Cannot cast mixed to string\.$#'
@@ -769,82 +697,22 @@ parameters:
 			path: app/Jobs/Handlers/BroadcastJobHandler.php
 
 		-
-			message: '#^Cannot access offset ''force'' on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: app/Jobs/Handlers/DownloadJobHandler.php
-
-		-
-			message: '#^Cannot access offset ''media_item_id'' on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: app/Jobs/Handlers/DownloadJobHandler.php
-
-		-
-			message: '#^Cannot access offset ''stash_id'' on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: app/Jobs/Handlers/DownloadJobHandler.php
-
-		-
 			message: '#^Cannot cast mixed to string\.$#'
 			identifier: cast.string
 			count: 2
 			path: app/Jobs/Handlers/DownloadJobHandler.php
 
 		-
-			message: '#^Cannot access offset ''action'' on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: app/Jobs/Handlers/MediaServerJobHandler.php
-
-		-
-			message: '#^Cannot access offset ''media_server_connection_id'' on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: app/Jobs/Handlers/MediaServerJobHandler.php
-
-		-
 			message: '#^Cannot cast mixed to string\.$#'
 			identifier: cast.string
 			count: 2
 			path: app/Jobs/Handlers/MediaServerJobHandler.php
-
-		-
-			message: '#^Parameter \#1 \$payload of method App\\Stashes\\DiscoverStashInput\:\:execute\(\) expects array\<string, mixed\>, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Jobs/Handlers/PreflightJobHandler.php
-
-		-
-			message: '#^Cannot access offset ''asset_id'' on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: app/Jobs/Handlers/TranscodePodcastAudioJobHandler.php
-
-		-
-			message: '#^Cannot access offset ''media_item_id'' on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: app/Jobs/Handlers/TranscodePodcastAudioJobHandler.php
-
-		-
-			message: '#^Cannot access offset ''source_asset_id'' on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: app/Jobs/Handlers/TranscodePodcastAudioJobHandler.php
 
 		-
 			message: '#^Cannot cast mixed to string\.$#'
 			identifier: cast.string
 			count: 3
 			path: app/Jobs/Handlers/TranscodePodcastAudioJobHandler.php
-
-		-
-			message: '#^Cannot access offset ''asset_id'' on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: app/Jobs/Handlers/VerifyVaultJobHandler.php
 
 		-
 			message: '#^Cannot access property \$attempts on mixed\.$#'
@@ -873,12 +741,6 @@ parameters:
 		-
 			message: '#^Cannot use \+\+ on mixed\.$#'
 			identifier: postInc.type
-			count: 1
-			path: app/Jobs/JobRepository.php
-
-		-
-			message: '#^Method App\\Jobs\\JobRepository\:\:create\(\) has parameter \$payload with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
 			count: 1
 			path: app/Jobs/JobRepository.php
 
@@ -1159,20 +1021,8 @@ parameters:
 			path: app/Stashes/CreateStashFromDiscovery.php
 
 		-
-			message: '#^Method App\\Stashes\\CreateStashFromDiscovery\:\:decodePreflightResult\(\) should return array\<string, mixed\> but returns array\<mixed, mixed\>\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Stashes/CreateStashFromDiscovery.php
-
-		-
 			message: '#^Parameter \#1 \$array \(list\<array\<string, mixed\>\>\) of array_values is already a list, call has no effect\.$#'
 			identifier: arrayValues.list
-			count: 1
-			path: app/Stashes/CreateStashFromDiscovery.php
-
-		-
-			message: '#^Parameter \#1 \$json of function json_decode expects string, string\|null given\.$#'
-			identifier: argument.type
 			count: 1
 			path: app/Stashes/CreateStashFromDiscovery.php
 
@@ -1309,12 +1159,6 @@ parameters:
 			path: app/Stashes/StashRepository.php
 
 		-
-			message: '#^Method App\\System\\Activity\\ActivityEventRepository\:\:create\(\) has parameter \$metadata with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/System/Activity/ActivityEventRepository.php
-
-		-
 			message: '#^Method App\\System\\Activity\\ActivityEventRepository\:\:listRecent\(\) should return list\<App\\System\\Activity\\ActivityEventRecord\> but returns array\<App\\System\\Activity\\ActivityEventRecord\>\.$#'
 			identifier: return.type
 			count: 1
@@ -1387,22 +1231,10 @@ parameters:
 			path: app/System/RoadRunner/TempestPsr7Bridge.php
 
 		-
-			message: '#^Method App\\System\\Secret\\SecretRepository\:\:create\(\) has parameter \$metadata with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/System/Secret/SecretRepository.php
-
-		-
 			message: '#^Method App\\System\\Secret\\SecretRepository\:\:findByKey\(\) should return App\\System\\Secret\\SecretRecord\|null but returns mixed\.$#'
 			identifier: return.type
 			count: 1
 			path: app/System/Secret/SecretRepository.php
-
-		-
-			message: '#^Method App\\System\\Secret\\SecretsService\:\:put\(\) has parameter \$metadata with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/System/Secret/SecretsService.php
 
 		-
 			message: '#^Access to property \$state on an unknown class App\\System\\State\\TRecord\.$#'
@@ -1615,12 +1447,6 @@ parameters:
 			path: app/System/Storage/StorageCapabilityChecker.php
 
 		-
-			message: '#^Method App\\System\\Storage\\StorageCapabilityChecker\:\:recordCheck\(\) has parameter \$details with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/System/Storage/StorageCapabilityChecker.php
-
-		-
 			message: '#^Offset ''dev'' on array\{0\: int, 1\: int, 2\: int, 3\: int, 4\: int, 5\: int, 6\: int, 7\: int, \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
@@ -1643,12 +1469,6 @@ parameters:
 			identifier: booleanAnd.alwaysFalse
 			count: 3
 			path: app/System/Storage/StorageCapabilityChecker.php
-
-		-
-			message: '#^Method App\\System\\Storage\\StorageCheckRepository\:\:record\(\) has parameter \$details with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/System/Storage/StorageCheckRepository.php
 
 		-
 			message: '#^Cannot access property \$filesystemId on mixed\.$#'
@@ -1774,18 +1594,6 @@ parameters:
 			message: '#^Method App\\Transcoding\\AssetTranscodePodcastAudioCommandHandler\:\:extras\(\) has parameter \$options with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: app/Transcoding/AssetTranscodePodcastAudioCommandHandler.php
-
-		-
-			message: '#^Method App\\Transcoding\\AssetTranscodePodcastAudioCommandHandler\:\:normalizedPayload\(\) has parameter \$options with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Transcoding/AssetTranscodePodcastAudioCommandHandler.php
-
-		-
-			message: '#^Cannot cast mixed to string\.$#'
-			identifier: cast.string
-			count: 3
 			path: app/Transcoding/AssetTranscodePodcastAudioCommandHandler.php
 
 		-

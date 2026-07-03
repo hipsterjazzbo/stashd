@@ -28,7 +28,7 @@ final readonly class StashInputResource implements Arrayable
         // future option key containing an uppercase letter), so it's pulled
         // out before encoding and reattached verbatim. See StashInputOptions
         // and the equivalent fix in BroadcastResource::toArray().
-        $options = $this->input->optionsJson?->toArray();
+        $options = $this->input->options?->toArray();
         $provider = is_array($options) ? ($options['provider'] ?? null) : null;
 
         $encoded = ApiJson::encode([

@@ -19,6 +19,7 @@ final class StorageCheckRepository
     ) {
     }
 
+    /** @param array<string, mixed>|null $details */
     public function record(
         string $storageLocationId,
         StorageCheckType $checkType,
@@ -32,7 +33,7 @@ final class StorageCheckRepository
             checkType: $checkType,
             state: $state,
             message: $message,
-            detailsJson: $details === null ? null : json_encode($details, JSON_THROW_ON_ERROR),
+            details: $details,
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);
@@ -41,7 +42,6 @@ final class StorageCheckRepository
 
         query(StorageCheckRecord::class)->insert($record)->execute();
 
-        return StorageCheckRecord::findById(new PrimaryKey($id))
-            ?? $record;
+        return $record;
     }
 }

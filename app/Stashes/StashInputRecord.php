@@ -26,7 +26,7 @@ final class StashInputRecord
         public int $consecutiveFailures = 0,
         public ?string $title = null,
         public ?SyncMode $syncMode = null,
-        public ?StashInputOptions $optionsJson = null,
+        public ?StashInputOptions $options = null,
         public ?DateTime $lastCheckedAt = null,
         public ?DateTime $nextCheckAt = null,
         public ?DateTime $lastSuccessAt = null,

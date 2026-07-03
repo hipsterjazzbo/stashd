@@ -8,7 +8,6 @@ use App\Commands\CommandId;
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
 use App\System\State\StateTransitionService;
-use InvalidArgumentException;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
@@ -24,6 +23,7 @@ final class JobRepository
     ) {
     }
 
+    /** @param array<string, mixed>|null $payload */
     public function create(
         JobIntent $intent,
         ?CommandId $commandId = null,
@@ -40,7 +40,7 @@ final class JobRepository
             entityId: $entityId?->toString(),
             state: JobState::Pending,
             priority: $priority,
-            payloadJson: $payload === null ? null : json_encode($payload, JSON_THROW_ON_ERROR),
+            payload: $payload,
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);
@@ -49,13 +49,12 @@ final class JobRepository
 
         query(JobRecord::class)->insert($record)->execute();
 
-        return JobRecord::findById(new PrimaryKey($id))
-            ?? throw new InvalidArgumentException('Failed to persist job record.');
+        return $record;
     }
 
     public function find(JobId $id): ?JobRecord
     {
-        return JobRecord::findById(new PrimaryKey($id->toString()));
+        return JobRecord::findById($id->toPrimaryKey());
     }
 
     public function save(JobRecord $record): JobRecord

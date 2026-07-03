@@ -109,7 +109,7 @@ final readonly class PodcastTokenService
             return null;
         }
 
-        foreach ($this->broadcastItems->listForBroadcast(BroadcastId::parse((string) $broadcast->id)) as $item) {
+        foreach ($this->broadcastItems->listForBroadcast(BroadcastId::fromPrimaryKey($broadcast->id)) as $item) {
             $candidate = $this->itemToken($item);
 
             if ($candidate !== null && hash_equals($candidate, $itemToken)) {

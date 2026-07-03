@@ -16,9 +16,10 @@ final class EventNotificationRecord
 
     public PrimaryKey $id;
 
+    /** @param array<string, mixed> $payload */
     public function __construct(
         public string $eventType,
-        public string $payloadJson,
+        public array $payload,
         public ?DateTime $createdAt = null,
     ) {
     }

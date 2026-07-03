@@ -52,7 +52,7 @@ final class BroadcastItemRepository
     {
         return BroadcastItemRecord::select()
             ->include('tokenSecretId')
-            ->get(new PrimaryKey($id->toString()));
+            ->get($id->toPrimaryKey());
     }
 
     public function save(BroadcastItemRecord $record): BroadcastItemRecord

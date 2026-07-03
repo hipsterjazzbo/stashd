@@ -43,11 +43,11 @@ final readonly class AssetVerifyCommandHandler implements CommandHandler
 
     public function createJobs(CommandRecord $command, array $options): array
     {
-        $commandId = CommandId::parse((string) $command->id);
+        $commandId = CommandId::fromPrimaryKey($command->id);
         $payload = [
             'asset_id' => trim((string) ($options['assetId'] ?? $options['asset_id'] ?? '')),
         ];
-        $command->optionsJson = json_encode($payload, JSON_THROW_ON_ERROR);
+        $command->options = $payload;
         $command->targetType = 'asset';
         $command->targetId = $payload['asset_id'];
         $this->commands->save($command);

@@ -18,6 +18,7 @@ final class BroadcastRecord
 
     public PrimaryKey $id;
 
+    /** @param array<string, mixed>|null $settings */
     public function __construct(
         public StashId $stashId,
         public string $type,
@@ -27,7 +28,7 @@ final class BroadcastRecord
         #[Hidden]
         public ?string $tokenSecretId = null,
         public ?string $tokenPreview = null,
-        public ?string $settingsJson = null,
+        public ?array $settings = null,
         public ?DateTime $lastPlannedAt = null,
         public ?DateTime $lastBuiltAt = null,
         public ?DateTime $lastVerifiedAt = null,

@@ -21,6 +21,7 @@ final class BroadcastRepository
     ) {
     }
 
+    /** @param array<string, mixed>|null $settings */
     public function create(
         StashId $stashId,
         string $type,
@@ -36,7 +37,7 @@ final class BroadcastRepository
             name: $name,
             slug: $slug,
             state: $state,
-            settingsJson: $settings === null ? null : json_encode($settings, JSON_THROW_ON_ERROR),
+            settings: $settings,
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);
@@ -55,7 +56,7 @@ final class BroadcastRepository
     {
         return BroadcastRecord::select()
             ->include('tokenSecretId')
-            ->get(new PrimaryKey($id->toString()));
+            ->get($id->toPrimaryKey());
     }
 
     public function save(BroadcastRecord $record): BroadcastRecord

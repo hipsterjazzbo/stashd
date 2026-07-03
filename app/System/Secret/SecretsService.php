@@ -20,6 +20,7 @@ final readonly class SecretsService
     ) {
     }
 
+    /** @param array<string, mixed>|null $metadata */
     public function put(
         string $key,
         SecretType $type,
@@ -44,9 +45,7 @@ final readonly class SecretsService
         $existing->type = $type;
         $existing->encryptedValue = $encrypted['value'];
         $existing->nonce = $encrypted['nonce'];
-        $existing->metadataJson = $metadata === null
-            ? $existing->metadataJson
-            : json_encode($metadata, JSON_THROW_ON_ERROR);
+        $existing->metadata = $metadata ?? $existing->metadata;
         $existing->revokedAt = null;
         $this->secrets->save($existing);
     }

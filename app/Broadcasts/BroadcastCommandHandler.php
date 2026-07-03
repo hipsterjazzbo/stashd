@@ -48,9 +48,9 @@ final readonly class BroadcastCommandHandler implements CommandHandler
 
     public function createJobs(CommandRecord $command, array $options): array
     {
-        $commandId = CommandId::parse((string) $command->id);
+        $commandId = CommandId::fromPrimaryKey($command->id);
         $payload = $this->normalizedPayload($options);
-        $command->optionsJson = json_encode($payload, JSON_THROW_ON_ERROR);
+        $command->options = $payload;
         $command->targetType = 'broadcast';
         $command->targetId = $payload['broadcast_id'];
         $this->commands->save($command);

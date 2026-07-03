@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Auth;
 
 use App\Support\PrefixedUlidGenerator;
-use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
@@ -35,7 +34,7 @@ final class ApiTokenRepository
             name: $name,
             tokenHash: $tokenHash,
             tokenPreview: $tokenPreview,
-            scopesJson: $scopes === null ? null : ApiTokenScopes::fromArray($scopes),
+            scopes: $scopes === null ? null : ApiTokenScopes::fromArray($scopes),
             expiresAt: $expiresAt,
             createdAt: $now,
         );
@@ -43,8 +42,7 @@ final class ApiTokenRepository
 
         query(ApiTokenRecord::class)->insert($record)->execute();
 
-        return ApiTokenRecord::findById(new PrimaryKey($id))
-            ?? throw new InvalidArgumentException('Failed to persist API token record.');
+        return $record;
     }
 
     public function findByHash(string $tokenHash): ?ApiTokenRecord
@@ -65,7 +63,7 @@ final class ApiTokenRepository
 
     public function revoke(ApiTokenId $tokenId): void
     {
-        $record = ApiTokenRecord::findById(new PrimaryKey($tokenId->toString()));
+        $record = ApiTokenRecord::findById($tokenId->toPrimaryKey());
 
         if ($record === null || $record->revokedAt !== null) {
             return;

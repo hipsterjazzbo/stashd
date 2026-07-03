@@ -30,7 +30,7 @@ final readonly class SystemStorageCheckCommandHandler implements CommandHandler
 
     public function createJobs(CommandRecord $command, array $options): array
     {
-        $commandId = CommandId::parse((string) $command->id);
+        $commandId = CommandId::fromPrimaryKey($command->id);
 
         return [
             $this->jobs->create(

@@ -29,7 +29,7 @@ final readonly class CommandDispatchService
             type: $type,
             targetType: $handler->type()->value,
             options: $options,
-            createdByUserId: $user === null ? null : UserId::parse((string) $user->id),
+            createdByUserId: $user === null ? null : UserId::fromPrimaryKey($user->id),
         );
 
         $this->activity->commandAccepted($command);
