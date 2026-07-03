@@ -326,17 +326,26 @@ function awaitSseTerminal(checkTerminal: () => Promise<boolean>): void {
 	const source = new EventSource('/api/v1/events')
 	let closed = false
 
+	const finish = () => {
+		if (closed) return
+		closed = true
+		source.close()
+		clearInterval(fallback)
+	}
+
 	const tick = async () => {
 		if (closed) return
-		if (await checkTerminal()) {
-			closed = true
-			source.close()
-		}
+		if (await checkTerminal()) finish()
 	}
 
 	for (const type of EVENT_TYPES) {
 		source.addEventListener(type, () => void tick())
 	}
+
+	// ponytail: SSE delivery isn't guaranteed (dropped connection, missed
+	// event) — this poll guarantees the caller eventually notices a terminal
+	// state even if every SSE event is lost.
+	const fallback = setInterval(() => void tick(), 3000)
 
 	void tick()
 }
