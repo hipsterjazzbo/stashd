@@ -505,6 +505,8 @@ interface StashEditForm {
 	organizationMode: string
 }
 
+type ItemSortKey = 'position' | 'title' | 'duration' | 'size' | 'status' | 'membership'
+
 interface StashItemSummary {
 	id: string
 	stash_id: string
@@ -927,6 +929,11 @@ function stashDetailComponent(stashId: string) {
 		error: null as string | null,
 		stash: null as StashSummary | null,
 		items: [] as StashItemSummary[],
+		itemSortKey: 'position' as ItemSortKey,
+		itemSortDir: 'asc' as 'asc' | 'desc',
+		itemStatusFilter: 'all',
+		itemMembershipFilter: 'all',
+		itemSearch: '',
 		jobs: [] as JobSummary[],
 		inputs: [] as StashInputSummary[],
 		broadcasts: [] as BroadcastSummary[],
@@ -944,6 +951,7 @@ function stashDetailComponent(stashId: string) {
 		statusBadge,
 		formatRelativeTime,
 		formatDuration,
+		formatBytes,
 
 		editingOpen: false,
 		editForm: { name: '', description: '', syncMode: 'automatic', downloadPolicy: 'video', organizationMode: 'flat' } as StashEditForm,
@@ -1054,6 +1062,75 @@ function stashDetailComponent(stashId: string) {
 			return this.jobs.find((job) => job.entity_type === 'media_item' && job.entity_id === mediaItemId && job.state === 'processing') ?? null
 		},
 
+		// Distinct media_item.state values actually present, in a stable
+		// lifecycle order -- drives the status filter's options.
+		itemStatusOptions(): string[] {
+			const order = ['discovered', 'metadata_ready', 'download_pending', 'downloading', 'ready', 'failed', 'missing', 'ignored']
+			const present = new Set(this.items.map((item) => item.media_item?.state).filter((state): state is string => !!state))
+			return order.filter((state) => present.has(state))
+		},
+
+		itemMembershipOptions(): string[] {
+			const order = ['active', 'hidden', 'ignored', 'removed']
+			const present = new Set(this.items.map((item) => item.state))
+			return order.filter((state) => present.has(state))
+		},
+
+		setItemSort(key: ItemSortKey) {
+			if (this.itemSortKey === key) {
+				this.itemSortDir = this.itemSortDir === 'asc' ? 'desc' : 'asc'
+			} else {
+				this.itemSortKey = key
+				this.itemSortDir = 'asc'
+			}
+		},
+
+		itemSortIndicator(key: ItemSortKey): string {
+			if (this.itemSortKey !== key) return ''
+			return this.itemSortDir === 'asc' ? '↑' : '↓'
+		},
+
+		itemSortValue(item: StashItemSummary, key: ItemSortKey): string | number {
+			switch (key) {
+				case 'title':
+					return (item.display_title ?? item.media_item?.title ?? '').toLowerCase()
+				case 'duration':
+					return item.media_item?.duration_seconds ?? -1
+				case 'size':
+					return item.total_asset_size_bytes ?? -1
+				case 'status':
+					return item.media_item?.state ?? ''
+				case 'membership':
+					return item.state
+				case 'position':
+				default:
+					return item.position ?? 0
+			}
+		},
+
+		// Filters, then sorts, the raw items list -- itemRows() flattens the
+		// result with each item's live download progress row.
+		visibleItems(): StashItemSummary[] {
+			const search = this.itemSearch.trim().toLowerCase()
+
+			const filtered = this.items.filter((item) => {
+				if (this.itemStatusFilter !== 'all' && item.media_item?.state !== this.itemStatusFilter) return false
+				if (this.itemMembershipFilter !== 'all' && item.state !== this.itemMembershipFilter) return false
+				if (search === '') return true
+				const title = (item.display_title ?? item.media_item?.title ?? '').toLowerCase()
+				return title.includes(search)
+			})
+
+			const dir = this.itemSortDir === 'asc' ? 1 : -1
+			return [...filtered].sort((a, b) => {
+				const av = this.itemSortValue(a, this.itemSortKey)
+				const bv = this.itemSortValue(b, this.itemSortKey)
+				if (av < bv) return -dir
+				if (av > bv) return dir
+				return 0
+			})
+		},
+
 		// Flattens items + their active job (if any) into one list so the items
 		// table's x-for can render a full-width progress row directly under its
 		// own item, in order. Alpine's x-for template can only have a single
@@ -1062,7 +1139,7 @@ function stashDetailComponent(stashId: string) {
 		// is what makes that possible.
 		itemRows(): Array<{ type: 'item' | 'progress'; key: string; item: StashItemSummary; job: JobSummary | null }> {
 			const rows: Array<{ type: 'item' | 'progress'; key: string; item: StashItemSummary; job: JobSummary | null }> = []
-			for (const item of this.items) {
+			for (const item of this.visibleItems()) {
 				rows.push({ type: 'item', key: item.id, item, job: null })
 				const job = this.activeJobFor(item.media_item_id)
 				if (job) {

@@ -727,6 +727,18 @@ parameters:
 			path: app/Jobs/JobRepository.php
 
 		-
+			message: '#^Cannot access property \$id on mixed\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Jobs/JobRepository.php
+
+		-
+			message: '#^Cannot cast mixed to string\.$#'
+			identifier: cast.string
+			count: 1
+			path: app/Jobs/JobRepository.php
+
+		-
 			message: '#^Cannot access property \$lastError on mixed\.$#'
 			identifier: property.nonObject
 			count: 1
@@ -757,7 +769,7 @@ parameters:
 			path: app/Jobs/JobRepository.php
 
 		-
-			message: '#^Method App\\Jobs\\JobRepository\:\:listRecent\(\) should return list\<App\\Jobs\\JobRecord\> but returns array\<App\\Jobs\\JobRecord\>\.$#'
+			message: '#^Method App\\Jobs\\JobRepository\:\:listRecent\(\) should return list\<App\\Jobs\\JobRecord\> but returns list\<mixed\>\.$#'
 			identifier: return.type
 			count: 1
 			path: app/Jobs/JobRepository.php
