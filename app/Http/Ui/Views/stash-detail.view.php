@@ -83,7 +83,10 @@
 				</section>
 
 				<section class="rounded-lg border border-line bg-panel/60">
-					<h2 class="border-b border-line px-4 py-3 text-[13px] font-semibold text-cream">Items</h2>
+					<div class="flex items-center justify-between border-b border-line px-4 py-3">
+						<h2 class="text-[13px] font-semibold text-cream">Items</h2>
+						<p class="text-[12px] text-muted" x-text="itemsSummary()"></p>
+					</div>
 
 					<div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2" x-show="items.length > 0">
 						<input type="text" x-model="itemSearch" placeholder="Search title…"
@@ -95,13 +98,6 @@
 								<option x-bind:value="status" x-text="status.replace(/_/g, ' ')"></option>
 							</template>
 						</select>
-						<select x-model="itemMembershipFilter"
-							class="rounded border border-line bg-espresso px-2 py-1 text-[12px] text-cream outline-none focus:border-amber">
-							<option value="all">All membership</option>
-							<template x-for="membership in itemMembershipOptions()" x-bind:key="membership">
-								<option x-bind:value="membership" x-text="membership"></option>
-							</template>
-						</select>
 					</div>
 
 					<table class="w-full text-left text-[13px]" x-show="items.length > 0">
@@ -109,6 +105,9 @@
 							<tr class="text-[11px] uppercase tracking-wide text-muted">
 								<th class="px-4 py-2 font-normal">
 									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('title')">Item <span x-text="itemSortIndicator('title')"></span></button>
+								</th>
+								<th class="px-4 py-2 font-normal">
+									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('published')">Published <span x-text="itemSortIndicator('published')"></span></button>
 								</th>
 								<th class="px-4 py-2 font-normal">
 									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('duration')">Duration <span x-text="itemSortIndicator('duration')"></span></button>
@@ -119,14 +118,11 @@
 								<th class="px-4 py-2 font-normal">
 									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('status')">Status <span x-text="itemSortIndicator('status')"></span></button>
 								</th>
-								<th class="px-4 py-2 font-normal">
-									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('membership')">Membership <span x-text="itemSortIndicator('membership')"></span></button>
-								</th>
 							</tr>
 						</thead>
 						<tbody>
 							<template x-for="row in itemRows()" x-bind:key="row.key">
-								<tr class="border-t border-line/60" x-bind:class="row.item.state === 'ignored' ? 'opacity-50' : ''">
+								<tr class="border-t border-line/60" x-bind:class="row.item.state === 'ignored' ? 'opacity-50' : (isDownloading(row.item) ? 'bg-amber/5' : '')">
 									<template x-if="row.type === 'item'">
 										<td class="px-4 py-2">
 											<a class="flex items-center gap-2 text-cream transition-colors hover:text-amber" x-bind:href="'/vault/' + row.item.media_item_id">
@@ -134,6 +130,9 @@
 												<span x-text="row.item.display_title ?? row.item.media_item?.title ?? row.item.media_item_id"></span>
 											</a>
 										</td>
+									</template>
+									<template x-if="row.type === 'item'">
+										<td class="px-4 py-2 text-muted" x-text="formatRelativeTime(row.item.media_item?.published_at)"></td>
 									</template>
 									<template x-if="row.type === 'item'">
 										<td class="px-4 py-2 text-muted" x-text="formatDuration(row.item.media_item?.duration_seconds)"></td>
@@ -147,14 +146,6 @@
 												<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(row.item.media_item?.state).dot, statusBadge(row.item.media_item?.state).pulse ? 'pulse-dot' : '']"></span>
 												<span x-text="statusBadge(row.item.media_item?.state).label"></span>
 											</span>
-										</td>
-									</template>
-									<template x-if="row.type === 'item'">
-										<td class="px-4 py-2">
-											<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(row.item.state).text">
-												<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(row.item.state).dot, statusBadge(row.item.state).pulse ? 'pulse-dot' : '']"></span>
-												<span x-text="row.item.state"></span>
-											</span>
 											<p class="mt-1 text-[12px] text-muted" x-show="row.item.state === 'ignored'" x-text="'ignored: ' + (row.item.ignored_reason ?? 'unknown reason').replace(/_/g, ' ')"></p>
 										</td>
 									</template>
@@ -163,6 +154,7 @@
 											<div class="flex items-center gap-2">
 												<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber pulse-dot"></span>
 												<span class="shrink-0 text-[11px] text-muted" x-text="row.job.progress_label ?? row.job.intent.replace(/_/g, ' ')"></span>
+												<span class="shrink-0 text-[11px] text-muted" x-text="Math.round(row.job.progress_percent ?? 0) + '%'"></span>
 												<div class="h-1.5 flex-1 rounded-full bg-espresso">
 													<div class="h-1.5 rounded-full bg-amber" x-bind:style="'width: ' + (row.job.progress_percent ?? 0) + '%'"></div>
 												</div>

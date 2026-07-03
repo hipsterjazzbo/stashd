@@ -185,6 +185,11 @@ const STATE_BADGES: Record<string, Badge> = {
 // descriptive (active = not-removed, not a live process). Only these pulse.
 const ACTIVELY_HAPPENING_STATES = new Set(['processing', 'downloading'])
 
+// Mirrors App\Vault\MediaItemState -- the stash items table's status filter
+// always offers every lifecycle state, not just ones currently present (see
+// stashDetailComponent.itemStatusOptions).
+const ITEM_STATUS_OPTIONS = ['discovered', 'metadata_ready', 'download_pending', 'downloading', 'ready', 'failed', 'missing', 'ignored']
+
 function statusBadge(state: string | null | undefined): Badge {
 	if (!state) return { label: '—', dot: 'bg-muted', text: 'text-muted' }
 	const badge = STATE_BADGES[state] ?? { label: state, dot: 'bg-muted', text: 'text-muted' }
@@ -505,7 +510,7 @@ interface StashEditForm {
 	organizationMode: string
 }
 
-type ItemSortKey = 'position' | 'title' | 'duration' | 'size' | 'status' | 'membership'
+type ItemSortKey = 'position' | 'title' | 'published' | 'duration' | 'size' | 'status'
 
 interface StashItemSummary {
 	id: string
@@ -532,6 +537,7 @@ interface StashItemSummary {
 		thumbnail_uri: string | null
 		duration_seconds: number | null
 		content_type: string | null
+		published_at: string | null
 	} | null
 	total_asset_size_bytes: number | null
 }
@@ -929,10 +935,9 @@ function stashDetailComponent(stashId: string) {
 		error: null as string | null,
 		stash: null as StashSummary | null,
 		items: [] as StashItemSummary[],
-		itemSortKey: 'position' as ItemSortKey,
-		itemSortDir: 'asc' as 'asc' | 'desc',
+		itemSortKey: 'published' as ItemSortKey,
+		itemSortDir: 'desc' as 'asc' | 'desc',
 		itemStatusFilter: 'all',
-		itemMembershipFilter: 'all',
 		itemSearch: '',
 		jobs: [] as JobSummary[],
 		inputs: [] as StashInputSummary[],
@@ -1012,11 +1017,23 @@ function stashDetailComponent(stashId: string) {
 					apiFetch(`/api/v1/stashes/${stashId}/broadcasts`),
 					apiFetch('/api/v1/jobs'),
 				])
-				this.stash = (await stashResponse.json()).stash
-				this.items = (await itemsResponse.json()).items
-				this.inputs = (await inputsResponse.json()).inputs
-				this.broadcasts = (await broadcastsResponse.json()).broadcasts
-				this.jobs = (await jobsResponse.json()).jobs
+				const [stashBody, itemsBody, inputsBody, broadcastsBody, jobsBody] = await Promise.all([
+					stashResponse.json(),
+					itemsResponse.json(),
+					inputsResponse.json(),
+					broadcastsResponse.json(),
+					jobsResponse.json(),
+				])
+				// A transient error response is still valid JSON (an `{ error }`
+				// envelope), just without the expected key -- fall back to the
+				// current value instead of wiping it to undefined and breaking
+				// every template expression that reads it until the next
+				// successful refresh.
+				this.stash = stashBody.stash ?? this.stash
+				this.items = itemsBody.items ?? this.items
+				this.inputs = inputsBody.inputs ?? this.inputs
+				this.broadcasts = broadcastsBody.broadcasts ?? this.broadcasts
+				this.jobs = jobsBody.jobs ?? this.jobs
 				this.error = null
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
@@ -1030,7 +1047,8 @@ function stashDetailComponent(stashId: string) {
 		async loadBroadcastPlugins() {
 			try {
 				const response = await apiFetch('/api/v1/broadcast-plugins')
-				this.broadcastPlugins = (await response.json()).plugins
+				const body = await response.json()
+				this.broadcastPlugins = body.plugins ?? this.broadcastPlugins
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
 				this.error = 'Could not reach the server.'
@@ -1062,18 +1080,12 @@ function stashDetailComponent(stashId: string) {
 			return this.jobs.find((job) => job.entity_type === 'media_item' && job.entity_id === mediaItemId && job.state === 'processing') ?? null
 		},
 
-		// Distinct media_item.state values actually present, in a stable
-		// lifecycle order -- drives the status filter's options.
+		// Static -- always shown in the status filter regardless of which
+		// states are present, so the dropdown's option list never shifts out
+		// from under the current selection (a <select> whose selected
+		// <option> disappears silently resets to another one).
 		itemStatusOptions(): string[] {
-			const order = ['discovered', 'metadata_ready', 'download_pending', 'downloading', 'ready', 'failed', 'missing', 'ignored']
-			const present = new Set(this.items.map((item) => item.media_item?.state).filter((state): state is string => !!state))
-			return order.filter((state) => present.has(state))
-		},
-
-		itemMembershipOptions(): string[] {
-			const order = ['active', 'hidden', 'ignored', 'removed']
-			const present = new Set(this.items.map((item) => item.state))
-			return order.filter((state) => present.has(state))
+			return ITEM_STATUS_OPTIONS
 		},
 
 		setItemSort(key: ItemSortKey) {
@@ -1081,7 +1093,7 @@ function stashDetailComponent(stashId: string) {
 				this.itemSortDir = this.itemSortDir === 'asc' ? 'desc' : 'asc'
 			} else {
 				this.itemSortKey = key
-				this.itemSortDir = 'asc'
+				this.itemSortDir = key === 'published' ? 'desc' : 'asc'
 			}
 		},
 
@@ -1094,28 +1106,33 @@ function stashDetailComponent(stashId: string) {
 			switch (key) {
 				case 'title':
 					return (item.display_title ?? item.media_item?.title ?? '').toLowerCase()
+				case 'published':
+					return item.media_item?.published_at ? Date.parse(item.media_item.published_at) : 0
 				case 'duration':
 					return item.media_item?.duration_seconds ?? -1
 				case 'size':
 					return item.total_asset_size_bytes ?? -1
 				case 'status':
 					return item.media_item?.state ?? ''
-				case 'membership':
-					return item.state
 				case 'position':
 				default:
 					return item.position ?? 0
 			}
 		},
 
+		isDownloading(item: StashItemSummary): boolean {
+			return this.activeJobFor(item.media_item_id) !== null
+		},
+
 		// Filters, then sorts, the raw items list -- itemRows() flattens the
-		// result with each item's live download progress row.
+		// result with each item's live download progress row. Items actively
+		// downloading are always pinned above the chosen sort, since they're
+		// otherwise easy to lose in a long list.
 		visibleItems(): StashItemSummary[] {
 			const search = this.itemSearch.trim().toLowerCase()
 
 			const filtered = this.items.filter((item) => {
 				if (this.itemStatusFilter !== 'all' && item.media_item?.state !== this.itemStatusFilter) return false
-				if (this.itemMembershipFilter !== 'all' && item.state !== this.itemMembershipFilter) return false
 				if (search === '') return true
 				const title = (item.display_title ?? item.media_item?.title ?? '').toLowerCase()
 				return title.includes(search)
@@ -1123,12 +1140,33 @@ function stashDetailComponent(stashId: string) {
 
 			const dir = this.itemSortDir === 'asc' ? 1 : -1
 			return [...filtered].sort((a, b) => {
+				const aDownloading = this.isDownloading(a)
+				const bDownloading = this.isDownloading(b)
+				if (aDownloading !== bDownloading) return aDownloading ? -1 : 1
+
 				const av = this.itemSortValue(a, this.itemSortKey)
 				const bv = this.itemSortValue(b, this.itemSortKey)
 				if (av < bv) return -dir
 				if (av > bv) return dir
 				return 0
 			})
+		},
+
+		// Header summary, e.g. "218 items · 3 downloading · 4 ignored".
+		itemsSummary(): string {
+			const total = this.items.length
+			if (total === 0) return 'No items'
+
+			const downloading = this.items.filter((item) => this.isDownloading(item)).length
+			const ignored = this.items.filter((item) => item.state === 'ignored').length
+			const failed = this.items.filter((item) => item.media_item?.state === 'failed').length
+
+			const parts = [`${total} item${total === 1 ? '' : 's'}`]
+			if (downloading > 0) parts.push(`${downloading} downloading`)
+			if (failed > 0) parts.push(`${failed} failed`)
+			if (ignored > 0) parts.push(`${ignored} ignored`)
+
+			return parts.join(' · ')
 		},
 
 		// Flattens items + their active job (if any) into one list so the items
