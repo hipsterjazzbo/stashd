@@ -69,7 +69,7 @@ final readonly class MediaItemController
             return $this->notFound();
         }
 
-        $mediaItemId = MediaItemId::parse((string) $mediaItem->id);
+        $mediaItemId = MediaItemId::fromPrimaryKey($mediaItem->id);
         $assets = $this->assets->listForMediaItem($mediaItemId);
 
         $vaultOriginal = $this->assets->findByMediaItemAndRole($mediaItemId, AssetRole::VaultOriginal);
@@ -110,7 +110,7 @@ final readonly class MediaItemController
             return $this->notFound();
         }
 
-        $mediaItemId = MediaItemId::parse((string) $mediaItem->id);
+        $mediaItemId = MediaItemId::fromPrimaryKey($mediaItem->id);
 
         $stashIds = array_values(array_unique(array_map(
             static fn ($stashItem): string => (string) $stashItem->stashId,
@@ -140,7 +140,7 @@ final readonly class MediaItemController
             return $this->notFound();
         }
 
-        $mediaItemId = MediaItemId::parse((string) $mediaItem->id);
+        $mediaItemId = MediaItemId::fromPrimaryKey($mediaItem->id);
 
         $broadcastIds = array_values(array_unique(array_map(
             static fn ($broadcastItem): string => (string) $broadcastItem->broadcastId,

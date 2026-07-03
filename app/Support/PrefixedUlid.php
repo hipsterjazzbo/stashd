@@ -6,6 +6,7 @@ namespace App\Support;
 
 use InvalidArgumentException;
 use Stringable;
+use Tempest\Database\PrimaryKey;
 
 final readonly class PrefixedUlid implements Stringable
 {
@@ -43,6 +44,11 @@ final readonly class PrefixedUlid implements Stringable
     public function toString(): string
     {
         return "{$this->prefix}_{$this->ulid}";
+    }
+
+    public function toPrimaryKey(): PrimaryKey
+    {
+        return new PrimaryKey($this->toString());
     }
 
     public function __toString(): string

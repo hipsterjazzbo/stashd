@@ -32,7 +32,7 @@ final readonly class AuthService
 
     public function isSetupRequired(): bool
     {
-        return $this->users->count() === 0;
+        return UserRecord::count()->execute() === 0;
     }
 
     public function setupAdmin(string $email, #[SensitiveParameter] string $password): UserRecord
@@ -137,9 +137,9 @@ final readonly class AuthService
 
     public function revokeWebSessionTokens(UserRecord $user): void
     {
-        foreach ($this->tokens->listForUser(UserId::parse((string) $user->id)) as $token) {
+        foreach ($this->tokens->listForUser(UserId::fromPrimaryKey($user->id)) as $token) {
             if ($token->name === self::WEB_SESSION_TOKEN_NAME) {
-                $this->tokens->revoke(ApiTokenId::parse((string) $token->id));
+                $this->tokens->revoke(ApiTokenId::fromPrimaryKey($token->id));
             }
         }
     }
@@ -149,7 +149,7 @@ final readonly class AuthService
     {
         $plainToken = 'stashd_pat_' . bin2hex(random_bytes(24));
         $record = $this->tokens->create(
-            userId: UserId::parse((string) $user->id),
+            userId: UserId::fromPrimaryKey($user->id),
             name: $name,
             tokenHash: hash('sha256', $plainToken),
             tokenPreview: substr($plainToken, 0, 20) . '…',
@@ -169,7 +169,7 @@ final readonly class AuthService
     public function listApiTokens(UserRecord $user): array
     {
         $tokens = array_filter(
-            $this->tokens->listForUser(UserId::parse((string) $user->id)),
+            $this->tokens->listForUser(UserId::fromPrimaryKey($user->id)),
             static fn ($token): bool => $token->name !== self::WEB_SESSION_TOKEN_NAME,
         );
 
@@ -189,7 +189,7 @@ final readonly class AuthService
 
     public function revokeApiToken(UserRecord $user, ApiTokenId $tokenId): void
     {
-        $record = ApiTokenRecord::findById(new \Tempest\Database\PrimaryKey($tokenId->toString()));
+        $record = ApiTokenRecord::findById($tokenId->toPrimaryKey());
 
         if ($record === null || (string) $record->userId !== (string) $user->id) {
             return;

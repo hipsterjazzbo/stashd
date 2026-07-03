@@ -6,7 +6,6 @@ namespace App\MediaServers;
 
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
-use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
@@ -45,15 +44,14 @@ final class MediaServerConnectionRepository
 
         query(MediaServerConnectionRecord::class)->insert($record)->execute();
 
-        return MediaServerConnectionRecord::findById(new PrimaryKey($id))
-            ?? throw new InvalidArgumentException('Failed to persist media server connection.');
+        return $record;
     }
 
     public function find(PrefixedUlid $id): ?MediaServerConnectionRecord
     {
         return MediaServerConnectionRecord::select()
             ->include('tokenSecretId')
-            ->get(new PrimaryKey($id->toString()));
+            ->get($id->toPrimaryKey());
     }
 
     public function save(MediaServerConnectionRecord $record): MediaServerConnectionRecord

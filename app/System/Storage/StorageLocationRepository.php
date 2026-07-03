@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\System\Storage;
 
 use App\Support\PrefixedUlidGenerator;
-use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
@@ -82,8 +81,7 @@ final class StorageLocationRepository
 
         query(StorageLocationRecord::class)->insert($record)->execute();
 
-        return StorageLocationRecord::findById(new PrimaryKey($id))
-            ?? throw new InvalidArgumentException('Failed to persist storage location.');
+        return $record;
     }
 
     /** @return list<StorageLocationRecord> */

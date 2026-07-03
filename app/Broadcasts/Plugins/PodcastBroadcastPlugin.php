@@ -166,8 +166,8 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
             }
 
             $item = $this->broadcastItems->findByBroadcastAndStashItem(
-                BroadcastId::parse((string) $context->broadcast->id),
-                StashItemId::parse((string) $stashItem->id),
+                BroadcastId::fromPrimaryKey($context->broadcast->id),
+                StashItemId::fromPrimaryKey($stashItem->id),
             );
 
             if ($item === null) {
@@ -233,12 +233,12 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         $broadcastId = (string) $context->broadcast->id;
         $item = $this->broadcastItems->findByBroadcastAndStashItem(
             BroadcastId::parse($broadcastId),
-            StashItemId::parse((string) $stashItem->id),
+            StashItemId::fromPrimaryKey($stashItem->id),
         );
 
         return $item ?? $this->broadcastItems->create(
             broadcastId: BroadcastId::parse($broadcastId),
-            stashItemId: StashItemId::parse((string) $stashItem->id),
+            stashItemId: StashItemId::fromPrimaryKey($stashItem->id),
             mediaItemId: $stashItem->mediaItemId,
         );
     }

@@ -64,7 +64,7 @@ final readonly class PodcastTranscodeFallback
             kind: AssetKind::Audio,
             state: AssetState::Pending,
         );
-        $audioAsset->derivedFromAssetId = AssetId::parse((string) $videoOriginal->id);
+        $audioAsset->derivedFromAssetId = AssetId::fromPrimaryKey($videoOriginal->id);
         $this->assets->save($audioAsset);
 
         $this->dispatch->dispatch(CommandType::AssetTranscodePodcastAudio, [

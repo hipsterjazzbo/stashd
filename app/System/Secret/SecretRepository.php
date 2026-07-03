@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\System\Secret;
 
 use App\Support\PrefixedUlidGenerator;
-use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
@@ -30,7 +29,7 @@ final class SecretRepository
 
     public function find(\App\Support\PrefixedUlid $id): ?SecretRecord
     {
-        return SecretRecord::findById(new PrimaryKey($id->toString()));
+        return SecretRecord::findById($id->toPrimaryKey());
     }
 
     /** @param array<string, mixed>|null $metadata */
@@ -56,8 +55,7 @@ final class SecretRepository
 
         query(SecretRecord::class)->insert($record)->execute();
 
-        return SecretRecord::findById(new PrimaryKey($id))
-            ?? throw new InvalidArgumentException('Failed to persist secret record.');
+        return $record;
     }
 
     public function save(SecretRecord $record): SecretRecord

@@ -6,7 +6,6 @@ namespace App\Vault;
 
 use App\Support\DurationSeconds;
 use App\Support\PrefixedUlidGenerator;
-use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
@@ -55,13 +54,12 @@ final class AssetRepository
 
         query(AssetRecord::class)->insert($record)->execute();
 
-        return AssetRecord::findById(new PrimaryKey($id))
-            ?? throw new InvalidArgumentException('Failed to persist asset record.');
+        return $record;
     }
 
     public function find(AssetId $id): ?AssetRecord
     {
-        return AssetRecord::findById(new PrimaryKey($id->toString()));
+        return AssetRecord::findById($id->toPrimaryKey());
     }
 
     public function save(AssetRecord $record): AssetRecord

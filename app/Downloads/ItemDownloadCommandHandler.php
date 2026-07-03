@@ -59,7 +59,7 @@ final readonly class ItemDownloadCommandHandler implements CommandHandler
 
     public function createJobs(CommandRecord $command, array $options): array
     {
-        $commandId = CommandId::parse((string) $command->id);
+        $commandId = CommandId::fromPrimaryKey($command->id);
         $payload = $this->normalizedPayload($options);
         $command->options = $payload;
         $command->targetType = 'media_item';

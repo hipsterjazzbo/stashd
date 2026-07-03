@@ -8,7 +8,6 @@ use App\Support\PrefixedUlidGenerator;
 use App\Vault\MediaItemId;
 use App\Vault\MediaItemRepository;
 use App\Vault\MediaItemSourceRepository;
-use InvalidArgumentException;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
@@ -57,13 +56,12 @@ final class StashRepository
 
         query(StashRecord::class)->insert($record)->execute();
 
-        return StashRecord::findById(new PrimaryKey($id))
-            ?? throw new InvalidArgumentException('Failed to persist stash record.');
+        return $record;
     }
 
     public function find(StashId $id): ?StashRecord
     {
-        return StashRecord::findById(new PrimaryKey($id->toString()));
+        return StashRecord::findById($id->toPrimaryKey());
     }
 
     public function findBySlug(string $slug): ?StashRecord
@@ -162,14 +160,14 @@ final class StashRepository
      */
     public function delete(StashRecord $stash): void
     {
-        $stashId = StashId::parse((string) $stash->id);
+        $stashId = StashId::fromPrimaryKey($stash->id);
 
         foreach ($this->stashItems->listForStash($stashId) as $item) {
             $item->delete();
         }
 
         foreach ($this->stashInputs->listForStash($stashId) as $input) {
-            $this->mediaItemSources->deleteForStashInput(StashInputId::parse((string) $input->id));
+            $this->mediaItemSources->deleteForStashInput(StashInputId::fromPrimaryKey($input->id));
             $input->delete();
         }
 
@@ -184,7 +182,7 @@ final class StashRepository
      */
     public function deleteImpact(StashRecord $stash): array
     {
-        $stashId = StashId::parse((string) $stash->id);
+        $stashId = StashId::fromPrimaryKey($stash->id);
 
         $mediaItemIds = array_values(array_unique(array_map(
             static fn (StashItemRecord $item): string => (string) $item->mediaItemId,

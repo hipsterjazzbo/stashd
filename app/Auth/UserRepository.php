@@ -20,11 +20,6 @@ final class UserRepository
     ) {
     }
 
-    public function count(): int
-    {
-        return UserRecord::count()->execute();
-    }
-
     public function findByEmail(string $email): ?UserRecord
     {
         return UserRecord::select()->where('email = ?', $email)->include('passwordHash')->first();
@@ -32,12 +27,12 @@ final class UserRepository
 
     public function findById(UserId $id): ?UserRecord
     {
-        return UserRecord::findById(new PrimaryKey($id->toString()));
+        return UserRecord::findById($id->toPrimaryKey());
     }
 
     public function createAdmin(string $email, string $passwordHash): UserRecord
     {
-        if ($this->count() > 0) {
+        if (UserRecord::count()->execute() > 0) {
             throw new InvalidArgumentException('Admin account already exists.');
         }
 
@@ -54,7 +49,6 @@ final class UserRepository
 
         query(UserRecord::class)->insert($record)->execute();
 
-        return UserRecord::findById(new PrimaryKey($id))
-            ?? throw new InvalidArgumentException('Failed to persist user record.');
+        return $record;
     }
 }

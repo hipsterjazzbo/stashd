@@ -7,7 +7,6 @@ namespace App\Vault;
 use App\Providers\StashdUri;
 use App\Support\DurationSeconds;
 use App\Support\PrefixedUlidGenerator;
-use InvalidArgumentException;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
@@ -56,13 +55,12 @@ final class MediaItemRepository
 
         query(MediaItemRecord::class)->insert($record)->execute();
 
-        return MediaItemRecord::findById(new PrimaryKey($id))
-            ?? throw new InvalidArgumentException('Failed to persist media item record.');
+        return $record;
     }
 
     public function find(MediaItemId $id): ?MediaItemRecord
     {
-        return MediaItemRecord::findById(new PrimaryKey($id->toString()));
+        return MediaItemRecord::findById($id->toPrimaryKey());
     }
 
     public function findByProviderIdentity(string $providerKey, string $providerItemId): ?MediaItemRecord

@@ -42,7 +42,6 @@ final class StorageCheckRepository
 
         query(StorageCheckRecord::class)->insert($record)->execute();
 
-        return StorageCheckRecord::findById(new PrimaryKey($id))
-            ?? $record;
+        return $record;
     }
 }

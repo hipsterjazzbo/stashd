@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\System\Event;
 
 use App\Support\PrefixedUlidGenerator;
-use InvalidArgumentException;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
@@ -35,8 +34,7 @@ final class EventNotificationRepository
 
         query(EventNotificationRecord::class)->insert($record)->execute();
 
-        return EventNotificationRecord::findById(new PrimaryKey($id))
-            ?? throw new InvalidArgumentException('Failed to persist event notification.');
+        return $record;
     }
 
     /** @return list<EventNotificationRecord> */

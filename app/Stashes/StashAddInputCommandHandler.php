@@ -82,7 +82,7 @@ final readonly class StashAddInputCommandHandler implements CommandHandler
     {
         $stashId = trim((string) ($options['stashId'] ?? $options['stash_id'] ?? ''));
         $preflightCommandId = trim((string) ($options['preflightCommandId'] ?? $options['preflight_command_id'] ?? ''));
-        $commandId = CommandId::parse((string) $command->id);
+        $commandId = CommandId::fromPrimaryKey($command->id);
         $payload = [
             'stash_id' => $stashId,
             'preflight_command_id' => $preflightCommandId,

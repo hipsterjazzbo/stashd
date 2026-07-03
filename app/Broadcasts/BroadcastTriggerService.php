@@ -70,7 +70,7 @@ final readonly class BroadcastTriggerService
         }
 
         $existing = $this->triggers->findEnabledScanTrigger(
-            BroadcastId::parse((string) $broadcast->id),
+            BroadcastId::fromPrimaryKey($broadcast->id),
             $type,
         );
 
@@ -79,7 +79,7 @@ final readonly class BroadcastTriggerService
         }
 
         return $this->triggers->create(
-            broadcastId: BroadcastId::parse((string) $broadcast->id),
+            broadcastId: BroadcastId::fromPrimaryKey($broadcast->id),
             type: $type,
             settings: ['mediaServerConnectionId' => $connectionId],
         );
@@ -124,7 +124,7 @@ final readonly class BroadcastTriggerService
         }
 
         $run = $this->triggerRuns->create(
-            triggerId: BroadcastTriggerId::parse((string) $trigger->id),
+            triggerId: BroadcastTriggerId::fromPrimaryKey($trigger->id),
             reason: $reason,
         );
         $this->transitionRun($run, BroadcastTriggerRunState::Processing);

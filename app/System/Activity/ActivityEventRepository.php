@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\System\Activity;
 
 use App\Support\PrefixedUlidGenerator;
-use InvalidArgumentException;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
@@ -56,8 +55,7 @@ final class ActivityEventRepository
 
         query(ActivityEventRecord::class)->insert($record)->execute();
 
-        return ActivityEventRecord::findById(new PrimaryKey($id))
-            ?? throw new InvalidArgumentException('Failed to persist activity event.');
+        return $record;
     }
 
     /** @return list<ActivityEventRecord> */

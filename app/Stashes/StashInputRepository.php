@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Stashes;
 
 use App\Support\PrefixedUlidGenerator;
-use InvalidArgumentException;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
@@ -50,13 +49,12 @@ final class StashInputRepository
 
         query(StashInputRecord::class)->insert($record)->execute();
 
-        return StashInputRecord::findById(new PrimaryKey($id))
-            ?? throw new InvalidArgumentException('Failed to persist stash input record.');
+        return $record;
     }
 
     public function find(StashInputId $id): ?StashInputRecord
     {
-        return StashInputRecord::findById(new PrimaryKey($id->toString()));
+        return StashInputRecord::findById($id->toPrimaryKey());
     }
 
     public function save(StashInputRecord $record): StashInputRecord

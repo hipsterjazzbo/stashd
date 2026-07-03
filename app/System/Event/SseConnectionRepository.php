@@ -7,7 +7,6 @@ namespace App\System\Event;
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
 use Tempest\Database\Connection\Connection;
-use Tempest\Database\PrimaryKey;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
@@ -69,7 +68,7 @@ final class SseConnectionRepository
 
     public function heartbeat(PrefixedUlid $id): void
     {
-        $record = SseConnectionRecord::findById(new PrimaryKey($id->toString()));
+        $record = SseConnectionRecord::findById($id->toPrimaryKey());
 
         if ($record === null) {
             return;
@@ -81,6 +80,6 @@ final class SseConnectionRepository
 
     public function release(PrefixedUlid $id): void
     {
-        SseConnectionRecord::findById(new PrimaryKey($id->toString()))?->delete();
+        SseConnectionRecord::findById($id->toPrimaryKey())?->delete();
     }
 }
