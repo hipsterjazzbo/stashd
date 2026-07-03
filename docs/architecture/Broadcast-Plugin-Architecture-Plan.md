@@ -80,7 +80,7 @@ interface BroadcastPlugin
 
 Note the real `plan()` takes **no `$userInput` parameter** — the draft below is
 wrong on this point. Per-broadcast settings (e.g. podcast `media_kind`) are read
-from `BroadcastContext`/`BroadcastRecord.settingsJson`, not passed into `plan()`.
+from `BroadcastContext`/`BroadcastRecord.settings`, not passed into `plan()`.
 
 ### `StashdBroadcast` (attribute) — `app/Broadcasts/StashdBroadcast.php`
 

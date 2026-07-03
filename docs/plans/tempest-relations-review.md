@@ -1,5 +1,11 @@
 # Tempest Relations Review
 
+> **Status (2026-07-03): resolved** by the Tempest-native records slice (`cb5d4b1`, PR #3) — see
+> the "Tempest relations audit" entry in `docs/TODO.md`. Relations were proven on SQLite and
+> declared on stash/stash-item (`tests/Feature/TempestRelationsTest.php`); replacing the
+> ID-driven repository FK-list methods was deliberately rejected. Kept for the original
+> evaluation criteria.
+
 This document captures planning notes for evaluating Tempest database relations in stashd.
 
 This document is subordinate to the project-wide Tempest-native default in `AGENTS.md`: use Tempest-native facilities by default when they fit the domain, and keep custom code where stashd has a real domain, security, storage, or product requirement.

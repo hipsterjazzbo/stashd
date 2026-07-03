@@ -1,5 +1,12 @@
 # Stronger Record Types Prompts
 
+> **Stale-risk note (2026-07-03):** property names in this document predate the Tempest-native
+> records slice (`cb5d4b1`, PR #3), which removed the `*Json` suffix everywhere
+> (`$optionsJson` → `$options`, etc.) and retyped the polymorphic JSON columns as plain
+> `array<string, mixed>` via Tempest's array↔JSON casting — the "do not convert to value objects"
+> guidance below still stands, but the raw-`?string`-column premise no longer does. See the
+> "Tempest-native records" entry in `docs/TODO.md`.
+
 These prompts capture planned follow-up work for moving stashd records away from weak stringly typed fields and toward Tempest-native model property types.
 
 ## Timestamp Properties
