@@ -84,13 +84,44 @@
 
 				<section class="rounded-lg border border-line bg-panel/60">
 					<h2 class="border-b border-line px-4 py-3 text-[13px] font-semibold text-cream">Items</h2>
+
+					<div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2" x-show="items.length > 0">
+						<input type="text" x-model="itemSearch" placeholder="Search title…"
+							class="w-40 rounded border border-line bg-espresso px-2 py-1 text-[12px] text-cream outline-none focus:border-amber"/>
+						<select x-model="itemStatusFilter"
+							class="rounded border border-line bg-espresso px-2 py-1 text-[12px] text-cream outline-none focus:border-amber">
+							<option value="all">All statuses</option>
+							<template x-for="status in itemStatusOptions()" x-bind:key="status">
+								<option x-bind:value="status" x-text="status.replace(/_/g, ' ')"></option>
+							</template>
+						</select>
+						<select x-model="itemMembershipFilter"
+							class="rounded border border-line bg-espresso px-2 py-1 text-[12px] text-cream outline-none focus:border-amber">
+							<option value="all">All membership</option>
+							<template x-for="membership in itemMembershipOptions()" x-bind:key="membership">
+								<option x-bind:value="membership" x-text="membership"></option>
+							</template>
+						</select>
+					</div>
+
 					<table class="w-full text-left text-[13px]" x-show="items.length > 0">
 						<thead>
 							<tr class="text-[11px] uppercase tracking-wide text-muted">
-								<th class="px-4 py-2 font-normal">Item</th>
-								<th class="px-4 py-2 font-normal">Duration</th>
-								<th class="px-4 py-2 font-normal">Size</th>
-								<th class="px-4 py-2 font-normal">State</th>
+								<th class="px-4 py-2 font-normal">
+									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('title')">Item <span x-text="itemSortIndicator('title')"></span></button>
+								</th>
+								<th class="px-4 py-2 font-normal">
+									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('duration')">Duration <span x-text="itemSortIndicator('duration')"></span></button>
+								</th>
+								<th class="px-4 py-2 font-normal">
+									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('size')">Size <span x-text="itemSortIndicator('size')"></span></button>
+								</th>
+								<th class="px-4 py-2 font-normal">
+									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('status')">Status <span x-text="itemSortIndicator('status')"></span></button>
+								</th>
+								<th class="px-4 py-2 font-normal">
+									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('membership')">Membership <span x-text="itemSortIndicator('membership')"></span></button>
+								</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -112,6 +143,14 @@
 									</template>
 									<template x-if="row.type === 'item'">
 										<td class="px-4 py-2">
+											<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(row.item.media_item?.state).text">
+												<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(row.item.media_item?.state).dot, statusBadge(row.item.media_item?.state).pulse ? 'pulse-dot' : '']"></span>
+												<span x-text="statusBadge(row.item.media_item?.state).label"></span>
+											</span>
+										</td>
+									</template>
+									<template x-if="row.type === 'item'">
+										<td class="px-4 py-2">
 											<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(row.item.state).text">
 												<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(row.item.state).dot, statusBadge(row.item.state).pulse ? 'pulse-dot' : '']"></span>
 												<span x-text="row.item.state"></span>
@@ -120,7 +159,7 @@
 										</td>
 									</template>
 									<template x-if="row.type === 'progress'">
-										<td colspan="4" class="px-4 py-2">
+										<td colspan="5" class="px-4 py-2">
 											<div class="flex items-center gap-2">
 												<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber pulse-dot"></span>
 												<span class="shrink-0 text-[11px] text-muted" x-text="row.job.progress_label ?? row.job.intent.replace(/_/g, ' ')"></span>
@@ -136,6 +175,7 @@
 						</tbody>
 					</table>
 					<p class="px-4 py-3 text-[13px] text-muted" x-show="items.length === 0">No items yet.</p>
+					<p class="px-4 py-3 text-[13px] text-muted" x-show="items.length > 0 && itemRows().length === 0">No items match the current filters.</p>
 				</section>
 
 				<section class="rounded-lg border border-line bg-panel/60">

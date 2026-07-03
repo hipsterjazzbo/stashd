@@ -94,13 +94,44 @@ final class JobRepository
             ->all();
     }
 
-    /** @return list<JobRecord> */
+    /**
+     * Processing jobs are always included, on top of the $limit most recent.
+     * They're claimed oldest-first (see claimNextPending), so a plain
+     * "ORDER BY createdAt DESC LIMIT $limit" reliably drops the one actively
+     * processing job during a large batch (e.g. backfilling a channel with
+     * hundreds of items) -- which hid live download progress from the stash
+     * detail page.
+     *
+     * @return list<JobRecord>
+     */
     public function listRecent(int $limit = 50): array
     {
-        return JobRecord::select()
+        $processing = JobRecord::select()
+            ->where('state = ?', JobState::Processing)
+            ->orderBy('createdAt', Direction::ASC)
+            ->all();
+
+        $recent = JobRecord::select()
             ->orderBy('createdAt', Direction::DESC)
             ->limit($limit)
             ->all();
+
+        $seen = [];
+        $jobs = [];
+        foreach ($processing as $job) {
+            $seen[(string) $job->id] = true;
+            $jobs[] = $job;
+        }
+        foreach ($recent as $job) {
+            $id = (string) $job->id;
+            if (isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            $jobs[] = $job;
+        }
+
+        return $jobs;
     }
 
     /** @return list<JobRecord> */

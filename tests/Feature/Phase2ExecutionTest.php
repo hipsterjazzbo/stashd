@@ -99,6 +99,25 @@ test('jobs api lists recent jobs', function (): void {
     expect($jobs->body['jobs'])->not->toBeEmpty();
 });
 
+test('jobs api still surfaces the actively processing job when it is older than the 50 most recent', function (): void {
+    $headers = $this->authHeaders();
+    $jobs = $this->container->get(\App\Jobs\JobRepository::class);
+    $transitions = $this->container->get(\App\System\State\StateTransitionService::class);
+
+    $oldest = $jobs->create(intent: JobIntent::Enrich, entityType: 'media_item', entityId: null);
+    $transitions->transitionJob($oldest, JobState::Processing);
+
+    for ($i = 0; $i < 55; $i++) {
+        $jobs->create(intent: JobIntent::Enrich, entityType: 'media_item', entityId: null);
+    }
+
+    $response = $this->http->get('/api/v1/jobs', headers: $headers)->assertOk();
+
+    $ids = array_column($response->body['jobs'], 'id');
+    expect($ids)->toContain((string) $oldest->id)
+        ->and($response->body['jobs'][array_search((string) $oldest->id, $ids, true)]['state'])->toBe('processing');
+});
+
 test('jobs api exposes entity_type and entity_id for a media item download job', function (): void {
     [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('jobs-entity-link');
 
