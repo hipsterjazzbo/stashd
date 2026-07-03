@@ -17,7 +17,7 @@
 				<section class="rounded-lg border border-line bg-panel/60 p-4">
 					<h2 class="text-sm font-semibold text-cream">Account</h2>
 					<p class="mt-1 text-[13px] text-muted">
-						<span x-text="me?.email"></span> · <span x-text="me?.role"></span>
+						<span x-text="me?.username"></span> · <span x-text="me?.role"></span>
 					</p>
 				</section>
 

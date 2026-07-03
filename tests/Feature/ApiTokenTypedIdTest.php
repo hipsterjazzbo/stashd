@@ -13,7 +13,7 @@ test('ApiTokenRecord::userId round-trips as UserId through insert, where-lookup,
     $tokens = $this->container->get(ApiTokenRepository::class);
 
     $user = $users->createAdmin(
-        email: 'typed-id@stashd.test',
+        username: 'typed-id',
         passwordHash: password_hash('secret-password', PASSWORD_DEFAULT),
     );
     $userId = UserId::parse((string) $user->id);
