@@ -17,34 +17,33 @@ log() {
     printf 'stashd: %s\n' "$*"
 }
 
-remap_app_user() {
-    [ "$(id -u)" -eq 0 ] || return 0
-
-    if ! getent group stashd >/dev/null 2>&1; then
-        groupadd -o -g "${PGID}" stashd
-    else
-        groupmod -o -g "${PGID}" stashd 2>/dev/null || true
-    fi
-
-    if ! getent passwd stashd >/dev/null 2>&1; then
-        useradd -o -u "${PUID}" -g stashd -d "${APP_DIR}" -s /usr/sbin/nologin stashd
-    else
-        usermod -o -u "${PUID}" -g stashd stashd 2>/dev/null || true
-    fi
-}
-
 run_app() {
-    # Dropping to the unprivileged stashd user only makes sense against the
-    # image's own baked copy: under rootless Podman, "root" inside the
-    # container is the user-namespace-mapped equivalent of the host user that
-    # started it (the same mapping lerd's own exec sessions rely on), but a
-    # non-root in-container uid maps to an unrelated host subuid -- which
-    # can't write to the live bind-mounted checkout even when it numerically
-    # matches the host owner's uid. Dev's live mount is already the
-    # developer's own machine/source, so there's nothing to additionally
-    # sandbox by dropping privileges there.
+    # Dropping to an unprivileged uid:gid only makes sense against the image's
+    # own baked copy: under rootless Podman, "root" inside the container is
+    # the user-namespace-mapped equivalent of the host user that started it
+    # (the same mapping lerd's own exec sessions rely on), but a non-root
+    # in-container uid maps to an unrelated host subuid -- which can't write
+    # to the live bind-mounted checkout even when it numerically matches the
+    # host owner's uid. Dev's live mount is already the developer's own
+    # machine/source, so there's nothing to additionally sandbox by dropping
+    # privileges there.
+    #
+    # gosu takes the raw numeric ids directly rather than a "stashd" username
+    # resolved via /etc/passwd -- deliberately: a prior version remapped the
+    # image's baked stashd user (uid 1000) to PUID via `usermod -u`, which
+    # shadow-utils implements by recursively chowning every file already
+    # owned by uid 1000 under that user's home directory (/var/www/html, the
+    # full app + vendor tree). Any PUID other than the image default paid for
+    # that walk on every container start, and on slower/networked storage
+    # (common for NAS bind mounts) it could take minutes before the app was
+    # reachable, with nothing logged in the meantime since remap ran before
+    # the first log line. /var/www/html only ever needs to be *readable* at
+    # runtime -- its build-time chown to stashd:stashd already leaves it
+    # world-readable -- so no uid match is needed there at all; the paths
+    # that do need to be writable (DATA_DIR, MEDIA_DIR, .env) are already
+    # chowned to PUID:PGID explicitly elsewhere in this script.
     if [ "$APP_DIR" = "/var/www/html" ] && [ "$(id -u)" -eq 0 ]; then
-        gosu stashd:"${PGID}" "$@"
+        gosu "${PUID}:${PGID}" "$@"
     else
         "$@"
     fi
@@ -137,10 +136,6 @@ prepare_runtime() {
 }
 
 ROLE="${1:-all}"
-
-if [ "$(id -u)" -eq 0 ]; then
-    remap_app_user
-fi
 
 cd "$APP_DIR"
 
