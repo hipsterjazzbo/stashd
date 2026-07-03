@@ -402,6 +402,10 @@ the live status tracker, so "what's left" never again needs a tour of `docs/plan
     `CommandRecord::$optionsJson`/`$resultJson`, `JobRecord::$payloadJson`,
     `ActivityEventRecord::$metadataJson`, `EventNotificationRecord::$payloadJson`,
     `RawMetadataSnapshotRecord::$rawJson`, `SecretRecord::$metadataJson`
+  - Superseded by the Tempest-native records slice (`cb5d4b1`): the deferral of *value objects*
+    for the polymorphic ones stands, but they are now typed `array` properties named without the
+    `Json` suffix (`options`/`result`/`payload`/`metadata`), persisted via Tempest's built-in
+    array↔JSON casting — see the "Tempest-native records" entry below for the details.
 - [ ] Entity Identity References — typed ID value objects (`StashId`, `MediaItemId`, `BroadcastId`, …)
   replacing raw `PrefixedUlid`/string at boundaries; pass loaded records instead of IDs where the
   caller already has them, keep raw strings only at HTTP/DB/serialization boundaries. Split by
@@ -568,6 +572,29 @@ the live status tracker, so "what's left" never again needs a tour of `docs/plan
   corresponding safety gain. `JobRecord::$progressPercent`, `AssetRecord::$mimeType`/`$language`, and
   `MediaItemRecord::$contentType` were named as candidates in `docs/plans/stronger-record-types.md` but not
   in this checklist line itself — left as plain scalars, revisit as a separate slice if desired.
+- [x] Tempest-native records (`cb5d4b1`, PR #3) — three slices making the persistence layer lean on
+  the framework instead of hand-rolled marshalling, driven by a 93-method audit across all 21
+  repositories (~57% was framework-replaceable boilerplate; the ~40 real-invariant methods stay).
+  **JSON columns**: every `*Json` column/property renamed to its bare name (`options`/`result`/
+  `payload`/`settings`/`metadata`/`details`/`scopes`; 12 columns, 10 tables, migration
+  `2026_07_03_rename_json_columns`) and the raw-string ones retyped as `array<string, mixed>` —
+  Tempest's `JsonToArrayCaster`/`ArrayToJsonSerializer` own the JSON boundary, ~41 manual
+  `json_encode`/`json_decode` sites deleted, `ApiJson::encode` opaque-key protection preserved in
+  resources; PHPStan baseline shrank by 32 entries, none added. **PrimaryKey ceremony**:
+  `PrefixedId::toPrimaryKey()`/`fromPrimaryKey()` + `PrefixedUlid::toPrimaryKey()` replaced ~36
+  `new PrimaryKey($id->toString())`/`XId::parse((string) $record->id)` sites; every repository
+  `create()` dropped its insert-then-`findById()` reload (Tempest persists client-set PKs as-is);
+  dead `BroadcastTriggerRunRepository::save()` deleted, single-caller `UserRepository::count()`
+  inlined. **Relations**: `#[HasMany] StashRecord::$items` / `#[BelongsTo] StashItemRecord::$stash`
+  declared and proven on SQLite (`tests/Feature/TempestRelationsTest.php`: `with()`, `load()`,
+  `whereHas()`, BelongsTo hydration) — the `BelongsToStatement` stripping in
+  `MigrationSchemaHelpers` affects only FK *constraints*, not relation joins. Gotchas: the FK
+  column on the child table is the `ownerJoin` arg for **both** `#[BelongsTo]` and `#[HasMany]`
+  (needed since our camelCase columns don't match Tempest's `snake_id` default), and a HasMany
+  `@var` docblock needs an FQCN (`\App\Stashes\StashItemRecord[]`) — bare same-namespace names fail
+  reflection at query time. Custom-typed *primary keys* are unsupported (PK stays `PrimaryKey`,
+  holding client-set string ULIDs), and Tempest generates only UUIDv7, so `PrefixedUlidGenerator`
+  stays.
 - [ ] Later Encryption Annotation Review — investigate `#[Encrypted]` as a future `SecretsService`
   simplification; deliberately not combined with the `#[Hidden]` slice above
 - [ ] Later Naming Review — audit whether `*Record` should remain the persistence-marker suffix
@@ -575,10 +602,14 @@ the live status tracker, so "what's left" never again needs a tour of `docs/plan
 - [ ] Later Discovery Review — investigate Tempest custom discovery for provider / command-handler /
   job-handler / broadcast-format / media-server-client registries, replacing today's manually-curated
   initializer registries
-- [ ] Tempest relations audit (`docs/plans/tempest-relations-review.md`) — spike on whether
-  `BelongsTo`/`HasMany`/`with(...)`/`$record->query('relation')` should replace explicit repository
-  loading anywhere (stash/stash-item, broadcast/broadcast-item, vault assets, jobs/commands,
-  auth/tokens); audit and recommendation only, no relations adopted yet
+- [x] Tempest relations audit (`docs/plans/tempest-relations-review.md`) — resolved by the
+  Tempest-native records slice (`cb5d4b1`): relations proven working on SQLite and declared on
+  stash/stash-item, but the wholesale replacement of repository FK-list methods (`listForStash` &
+  co., 18 methods) was **deliberately rejected** — every caller holds a typed ID from a command/job
+  payload or route param, so the repo one-liner is already the minimal interface; relation access
+  would add a parent-record fetch at 17 call sites. Adopt `with()`/`load()`/`whereHas()`
+  opportunistically where future code starts from a loaded record, not by refactoring ID-driven
+  callers.
 
 ## Future companion apps (not started, not part of this v1 roadmap)
 

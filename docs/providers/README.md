@@ -102,7 +102,7 @@ STASHD_LIVE_DOWNLOAD_TESTS=1
 ```text
 POST /api/v1/commands  type=stash.preflight  source_uri=<url>
   → job preflight
-  → commands.resultJson
+  → commands.result
 
 GET /api/v1/stashes/preflight/{commandId}/review
 
