@@ -211,6 +211,12 @@ parameters:
 			path: app/Broadcasts/BroadcastPluginRegistry.php
 
 		-
+			message: '#^Parameter \#1 \$callback of function array_map expects \(callable\(mixed\)\: mixed\)\|null, Closure\(App\\Broadcasts\\BroadcastRecord\)\: string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Broadcasts/BroadcastRepository.php
+
+		-
 			message: '#^Method App\\Broadcasts\\BroadcastRepository\:\:findByStashAndSlug\(\) should return App\\Broadcasts\\BroadcastRecord\|null but returns mixed\.$#'
 			identifier: return.type
 			count: 1
