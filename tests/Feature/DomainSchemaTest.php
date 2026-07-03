@@ -26,7 +26,6 @@ test('domain schema migration creates all v1 tables on a fresh database', functi
         'broadcast_items',
         'broadcast_triggers',
         'broadcast_trigger_runs',
-        'provider_accounts',
         'media_server_connections',
         'users',
         'api_tokens',

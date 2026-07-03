@@ -12,8 +12,6 @@ use App\Broadcasts\BroadcastTriggerState;
 use App\Broadcasts\BroadcastTriggerType;
 use App\MediaServers\MediaServerConnectionState;
 use App\MediaServers\MediaServerType;
-use App\Providers\ProviderAccountState;
-use App\Providers\ProviderAuthType;
 use App\Stashes\DownloadPolicy;
 use App\Stashes\OrganizationMode;
 use App\Stashes\StashInputState;
@@ -47,7 +45,6 @@ final class CreateDomainSchema implements MigratesUp
                 $this->users(),
                 $this->secrets(),
                 $this->stashes(),
-                $this->providerAccounts(),
                 $this->mediaServerConnections(),
                 $this->stashInputs(),
                 $this->mediaItems(),
@@ -103,20 +100,6 @@ final class CreateDomainSchema implements MigratesUp
             ->enum('organizationMode', OrganizationMode::class, default: OrganizationMode::Flat)
             ->enum('state', StashState::class, default: StashState::Ready)
             ->unique('slug')
-            ->index('state');
-    }
-
-    private function providerAccounts(): CreateTableStatement
-    {
-        return $this->prefixedIdTable('provider_accounts')
-            ->string('providerKey')
-            ->string('name')
-            ->enum('authType', ProviderAuthType::class, default: ProviderAuthType::None)
-            ->raw($this->fkColumn('secretId', 40, 'secrets', OnDelete::SET_NULL, nullable: true))
-            ->enum('state', ProviderAccountState::class, default: ProviderAccountState::Ready)
-            ->datetime('lastCheckedAt', nullable: true)
-            ->text('lastError', nullable: true)
-            ->index('providerKey')
             ->index('state');
     }
 
