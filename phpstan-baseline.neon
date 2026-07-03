@@ -775,12 +775,6 @@ parameters:
 			path: app/Jobs/JobRepository.php
 
 		-
-			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{10036\: non\-empty\-string\|null, 19913\: bool, 52\: bool, 13\: int, 10023\: array\<int, string\>\}, array\{10036\: string, 19913\: true, 52\: true, 13\: int, 10023\: list\<non\-falsy\-string\>\} given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/MediaServers/Http/CurlMediaServerHttpClient.php
-
-		-
 			message: '#^Argument of an invalid type mixed supplied for foreach, only iterables are supported\.$#'
 			identifier: foreach.nonIterable
 			count: 1

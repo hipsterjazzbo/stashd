@@ -6,6 +6,8 @@ namespace App\MediaServers\Http;
 
 use App\MediaServers\MediaServerHttpClient;
 use App\MediaServers\MediaServerHttpResponse;
+use App\Support\Http\CurlClient;
+use InvalidArgumentException;
 
 final class CurlMediaServerHttpClient implements MediaServerHttpClient
 {
@@ -17,37 +19,19 @@ final class CurlMediaServerHttpClient implements MediaServerHttpClient
         ?string $body = null,
         int $timeoutSeconds = 15,
     ): MediaServerHttpResponse {
-        $curl = curl_init($url);
+        if ($method === '') {
+            throw new InvalidArgumentException('HTTP method must not be empty.');
+        }
 
-        if ($curl === false) {
+        $response = CurlClient::send($method, $url, $headers, $body, $timeoutSeconds);
+
+        if ($response === null) {
             return new MediaServerHttpResponse(0, '');
         }
 
-        $headerLines = [];
-
-        foreach ($headers as $name => $value) {
-            $headerLines[] = $name . ': ' . $value;
-        }
-
-        curl_setopt_array($curl, [
-            CURLOPT_CUSTOMREQUEST => strtoupper($method),
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_TIMEOUT => $timeoutSeconds,
-            CURLOPT_HTTPHEADER => $headerLines,
-        ]);
-
-        if ($body !== null) {
-            curl_setopt($curl, CURLOPT_POSTFIELDS, $body);
-        }
-
-        $responseBody = curl_exec($curl);
-        $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
-        curl_close($curl);
-
         return new MediaServerHttpResponse(
-            status: $status,
-            body: is_string($responseBody) ? $responseBody : '',
+            status: $response['status'],
+            body: $response['body'],
         );
     }
 }
