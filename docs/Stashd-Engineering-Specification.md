@@ -372,7 +372,7 @@ Default compose:
 ```yaml
 services:
   stashd:
-    image: ghcr.io/stashd/stashd:v1
+    image: ghcr.io/hipsterjazzbo/stashd:v1
     container_name: stashd
     ports:
       - "8474:8474"
@@ -2500,7 +2500,7 @@ bare-metal PHP install docs
 Initial registry:
 
 ```text
-ghcr.io/stashd/stashd
+ghcr.io/hipsterjazzbo/stashd
 ```
 
 ## Tags
@@ -2516,7 +2516,7 @@ edge
 Recommended:
 
 ```yaml
-image: ghcr.io/stashd/stashd:v1
+image: ghcr.io/hipsterjazzbo/stashd:v1
 ```
 
 ## Architectures

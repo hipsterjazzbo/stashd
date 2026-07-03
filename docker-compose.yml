@@ -1,6 +1,6 @@
 services:
   stashd:
-    image: ghcr.io/stashd/stashd:latest
+    image: ghcr.io/hipsterjazzbo/stashd:latest
     container_name: stashd
     ports:
       - "8474:8474"
