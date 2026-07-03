@@ -54,6 +54,7 @@ final readonly class StashItemResource
                 'thumbnailUri' => $this->mediaItem->thumbnailUri,
                 'durationSeconds' => DurationSeconds::toSeconds($this->mediaItem->durationSeconds),
                 'contentType' => $this->mediaItem->contentType,
+                'publishedAt' => $this->mediaItem->publishedAt,
             ],
             'totalAssetSizeBytes' => $this->totalAssetSizeBytes,
         ]);

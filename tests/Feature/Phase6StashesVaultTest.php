@@ -63,7 +63,7 @@ test('GET /api/v1/stashes/{id}/items lists stash items', function (): void {
 
     expect($mediaItemIds)->toContain($mediaItemId)
         ->and($item)->toHaveKeys(['id', 'stash_id', 'media_item_id', 'state', 'position', 'media_item', 'total_asset_size_bytes'])
-        ->and($item['media_item'])->toHaveKeys(['title', 'state', 'thumbnail_uri', 'duration_seconds', 'content_type'])
+        ->and($item['media_item'])->toHaveKeys(['title', 'state', 'thumbnail_uri', 'duration_seconds', 'content_type', 'published_at'])
         ->and($item['total_asset_size_bytes'])->toBeGreaterThan(0);
 });
 
