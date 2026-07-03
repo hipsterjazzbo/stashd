@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Stashes;
 
+use Tempest\Database\HasMany;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
@@ -15,6 +16,10 @@ final class StashRecord
     use IsDatabaseModel;
 
     public PrimaryKey $id;
+
+    /** @var \App\Stashes\StashItemRecord[] */
+    #[HasMany(ownerJoin: 'stashId')]
+    public array $items;
 
     public function __construct(
         public string $name,
