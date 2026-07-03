@@ -579,6 +579,14 @@ interface BroadcastSummary {
 	token_preview?: string
 }
 
+interface BroadcastCreationPreviewSummary {
+	eligible_item_count: number
+	skipped_item_count: number
+	vault_size_bytes: number
+	hardlinked_item_count: number
+	transcode_item_count: number
+}
+
 interface BroadcastPluginUiControl {
 	name: string
 	label: string
@@ -949,6 +957,8 @@ function stashDetailComponent(stashId: string) {
 		newBroadcastName: '',
 		newBroadcastSettings: {} as Record<string, string>,
 		creatingBroadcast: false,
+		broadcastPreview: null as BroadcastCreationPreviewSummary | null,
+		loadingBroadcastPreview: false,
 		compatibleDownloadPolicyChoice: 'video',
 		updatingDownloadPolicy: false,
 		seasonMappingDrafts: {} as Record<string, Record<string, string>>,
@@ -1309,6 +1319,43 @@ function stashDetailComponent(stashId: string) {
 			if (!compatible.includes(this.compatibleDownloadPolicyChoice)) {
 				this.compatibleDownloadPolicyChoice = compatible[0] ?? 'video'
 			}
+			// Whatever was previewed no longer reflects the current choice.
+			this.broadcastPreview = null
+		},
+
+		// Storage-impact preview before actually creating anything -- what
+		// createBroadcast() used to do immediately. No side effects on the
+		// server (see BroadcastLifecycleService::preview): nothing is
+		// created or persisted just by looking.
+		async previewBroadcastCreation() {
+			this.loadingBroadcastPreview = true
+			try {
+				const response = await apiFetch(`/api/v1/stashes/${stashId}/broadcasts/preview`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						type: this.newBroadcastType,
+						...(this.newBroadcastType === 'podcast' ? { mediaKind: this.newBroadcastMediaKind } : {}),
+					}),
+				})
+				if (!response.ok) {
+					const body = (await response.json()) as { error?: { message?: string } }
+					this.error = body.error?.message ?? 'Could not preview that broadcast.'
+					return
+				}
+				const body = (await response.json()) as { preview: BroadcastCreationPreviewSummary }
+				this.broadcastPreview = body.preview
+				this.error = null
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not reach the server.'
+			} finally {
+				this.loadingBroadcastPreview = false
+			}
+		},
+
+		cancelBroadcastPreview() {
+			this.broadcastPreview = null
 		},
 
 		async updateStashDownloadPolicyTo(policy: string) {
@@ -1358,6 +1405,7 @@ function stashDetailComponent(stashId: string) {
 				}
 				this.newBroadcastName = ''
 				this.newBroadcastSettings = {}
+				this.broadcastPreview = null
 				this.error = null
 				await this.refresh()
 			} catch (cause) {

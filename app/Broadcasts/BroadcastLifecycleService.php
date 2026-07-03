@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
+use App\Broadcasts\Podcasts\PodcastMediaKind;
 use App\Broadcasts\Podcasts\PodcastTokenRotationResult;
 use App\Broadcasts\Podcasts\PodcastTokenService;
+use App\Stashes\StashId;
 use App\System\State\StateTransitionService;
+use App\Vault\AssetKind;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
@@ -57,6 +60,57 @@ final readonly class BroadcastLifecycleService
         $this->broadcasts->save($broadcast);
 
         return $plan;
+    }
+
+    /**
+     * Storage-impact preview for a broadcast that doesn't exist yet, so the
+     * create form can show what it'll actually do before committing to it.
+     * Never persists anything -- BroadcastContextFactory only reads
+     * $broadcast->stashId, so a broadcast that's never saved is enough to
+     * reuse the real eligibility rule (publishableStashItems) instead of
+     * re-deriving it here.
+     *
+     * Every plugin hardlinks (near-zero extra space) except podcast audio
+     * episodes sourced from a video original, which get transcoded --
+     * that's the only transcode pathway that exists today (see
+     * PodcastTranscodeFallback). Transcoded output size isn't known ahead of
+     * time, so those items are reported as a count, not a byte estimate.
+     */
+    public function preview(StashId $stashId, string $type, ?string $mediaKind): BroadcastCreationPreview
+    {
+        $draftBroadcast = new BroadcastRecord(
+            stashId: $stashId,
+            type: $type,
+            name: '',
+            slug: '',
+            state: BroadcastState::Pending,
+            settings: $mediaKind === null ? null : ['media_kind' => $mediaKind],
+        );
+
+        $context = $this->contextFactory->build($draftBroadcast);
+        $eligible = $this->contextFactory->publishableStashItems($context);
+
+        $needsAudioTranscode = $type === 'podcast' && PodcastMediaKind::forBroadcast($draftBroadcast) === PodcastMediaKind::Audio;
+
+        $vaultSizeBytes = 0;
+        $transcodeItemCount = 0;
+
+        foreach ($eligible as $stashItem) {
+            $vaultOriginal = $context->vaultOriginals[(string) $stashItem->mediaItemId] ?? null;
+            $vaultSizeBytes += $vaultOriginal->sizeBytes ?? 0;
+
+            if ($needsAudioTranscode && $vaultOriginal?->kind === AssetKind::Video) {
+                $transcodeItemCount++;
+            }
+        }
+
+        return new BroadcastCreationPreview(
+            eligibleItemCount: count($eligible),
+            skippedItemCount: count($context->stashItems) - count($eligible),
+            vaultSizeBytes: $vaultSizeBytes,
+            hardlinkedItemCount: count($eligible) - $transcodeItemCount,
+            transcodeItemCount: $transcodeItemCount,
+        );
     }
 
     public function rebuild(BroadcastId $broadcastId): BroadcastLifecycleResult

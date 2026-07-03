@@ -272,11 +272,40 @@
 							</select>
 							<input type="text" x-model="newBroadcastName" placeholder="Broadcast name"
 								class="flex-1 rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
-							<button type="button" x-on:click="createBroadcast()"
-								x-bind:disabled="creatingBroadcast || newBroadcastName.trim() === ''"
+							<button type="button" x-show="!broadcastPreview" x-on:click="previewBroadcastCreation()"
+								x-bind:disabled="loadingBroadcastPreview || newBroadcastName.trim() === ''"
 								class="shrink-0 rounded bg-amber px-3 py-2 text-[13px] font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-60">
-								Add broadcast
+								<span x-show="loadingBroadcastPreview">Loading…</span>
+								<span x-show="!loadingBroadcastPreview">Preview</span>
 							</button>
+						</div>
+
+						<div class="mt-3 rounded border border-line bg-espresso p-3" x-show="broadcastPreview">
+							<p class="text-[11px] uppercase tracking-wide text-muted">What this will do</p>
+							<p class="mt-1 text-[12px] text-cream">
+								<span x-text="broadcastPreview?.eligible_item_count"></span> item<span x-show="broadcastPreview?.eligible_item_count !== 1">s</span> will be published
+								(<span x-text="formatBytes(broadcastPreview?.vault_size_bytes)"></span> already in the Vault).
+							</p>
+							<p class="mt-1 text-[12px] text-muted" x-show="(broadcastPreview?.skipped_item_count ?? 0) > 0">
+								<span x-text="broadcastPreview?.skipped_item_count"></span> item<span x-show="broadcastPreview?.skipped_item_count !== 1">s</span> skipped — not yet downloaded, removed, or missing from the Vault.
+							</p>
+							<p class="mt-1 text-[12px] text-muted" x-show="(broadcastPreview?.hardlinked_item_count ?? 0) > 0">
+								<span x-text="broadcastPreview?.hardlinked_item_count"></span> published via hardlink — ~0 extra space.
+							</p>
+							<p class="mt-1 text-[12px] text-warn" x-show="(broadcastPreview?.transcode_item_count ?? 0) > 0">
+								<span x-text="broadcastPreview?.transcode_item_count"></span> will be transcoded — extra space, exact size unknown until it happens.
+							</p>
+							<div class="mt-2 flex items-center gap-2">
+								<button type="button" x-on:click="cancelBroadcastPreview()"
+									class="rounded border border-line px-3 py-2 text-[13px] text-muted transition-colors hover:text-cream">
+									Cancel
+								</button>
+								<button type="button" x-on:click="createBroadcast()"
+									x-bind:disabled="creatingBroadcast"
+									class="rounded bg-amber px-3 py-2 text-[13px] font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-60">
+									Create broadcast
+								</button>
+							</div>
 						</div>
 
 						<div class="mt-3 flex flex-wrap items-center gap-2" x-show="currentBroadcastExtraControls().length > 0">

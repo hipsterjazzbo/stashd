@@ -33,6 +33,85 @@ test('create jellyfin broadcast for stash returns snake_case json', function ():
         ->and($response->body['broadcast']['last_planned_at'])->toBeNull();
 });
 
+test('previewing a jellyfin broadcast reports eligible items and their vault size, with nothing needing transcode', function (): void {
+    [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('broadcast-preview-jellyfin');
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'item.download',
+        'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $response = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts/preview', [
+        'type' => 'jellyfin',
+    ], headers: $headers)->assertOk();
+
+    $preview = $response->body['preview'];
+
+    expect($preview['eligible_item_count'])->toBe(1)
+        ->and($preview['skipped_item_count'])->toBeGreaterThan(0)
+        ->and($preview['vault_size_bytes'])->toBeGreaterThan(0)
+        ->and($preview['hardlinked_item_count'])->toBe(1)
+        ->and($preview['transcode_item_count'])->toBe(0);
+});
+
+test('previewing an audio podcast counts video-sourced episodes as needing transcode', function (): void {
+    [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('broadcast-preview-podcast');
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'item.download',
+        'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $response = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts/preview', [
+        'type' => 'podcast',
+        'mediaKind' => 'audio',
+    ], headers: $headers)->assertOk();
+
+    $preview = $response->body['preview'];
+
+    // manual_download-policy fake downloads produce a video original, so an
+    // audio podcast needs it transcoded.
+    expect($preview['eligible_item_count'])->toBe(1)
+        ->and($preview['transcode_item_count'])->toBe(1)
+        ->and($preview['hardlinked_item_count'])->toBe(0);
+});
+
+test('previewing skips items that have not been downloaded yet', function (): void {
+    [$headers, $stashId] = array_slice($this->bootstrapFakeDownloadStash('broadcast-preview-skipped'), 0, 2);
+
+    $response = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts/preview', [
+        'type' => 'jellyfin',
+    ], headers: $headers)->assertOk();
+
+    $preview = $response->body['preview'];
+
+    expect($preview['eligible_item_count'])->toBe(0)
+        ->and($preview['skipped_item_count'])->toBeGreaterThan(0)
+        ->and($preview['vault_size_bytes'])->toBe(0);
+});
+
+test('previewing does not create a broadcast record', function (): void {
+    [$headers, $stashId] = array_slice($this->bootstrapFakeDownloadStash('broadcast-preview-no-create'), 0, 2);
+
+    $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts/preview', [
+        'type' => 'jellyfin',
+    ], headers: $headers)->assertOk();
+
+    $broadcasts = $this->http->get('/api/v1/stashes/' . $stashId . '/broadcasts', headers: $headers)->assertOk();
+
+    expect($broadcasts->body['broadcasts'])->toBeEmpty();
+});
+
+test('previewing an unsupported broadcast type is rejected', function (): void {
+    [$headers, $stashId] = array_slice($this->bootstrapFakeDownloadStash('broadcast-preview-bad-type'), 0, 2);
+
+    $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts/preview', [
+        'type' => 'not_a_real_type',
+    ], headers: $headers)->assertStatus(Status::BAD_REQUEST);
+});
+
 test('broadcast.plan produces intended files without writing to disk', function (): void {
     [$headers, $stashId, $mediaItemId, $broadcastId] = $this->bootstrapFakeDownloadBroadcast('broadcast-plan');
 
