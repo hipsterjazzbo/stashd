@@ -6,9 +6,8 @@ namespace App\MediaServers\Api;
 
 use App\Http\Api\ApiJson;
 use App\MediaServers\MediaServerConnectionRecord;
-use App\Support\Arrayable;
 
-final readonly class MediaServerResource implements Arrayable
+final readonly class MediaServerResource
 {
     public function __construct(
         private MediaServerConnectionRecord $connection,
@@ -20,6 +19,7 @@ final readonly class MediaServerResource implements Arrayable
         return new self($connection);
     }
 
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return ApiJson::encode([

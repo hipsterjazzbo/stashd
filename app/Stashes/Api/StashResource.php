@@ -6,9 +6,8 @@ namespace App\Stashes\Api;
 
 use App\Http\Api\ApiJson;
 use App\Stashes\StashRecord;
-use App\Support\Arrayable;
 
-final readonly class StashResource implements Arrayable
+final readonly class StashResource
 {
     public function __construct(
         private StashRecord $stash,
@@ -20,6 +19,7 @@ final readonly class StashResource implements Arrayable
         return new self($stash);
     }
 
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return ApiJson::encode([

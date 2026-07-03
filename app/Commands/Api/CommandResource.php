@@ -6,9 +6,8 @@ namespace App\Commands\Api;
 
 use App\Commands\CommandRecord;
 use App\Http\Api\ApiJson;
-use App\Support\Arrayable;
 
-final readonly class CommandResource implements Arrayable
+final readonly class CommandResource
 {
     public function __construct(
         private CommandRecord $command,
@@ -20,6 +19,7 @@ final readonly class CommandResource implements Arrayable
         return new self($command);
     }
 
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return ApiJson::encode([

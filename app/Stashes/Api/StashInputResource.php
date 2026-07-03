@@ -6,9 +6,8 @@ namespace App\Stashes\Api;
 
 use App\Http\Api\ApiJson;
 use App\Stashes\StashInputRecord;
-use App\Support\Arrayable;
 
-final readonly class StashInputResource implements Arrayable
+final readonly class StashInputResource
 {
     public function __construct(
         private StashInputRecord $input,
@@ -20,6 +19,7 @@ final readonly class StashInputResource implements Arrayable
         return new self($input);
     }
 
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         // options.provider is keyed by opaque provider option strings (e.g.

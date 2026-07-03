@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Vault\Api;
 
 use App\Http\Api\ApiJson;
-use App\Support\Arrayable;
 use App\Support\DurationSeconds;
 use App\Vault\MediaItemRecord;
 
-final readonly class MediaItemResource implements Arrayable
+final readonly class MediaItemResource
 {
     public function __construct(
         private MediaItemRecord $item,
@@ -21,6 +20,7 @@ final readonly class MediaItemResource implements Arrayable
         return new self($item);
     }
 
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return ApiJson::encode([

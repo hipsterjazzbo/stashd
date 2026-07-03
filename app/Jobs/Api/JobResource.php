@@ -6,10 +6,9 @@ namespace App\Jobs\Api;
 
 use App\Http\Api\ApiJson;
 use App\Jobs\JobRecord;
-use App\Support\Arrayable;
 use App\Support\DurationSeconds;
 
-final readonly class JobResource implements Arrayable
+final readonly class JobResource
 {
     public function __construct(
         private JobRecord $job,
@@ -21,6 +20,7 @@ final readonly class JobResource implements Arrayable
         return new self($job);
     }
 
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return ApiJson::encode([

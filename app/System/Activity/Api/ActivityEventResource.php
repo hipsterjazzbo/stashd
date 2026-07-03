@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace App\System\Activity\Api;
 
 use App\Http\Api\ApiJson;
-use App\Support\Arrayable;
 use App\System\Activity\ActivityEventRecord;
 
-final readonly class ActivityEventResource implements Arrayable
+final readonly class ActivityEventResource
 {
     public function __construct(
         private ActivityEventRecord $event,
@@ -20,6 +19,7 @@ final readonly class ActivityEventResource implements Arrayable
         return new self($event);
     }
 
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return ApiJson::encode([

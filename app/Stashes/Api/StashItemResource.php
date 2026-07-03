@@ -6,11 +6,10 @@ namespace App\Stashes\Api;
 
 use App\Http\Api\ApiJson;
 use App\Stashes\StashItemRecord;
-use App\Support\Arrayable;
 use App\Support\DurationSeconds;
 use App\Vault\MediaItemRecord;
 
-final readonly class StashItemResource implements Arrayable
+final readonly class StashItemResource
 {
     public function __construct(
         private StashItemRecord $item,
@@ -27,6 +26,7 @@ final readonly class StashItemResource implements Arrayable
         return new self($item, $mediaItem, $totalAssetSizeBytes);
     }
 
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return ApiJson::encode([

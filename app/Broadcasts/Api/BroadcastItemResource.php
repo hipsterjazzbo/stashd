@@ -6,9 +6,8 @@ namespace App\Broadcasts\Api;
 
 use App\Broadcasts\BroadcastItemRecord;
 use App\Http\Api\ApiJson;
-use App\Support\Arrayable;
 
-final readonly class BroadcastItemResource implements Arrayable
+final readonly class BroadcastItemResource
 {
     public function __construct(
         private BroadcastItemRecord $item,
@@ -20,6 +19,7 @@ final readonly class BroadcastItemResource implements Arrayable
         return new self($item);
     }
 
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return ApiJson::encode([

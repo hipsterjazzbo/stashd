@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace App\Vault\Api;
 
 use App\Http\Api\ApiJson;
-use App\Support\Arrayable;
 use App\Support\DurationSeconds;
 use App\Vault\AssetRecord;
 use App\Vault\AssetRegenerationGuidance;
 
-final readonly class AssetResource implements Arrayable
+final readonly class AssetResource
 {
     public function __construct(
         private AssetRecord $asset,
@@ -23,6 +22,7 @@ final readonly class AssetResource implements Arrayable
         return new self($asset, $guidance);
     }
 
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return ApiJson::encode([

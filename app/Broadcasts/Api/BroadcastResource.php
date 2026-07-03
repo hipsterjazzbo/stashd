@@ -6,9 +6,8 @@ namespace App\Broadcasts\Api;
 
 use App\Broadcasts\BroadcastRecord;
 use App\Http\Api\ApiJson;
-use App\Support\Arrayable;
 
-final readonly class BroadcastResource implements Arrayable
+final readonly class BroadcastResource
 {
     public function __construct(
         private BroadcastRecord $broadcast,
@@ -21,6 +20,7 @@ final readonly class BroadcastResource implements Arrayable
         return new self($broadcast, $feedUrl);
     }
 
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         $payload = [
