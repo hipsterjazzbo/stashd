@@ -15,6 +15,7 @@ final readonly class StashItemResource
         private StashItemRecord $item,
         private ?MediaItemRecord $mediaItem = null,
         private ?int $totalAssetSizeBytes = null,
+        private ?string $downloadFailureReason = null,
     ) {
     }
 
@@ -22,8 +23,9 @@ final readonly class StashItemResource
         StashItemRecord $item,
         ?MediaItemRecord $mediaItem = null,
         ?int $totalAssetSizeBytes = null,
+        ?string $downloadFailureReason = null,
     ): self {
-        return new self($item, $mediaItem, $totalAssetSizeBytes);
+        return new self($item, $mediaItem, $totalAssetSizeBytes, $downloadFailureReason);
     }
 
     /** @return array<string, mixed> */
@@ -55,6 +57,7 @@ final readonly class StashItemResource
                 'durationSeconds' => DurationSeconds::toSeconds($this->mediaItem->durationSeconds),
                 'contentType' => $this->mediaItem->contentType,
                 'publishedAt' => $this->mediaItem->publishedAt,
+                'failureReason' => $this->downloadFailureReason,
             ],
             'totalAssetSizeBytes' => $this->totalAssetSizeBytes,
         ]);

@@ -85,7 +85,17 @@
 				<section class="rounded-lg border border-line bg-panel/60">
 					<div class="flex items-center justify-between border-b border-line px-4 py-3">
 						<h2 class="text-[13px] font-semibold text-cream">Items</h2>
-						<p class="text-[12px] text-muted" x-text="itemsSummary()"></p>
+						<div class="flex flex-wrap items-center gap-x-1 text-[12px] text-muted" x-show="items.length > 0">
+							<button type="button" class="transition-colors hover:text-cream" x-bind:class="itemStatusFilter === 'all' ? 'text-cream' : ''" x-on:click="itemStatusFilter = 'all'">
+								<span x-text="items.length"></span> item<span x-show="items.length !== 1">s</span>
+							</button>
+							<template x-for="chip in itemStatusSummary()" x-bind:key="chip.filter">
+								<span>·
+									<button type="button" class="transition-colors hover:text-cream" x-bind:class="itemStatusFilter === chip.filter ? 'text-cream' : ''" x-on:click="itemStatusFilter = chip.filter" x-text="chip.label"></button>
+								</span>
+							</template>
+						</div>
+						<p class="text-[12px] text-muted" x-show="items.length === 0">No items</p>
 					</div>
 
 					<div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2" x-show="items.length > 0">
@@ -142,10 +152,17 @@
 									</template>
 									<template x-if="row.type === 'item'">
 										<td class="px-4 py-2">
-											<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(row.item.media_item?.state).text">
+											<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(row.item.media_item?.state).text"
+												x-bind:title="row.item.media_item?.state === 'failed' ? (row.item.media_item?.failure_reason ?? 'Unknown error') : null">
 												<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(row.item.media_item?.state).dot, statusBadge(row.item.media_item?.state).pulse ? 'pulse-dot' : '']"></span>
 												<span x-text="statusBadge(row.item.media_item?.state).label"></span>
 											</span>
+											<button type="button" x-show="row.item.media_item?.state === 'failed'"
+												class="ml-2 rounded border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:text-cream disabled:opacity-50"
+												x-bind:disabled="actionPending === row.item.id + ':retry'"
+												x-on:click="retryDownload(row.item)">
+												retry
+											</button>
 											<p class="mt-1 text-[12px] text-muted" x-show="row.item.state === 'ignored'" x-text="'ignored: ' + (row.item.ignored_reason ?? 'unknown reason').replace(/_/g, ' ')"></p>
 										</td>
 									</template>

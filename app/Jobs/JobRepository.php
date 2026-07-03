@@ -142,4 +142,46 @@ final class JobRepository
             ->orderBy('createdAt', Direction::ASC)
             ->all();
     }
+
+    /**
+     * The error message from each media item's most recent download job, but
+     * only for items whose most recent attempt is the one that failed --
+     * covers what the "why did this fail" tooltip needs without depending on
+     * listRecent()'s bounded window, which a media item's download job can
+     * easily fall out of by the time someone looks at a long-failed item.
+     *
+     * @param list<string> $mediaItemIds
+     *
+     * @return array<string, string> lastError keyed by media item id
+     */
+    public function latestDownloadFailureByMediaItem(array $mediaItemIds): array
+    {
+        if ($mediaItemIds === []) {
+            return [];
+        }
+
+        // createdAt is second-precision, so a retry issued within the same
+        // second as the failure it's replacing would tie -- id (a ULID) is
+        // monotonic and breaks the tie in actual creation order.
+        $jobs = JobRecord::select()
+            ->where('entityType = ? AND intent = ?', 'media_item', JobIntent::Download)
+            ->whereIn('entityId', $mediaItemIds)
+            ->orderBy('createdAt', Direction::DESC)
+            ->orderBy('id', Direction::DESC)
+            ->all();
+
+        $latestByMediaItem = [];
+        foreach ($jobs as $job) {
+            $latestByMediaItem[(string) $job->entityId] ??= $job;
+        }
+
+        $failures = [];
+        foreach ($latestByMediaItem as $mediaItemId => $job) {
+            if ($job->state === JobState::Failed && $job->lastError !== null) {
+                $failures[$mediaItemId] = $job->lastError;
+            }
+        }
+
+        return $failures;
+    }
 }
