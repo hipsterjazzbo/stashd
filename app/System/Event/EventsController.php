@@ -8,6 +8,7 @@ use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
 use Tempest\DateTime\Duration;
+use Tempest\Http\Request;
 use Tempest\Http\Responses\EventStream;
 use Tempest\Http\ServerSentMessage;
 use Tempest\Router\Get;
@@ -50,9 +51,18 @@ final readonly class EventsController
     }
 
     #[Get('/api/v1/events')]
-    public function stream(): EventStream
+    public function stream(Request $request): EventStream
     {
-        return new EventStream(function (): \Generator {
+        // A reconnecting EventSource echoes back the last `id:` it saw via
+        // Last-Event-ID -- honor it so reconnects resume instead of
+        // replaying the whole table from scratch. A brand-new connection
+        // (no header) starts from "now" rather than the beginning: nothing
+        // here is meant to backfill history, every consumer already
+        // re-fetches its own current state before listening, it's just
+        // asking to be told when to check again.
+        $lastSequence = $this->parseLastEventId($request) ?? $this->notifications->latestSequence();
+
+        return new EventStream(function () use ($lastSequence): \Generator {
             $slot = $this->connections->tryAcquireSlot(self::MAX_CONCURRENT_CONNECTIONS, self::STALE_AFTER_SECONDS);
 
             if ($slot === null) {
@@ -62,20 +72,20 @@ final readonly class EventsController
             }
 
             try {
-                $lastId = null;
                 $iterations = 0;
 
                 while ($iterations < self::MAX_ITERATIONS) {
-                    foreach ($this->notifications->listSinceId($lastId) as $notification) {
-                        $lastId = (string) $notification->id;
+                    foreach ($this->notifications->listSinceSequence($lastSequence) as $notification) {
+                        $lastSequence = $notification->sequence;
                         yield new ServerSentMessage(
                             data: ApiJson::encode([
-                                'id' => $lastId,
+                                'id' => $notification->id,
                                 'event' => $notification->eventType,
                                 'payload' => $notification->payload,
-                                'created_at' => $notification->createdAt?->toRfc3339(useZ: true),
+                                'created_at' => $notification->createdAt->toRfc3339(useZ: true),
                             ]),
                             event: $notification->eventType,
+                            id: $notification->sequence,
                         );
                     }
 
@@ -87,5 +97,12 @@ final readonly class EventsController
                 $this->connections->release($slot);
             }
         }, sleep: self::POLL_INTERVAL_MS);
+    }
+
+    private function parseLastEventId(Request $request): ?int
+    {
+        $header = $request->headers->get('Last-Event-ID');
+
+        return ($header !== null && ctype_digit($header)) ? (int) $header : null;
     }
 }

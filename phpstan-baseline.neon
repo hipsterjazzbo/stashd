@@ -1183,12 +1183,6 @@ parameters:
 			path: app/System/Boot/SqliteConfigurator.php
 
 		-
-			message: '#^Method App\\System\\Event\\EventNotificationRepository\:\:listSinceId\(\) should return list\<App\\System\\Event\\EventNotificationRecord\> but returns array\<mixed\>\.$#'
-			identifier: return.type
-			count: 1
-			path: app/System/Event/EventNotificationRepository.php
-
-		-
 			message: '#^Cannot call method delete\(\) on mixed\.$#'
 			identifier: method.nonObject
 			count: 1

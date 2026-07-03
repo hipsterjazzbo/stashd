@@ -100,7 +100,8 @@ test('events stream rejects a new connection once at capacity with a retry-after
     }
 
     $controller = $this->container->get(\App\System\Event\EventsController::class);
-    $generator = $controller->stream()->body;
+    $request = new \Tempest\Http\GenericRequest(\Tempest\Http\Method::GET, '/api/v1/events');
+    $generator = $controller->stream($request)->body;
 
     // The rejection path yields exactly one message and returns immediately —
     // safe to iterate fully in a test, unlike the accepted path's ~10s poll loop.
@@ -112,6 +113,81 @@ test('events stream rejects a new connection once at capacity with a retry-after
 
     $generator->next();
     expect($generator->valid())->toBeFalse();
+});
+
+test('sse stream starts fresh connections from now, not from old backlog', function (): void {
+    $publisher = $this->container->get(EventPublisher::class);
+    $controller = $this->container->get(\App\System\Event\EventsController::class);
+
+    $headers = $this->authHeaders();
+    $created = $this->http->post('/api/v1/commands', [
+        'type' => 'system.storage_check',
+        'options' => [],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $job = JobRecord::findById(new \Tempest\Database\PrimaryKey($created->body['job_ids'][0]));
+
+    // An "old" notification published before any connection opens.
+    $publisher->jobProgress($job);
+
+    // stream() snapshots "now" synchronously at call time, before the
+    // generator is ever iterated.
+    $request = new \Tempest\Http\GenericRequest(\Tempest\Http\Method::GET, '/api/v1/events');
+    $generator = $controller->stream($request)->body;
+
+    // A "new" notification published after that snapshot.
+    $publisher->jobFailed($job);
+
+    // The first (and only, for this test) message must be the new one — the
+    // old backlog entry must not be replayed.
+    $message = $generator->current();
+    expect($message->event)->toBe('job.failed');
+
+    // The generator is deliberately abandoned mid-iteration (its outer loop
+    // sleeps ~1s per iteration, not worth draining in a test) — its
+    // try/finally holds a reference cycle back through the controller, so
+    // without forcing collection here, the pending release() can fire
+    // during a *later*, unrelated test once PHP's cyclic GC gets around to
+    // it, by which point that test's container scope owns Database instead.
+    unset($generator);
+    gc_collect_cycles();
+});
+
+test('sse stream resumes from Last-Event-ID instead of replaying already-seen notifications', function (): void {
+    $publisher = $this->container->get(EventPublisher::class);
+    $controller = $this->container->get(\App\System\Event\EventsController::class);
+
+    $headers = $this->authHeaders();
+    $created = $this->http->post('/api/v1/commands', [
+        'type' => 'system.storage_check',
+        'options' => [],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $job = JobRecord::findById(new \Tempest\Database\PrimaryKey($created->body['job_ids'][0]));
+
+    $publisher->jobProgress($job);
+    $lastEventId = $this->container->get(\App\System\Event\EventNotificationRepository::class)->latestSequence();
+
+    $publisher->jobFailed($job);
+
+    $resumedRequest = new \Tempest\Http\GenericRequest(
+        \Tempest\Http\Method::GET,
+        '/api/v1/events',
+        headers: ['Last-Event-ID' => (string) $lastEventId],
+    );
+    $generator = $controller->stream($resumedRequest)->body;
+
+    // Only the notification published after $lastEventId should be
+    // delivered — not a replay of the job.progress one already seen. Stop
+    // at the first message: the accepted path's outer loop sleeps ~1s
+    // between iterations (unlike the rejection path above), so draining it
+    // further isn't worth the test time.
+    $message = $generator->current();
+    expect($message->event)->toBe('job.failed')
+        ->and($message->id)->toBeGreaterThan($lastEventId);
+
+    // See the comment in the previous test — force deterministic cleanup of
+    // the abandoned generator's reference cycle before this test ends.
+    unset($generator);
+    gc_collect_cycles();
 });
 
 test('sse job failed notifications redact secrets in last_error', function (): void {
