@@ -47,7 +47,7 @@ final readonly class AssetVerifyCommandHandler implements CommandHandler
         $payload = [
             'asset_id' => trim((string) ($options['assetId'] ?? $options['asset_id'] ?? '')),
         ];
-        $command->optionsJson = json_encode($payload, JSON_THROW_ON_ERROR);
+        $command->options = $payload;
         $command->targetType = 'asset';
         $command->targetId = $payload['asset_id'];
         $this->commands->save($command);

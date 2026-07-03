@@ -131,7 +131,7 @@ final readonly class FakeDownloader implements DownloaderInterface
     private function writeMetadata(DownloadRequest $request, DateTime $capturedAt): DownloadedFile
     {
         $path = $this->tempPath($request, 'metadata.json');
-        $payload = $this->sidecars->metadataJson($request, $capturedAt);
+        $payload = $this->sidecars->metadata($request, $capturedAt);
         file_put_contents($path, $payload);
 
         return new DownloadedFile(

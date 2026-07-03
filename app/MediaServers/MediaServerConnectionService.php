@@ -65,7 +65,7 @@ final readonly class MediaServerConnectionService
         }
 
         if ($settings !== null) {
-            $record->settingsJson = MediaServerLibrarySelection::fromArray($settings);
+            $record->settings = MediaServerLibrarySelection::fromArray($settings);
         }
 
         if ($token !== null && trim($token) !== '') {
@@ -119,12 +119,12 @@ final readonly class MediaServerConnectionService
     /** @return array<string, mixed> */
     public function settings(MediaServerConnectionRecord $record): array
     {
-        return $record->settingsJson?->toArray() ?? [];
+        return $record->settings?->toArray() ?? [];
     }
 
     public function libraryFromSettings(MediaServerConnectionRecord $record): ?MediaServerLibraryRef
     {
-        return $record->settingsJson?->toLibraryRef();
+        return $record->settings?->toLibraryRef();
     }
 
     private function storeToken(MediaServerConnectionRecord $record, string $token): void

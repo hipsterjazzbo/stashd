@@ -15,7 +15,7 @@ use Tempest\DateTime\DateTime;
  */
 final class VaultSidecarBuilder
 {
-    public function metadataJson(DownloadRequest $request, DateTime $capturedAt): string
+    public function metadata(DownloadRequest $request, DateTime $capturedAt): string
     {
         $payload = [
             'schema_version' => 1,

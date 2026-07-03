@@ -136,6 +136,7 @@ final readonly class StorageCapabilityChecker
         $record->save();
     }
 
+    /** @param array<string, mixed>|null $details */
     private function recordCheck(
         StorageLocationRecord $location,
         StorageCheckType $type,

@@ -36,7 +36,7 @@ final class MediaServerConnectionRepository
             baseUri: $baseUri,
             state: $state,
             tokenSecretId: $tokenSecretId,
-            settingsJson: MediaServerLibrarySelection::fromArray($settings),
+            settings: MediaServerLibrarySelection::fromArray($settings),
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);

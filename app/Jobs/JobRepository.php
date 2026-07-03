@@ -24,6 +24,7 @@ final class JobRepository
     ) {
     }
 
+    /** @param array<string, mixed>|null $payload */
     public function create(
         JobIntent $intent,
         ?CommandId $commandId = null,
@@ -40,7 +41,7 @@ final class JobRepository
             entityId: $entityId?->toString(),
             state: JobState::Pending,
             priority: $priority,
-            payloadJson: $payload === null ? null : json_encode($payload, JSON_THROW_ON_ERROR),
+            payload: $payload,
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);

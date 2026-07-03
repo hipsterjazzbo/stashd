@@ -29,7 +29,7 @@ final class StashInputRepository
         string $providerInputId,
         ?string $title = null,
         ?SyncMode $syncMode = null,
-        ?StashInputOptions $optionsJson = null,
+        ?StashInputOptions $options = null,
     ): StashInputRecord {
         $id = $this->ids->generate('input')->toString();
         $record = new StashInputRecord(
@@ -41,7 +41,7 @@ final class StashInputRepository
             state: StashInputState::Ready,
             title: $title,
             syncMode: $syncMode,
-            optionsJson: $optionsJson,
+            options: $options,
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);

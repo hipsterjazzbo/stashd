@@ -63,7 +63,7 @@ final readonly class StorageCheckJobHandler implements JobHandler
         ];
 
         if ($command !== null) {
-            $command->resultJson = json_encode($result, JSON_THROW_ON_ERROR);
+            $command->result = $result;
             $this->commands->save($command);
         }
 

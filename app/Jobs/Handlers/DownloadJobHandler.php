@@ -53,9 +53,7 @@ final readonly class DownloadJobHandler implements JobHandler
         $context->heartbeat($job);
         $context->progress($job, JobProgressUpdate::ofPercent(0.0, 'Preparing download'));
 
-        $payload = $job->payloadJson === null
-            ? []
-            : json_decode($job->payloadJson, true, flags: JSON_THROW_ON_ERROR);
+        $payload = $job->payload ?? [];
 
         $mediaItemId = MediaItemId::parse((string) ($payload['media_item_id'] ?? ''));
         $stashId = StashId::parse((string) ($payload['stash_id'] ?? ''));
@@ -112,7 +110,7 @@ final readonly class DownloadJobHandler implements JobHandler
                 },
             );
 
-            $command->resultJson = json_encode($result->toArray(), JSON_THROW_ON_ERROR);
+            $command->result = $result->toArray();
             $this->commands->save($command);
 
             $job->progressPercent = 100.0;

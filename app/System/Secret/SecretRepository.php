@@ -24,7 +24,7 @@ final class SecretRepository
     {
         return SecretRecord::select()
             ->where('key = ? AND revokedAt IS NULL', $key)
-            ->include('encryptedValue', 'nonce', 'metadataJson')
+            ->include('encryptedValue', 'nonce', 'metadata')
             ->first();
     }
 
@@ -33,6 +33,7 @@ final class SecretRepository
         return SecretRecord::findById(new PrimaryKey($id->toString()));
     }
 
+    /** @param array<string, mixed>|null $metadata */
     public function create(
         string $key,
         SecretType $type,
@@ -46,7 +47,7 @@ final class SecretRepository
             type: $type,
             encryptedValue: $encryptedValue,
             nonce: $nonce,
-            metadataJson: $metadata === null ? null : json_encode($metadata, JSON_THROW_ON_ERROR),
+            metadata: $metadata,
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);

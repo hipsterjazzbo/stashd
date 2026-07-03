@@ -342,13 +342,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
     /** @return array<string, mixed> */
     private function settings(BroadcastContext $context): array
     {
-        if ($context->broadcast->settingsJson === null) {
-            return [];
-        }
-
-        $settings = json_decode($context->broadcast->settingsJson, true);
-
-        return is_array($settings) ? $settings : [];
+        return $context->broadcast->settings ?? [];
     }
 
     private function nonEmptyString(mixed $value): ?string

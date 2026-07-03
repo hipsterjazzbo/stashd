@@ -23,6 +23,7 @@ final class CommandRepository
     ) {
     }
 
+    /** @param array<string, mixed>|null $options */
     public function create(
         CommandType $type,
         ?string $targetType = null,
@@ -36,7 +37,7 @@ final class CommandRepository
             state: CommandState::Accepted,
             targetType: $targetType,
             targetId: $targetId?->toString(),
-            optionsJson: $options === null ? null : json_encode($options, JSON_THROW_ON_ERROR),
+            options: $options,
             createdByUserId: $createdByUserId,
         );
         $record->id = new PrimaryKey($id);

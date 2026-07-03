@@ -21,6 +21,7 @@ final class ActivityEventRepository
     ) {
     }
 
+    /** @param array<string, mixed>|null $metadata */
     public function create(
         ActivityLevel $level,
         string $type,
@@ -48,7 +49,7 @@ final class ActivityEventRepository
             jobId: $jobId,
             commandId: $commandId,
             groupKey: $groupKey,
-            metadataJson: $metadata === null ? null : json_encode($metadata, JSON_THROW_ON_ERROR),
+            metadata: $metadata,
         );
         $record->id = new PrimaryKey($id);
         $record->createdAt = DateTime::now(Timezone::UTC);

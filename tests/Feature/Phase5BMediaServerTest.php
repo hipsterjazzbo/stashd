@@ -139,8 +139,8 @@ test('media server connection stores library selection as a typed value object',
     $connection = MediaServerConnectionRecord::findById(new PrimaryKey($response->body['media_server']['id']));
 
     expect($connection)->not->toBeNull()
-        ->and($connection->settingsJson)->toBeInstanceOf(MediaServerLibrarySelection::class)
-        ->and($connection->settingsJson?->toArray())->toBe([
+        ->and($connection->settings)->toBeInstanceOf(MediaServerLibrarySelection::class)
+        ->and($connection->settings?->toArray())->toBe([
             'libraryId' => '1',
             'libraryName' => 'TV Shows',
             'libraryType' => 'show',
@@ -152,10 +152,10 @@ test('media server connection stores library selection as a typed value object',
         ]);
 
     $row = $this->container->get(Database::class)->fetchFirst(new Query(
-        'SELECT settingsJson FROM media_server_connections WHERE id = ?',
+        'SELECT settings FROM media_server_connections WHERE id = ?',
         bindings: [$response->body['media_server']['id']],
     ));
-    $storedSettings = json_decode((string) $row['settingsJson'], true, flags: JSON_THROW_ON_ERROR);
+    $storedSettings = json_decode((string) $row['settings'], true, flags: JSON_THROW_ON_ERROR);
 
     expect($storedSettings)->toBe([
         'type' => 'media_server_library_selection',
@@ -257,14 +257,14 @@ test('broadcast trigger scan success records trigger run without failing broadca
         ->first();
 
     expect($triggerRecord)->not->toBeNull()
-        ->and($triggerRecord->settingsJson)->toBeInstanceOf(MediaServerScanTriggerSettings::class)
-        ->and($triggerRecord->settingsJson?->mediaServerConnectionId)->toBe($connectionId);
+        ->and($triggerRecord->settings)->toBeInstanceOf(MediaServerScanTriggerSettings::class)
+        ->and($triggerRecord->settings?->mediaServerConnectionId)->toBe($connectionId);
 
     $row = $this->container->get(Database::class)->fetchFirst(new Query(
-        'SELECT settingsJson FROM broadcast_triggers WHERE id = ?',
+        'SELECT settings FROM broadcast_triggers WHERE id = ?',
         bindings: [(string) $triggerRecord->id],
     ));
-    $storedSettings = json_decode((string) $row['settingsJson'], true, flags: JSON_THROW_ON_ERROR);
+    $storedSettings = json_decode((string) $row['settings'], true, flags: JSON_THROW_ON_ERROR);
 
     expect($storedSettings)->toBe([
         'type' => 'media_server_scan_trigger_settings',

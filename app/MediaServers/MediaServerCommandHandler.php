@@ -42,7 +42,7 @@ final readonly class MediaServerCommandHandler implements CommandHandler
     {
         $commandId = CommandId::parse((string) $command->id);
         $payload = $this->normalizedPayload($options);
-        $command->optionsJson = json_encode($payload, JSON_THROW_ON_ERROR);
+        $command->options = $payload;
         $command->targetType = 'media_server_connection';
         $command->targetId = $payload['media_server_connection_id'];
         $this->commands->save($command);

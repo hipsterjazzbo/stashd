@@ -168,17 +168,7 @@ final readonly class BroadcastLifecycleService
 
     private function shouldAutoTrigger(\App\Broadcasts\BroadcastRecord $broadcast): bool
     {
-        if ($broadcast->settingsJson === null) {
-            return false;
-        }
-
-        $settings = json_decode($broadcast->settingsJson, true);
-
-        if (! is_array($settings)) {
-            return false;
-        }
-
-        return (bool) ($settings['auto_trigger_scan'] ?? false);
+        return (bool) ($broadcast->settings['auto_trigger_scan'] ?? false);
     }
 
     private function transitionToProcessing(\App\Broadcasts\BroadcastRecord $broadcast): void

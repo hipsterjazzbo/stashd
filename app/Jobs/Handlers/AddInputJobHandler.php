@@ -50,9 +50,7 @@ final readonly class AddInputJobHandler implements JobHandler
         $context->heartbeat($job);
         $context->progress($job, JobProgressUpdate::ofSteps(0, 1, 'Adding input to stash'));
 
-        $payload = $job->payloadJson === null
-            ? []
-            : json_decode($job->payloadJson, true, flags: JSON_THROW_ON_ERROR);
+        $payload = $job->payload ?? [];
 
         $stashId = StashId::parse((string) ($payload['stash_id'] ?? ''));
         $stash = $this->stashes->find($stashId)
@@ -64,7 +62,7 @@ final readonly class AddInputJobHandler implements JobHandler
             ?? throw new RuntimeException('Preflight command not found.');
         $result = $this->stashFromPreflight->commitInput($stash, $preflightCommand, $options);
 
-        $command->resultJson = json_encode($result->toArray(), JSON_THROW_ON_ERROR);
+        $command->result = $result->toArray();
         $command->targetType = 'stash';
         $command->targetId = $result->stashId;
         $this->commands->save($command);

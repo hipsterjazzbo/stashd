@@ -29,13 +29,7 @@ final readonly class BroadcastContext
     /** @return array<string, mixed> */
     public function settings(): array
     {
-        if ($this->broadcast->settingsJson === null) {
-            return [];
-        }
-
-        $decoded = json_decode($this->broadcast->settingsJson, true);
-
-        return is_array($decoded) ? $decoded : [];
+        return $this->broadcast->settings ?? [];
     }
 
     public function seasonMapping(): SeasonMapping

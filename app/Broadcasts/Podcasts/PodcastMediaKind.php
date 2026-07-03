@@ -13,12 +13,7 @@ enum PodcastMediaKind: string
 
     public static function forBroadcast(BroadcastRecord $broadcast): self
     {
-        if ($broadcast->settingsJson === null) {
-            return self::Audio;
-        }
-
-        $decoded = json_decode($broadcast->settingsJson, true);
-        $value = is_array($decoded) ? ($decoded['media_kind'] ?? null) : null;
+        $value = $broadcast->settings['media_kind'] ?? null;
 
         return self::tryFrom((string) $value) ?? self::Audio;
     }

@@ -93,7 +93,7 @@ final readonly class BroadcastTriggerService
             return new BroadcastTriggerResult(0, 0, 0, []);
         }
 
-        $connectionId = $trigger->settingsJson?->mediaServerConnectionId ?? '';
+        $connectionId = $trigger->settings?->mediaServerConnectionId ?? '';
 
         if ($connectionId === '') {
             return new BroadcastTriggerResult(0, 0, 0, []);
@@ -209,13 +209,7 @@ final readonly class BroadcastTriggerService
     /** @return array<string, mixed> */
     private function broadcastSettings(BroadcastRecord $broadcast): array
     {
-        if ($broadcast->settingsJson === null) {
-            return [];
-        }
-
-        $decoded = json_decode($broadcast->settingsJson, true);
-
-        return is_array($decoded) ? $decoded : [];
+        return $broadcast->settings ?? [];
     }
 
     private function markTriggerFailed(\App\Broadcasts\BroadcastTriggerRecord $trigger, string $error): void

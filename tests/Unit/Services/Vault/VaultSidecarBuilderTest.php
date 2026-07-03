@@ -29,7 +29,7 @@ test('vault sidecar builder produces normalized metadata and source json', funct
         publishedAt: DateTime::parse('2026-06-15T08:30:00Z', Timezone::UTC),
     );
 
-    $metadata = json_decode($builder->metadataJson($request, $capturedAt), true, flags: JSON_THROW_ON_ERROR);
+    $metadata = json_decode($builder->metadata($request, $capturedAt), true, flags: JSON_THROW_ON_ERROR);
     $result = new DownloadResult(
         files: [],
         implementation: 'fake',
@@ -63,7 +63,7 @@ test('vault sidecar builder redacts secret-like tokens in sensitive fields', fun
         title: 'Bearer ' . $token,
     );
 
-    $json = $builder->metadataJson($request, $capturedAt);
+    $json = $builder->metadata($request, $capturedAt);
 
     expect($json)->not->toContain($token)
         ->and($json)->toContain('[REDACTED]')

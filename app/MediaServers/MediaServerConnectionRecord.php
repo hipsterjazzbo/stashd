@@ -24,7 +24,7 @@ final class MediaServerConnectionRecord
         public MediaServerConnectionState $state,
         #[Hidden]
         public ?string $tokenSecretId = null,
-        public ?MediaServerLibrarySelection $settingsJson = null,
+        public ?MediaServerLibrarySelection $settings = null,
         public ?DateTime $lastCheckedAt = null,
         public ?string $lastError = null,
         public ?DateTime $createdAt = null,

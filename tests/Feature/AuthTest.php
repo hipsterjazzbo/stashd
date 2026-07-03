@@ -215,14 +215,14 @@ test('api token scopes are stored as a typed value object', function (): void {
         ->first();
 
     expect($record)->not->toBeNull()
-        ->and($record->scopesJson)->toBeInstanceOf(ApiTokenScopes::class)
-        ->and($record->scopesJson?->toArray())->toBe(['media:read', 'broadcast:write']);
+        ->and($record->scopes)->toBeInstanceOf(ApiTokenScopes::class)
+        ->and($record->scopes?->toArray())->toBe(['media:read', 'broadcast:write']);
 
     $row = $this->container->get(Database::class)->fetchFirst(new Query(
-        'SELECT scopesJson FROM api_tokens WHERE id = ?',
+        'SELECT scopes FROM api_tokens WHERE id = ?',
         bindings: [$created->body['id']],
     ));
-    $storedScopes = json_decode((string) $row['scopesJson'], true, flags: JSON_THROW_ON_ERROR);
+    $storedScopes = json_decode((string) $row['scopes'], true, flags: JSON_THROW_ON_ERROR);
 
     expect($storedScopes)->toBe([
         'type' => 'api_token_scopes',

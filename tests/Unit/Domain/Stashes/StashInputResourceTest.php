@@ -22,7 +22,7 @@ test('provider option keys survive encoding untouched, even with digit-uppercase
         providerInputId: 'channel:demo',
         state: StashInputState::Ready,
         syncMode: SyncMode::Automatic,
-        optionsJson: new StashInputOptions(provider: ['weird_01Key' => true]),
+        options: new StashInputOptions(provider: ['weird_01Key' => true]),
     );
     $input->id = new PrimaryKey('input_01ARZ3NDEKTSV4RRFFQ69G5FAV');
 

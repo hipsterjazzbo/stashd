@@ -59,7 +59,7 @@ test('preflight persists completed command and ready job after worker run', func
 
     $command = \App\Commands\CommandRecord::findById($command->id);
     expect($command->state->value)->toBe('completed')
-        ->and($command->resultJson)->not->toBeNull();
+        ->and($command->result)->not->toBeNull();
 
     $job = \App\Jobs\JobRecord::select()
         ->where('commandId = ?', (string) $command->id)

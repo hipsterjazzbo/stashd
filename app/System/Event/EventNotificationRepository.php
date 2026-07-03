@@ -22,12 +22,13 @@ final class EventNotificationRepository
     }
 
     /** @param array<string, mixed> $payload */
+    /** @param array<string, mixed> $payload */
     public function publish(string $eventType, array $payload): EventNotificationRecord
     {
         $id = $this->ids->generate('evt')->toString();
         $record = new EventNotificationRecord(
             eventType: $eventType,
-            payloadJson: json_encode($payload, JSON_THROW_ON_ERROR),
+            payload: $payload,
         );
         $record->id = new PrimaryKey($id);
         $record->createdAt = DateTime::now(Timezone::UTC);

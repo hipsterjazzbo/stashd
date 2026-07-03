@@ -44,21 +44,19 @@ final readonly class JobResource implements Arrayable
             'progressEtaSeconds' => DurationSeconds::toSeconds($this->job->progressEtaSeconds),
             'progressRate' => $this->job->progressRate,
             'lastError' => $this->job->lastError,
-            'payload' => $this->decodeJson($this->job->payloadJson),
+            'payload' => $this->encodeForApi($this->job->payload),
             'createdAt' => $this->job->createdAt,
             'updatedAt' => $this->job->updatedAt,
         ]);
     }
 
-    /** @return array<string, mixed>|null */
-    private function decodeJson(?string $json): ?array
+    /**
+     * @param array<string, mixed>|null $data
+     *
+     * @return array<string, mixed>|null
+     */
+    private function encodeForApi(?array $data): ?array
     {
-        if ($json === null) {
-            return null;
-        }
-
-        $decoded = json_decode($json, true);
-
-        return is_array($decoded) ? ApiJson::encode($decoded) : null;
+        return $data === null ? null : ApiJson::encode($data);
     }
 }

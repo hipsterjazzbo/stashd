@@ -178,7 +178,7 @@ final readonly class AuthService
                 'id' => (string) $token->id,
                 'name' => $token->name,
                 'token_preview' => $token->tokenPreview,
-                'scopes' => $token->scopesJson?->toArray() ?? [],
+                'scopes' => $token->scopes?->toArray() ?? [],
                 'last_used_at' => $token->lastUsedAt?->toRfc3339(useZ: true),
                 'expires_at' => $token->expiresAt?->toRfc3339(useZ: true),
                 'created_at' => $token->createdAt?->toRfc3339(useZ: true),

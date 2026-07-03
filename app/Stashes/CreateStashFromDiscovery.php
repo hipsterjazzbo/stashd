@@ -89,7 +89,7 @@ final readonly class CreateStashFromDiscovery
             providerInputId: $resolved->providerInputId,
             title: $resolved->title,
             syncMode: $syncMode,
-            optionsJson: $inputOptions,
+            options: $inputOptions,
         );
 
         if ($stash->iconUri === null && $resolved->sourceAvatarUri !== null) {
@@ -272,7 +272,7 @@ final readonly class CreateStashFromDiscovery
             throw new InvalidArgumentException('Preflight command must be completed before adding an input.');
         }
 
-        if ($command->resultJson === null) {
+        if ($command->result === null) {
             throw new InvalidArgumentException('Preflight command is missing stored results.');
         }
 
@@ -282,12 +282,6 @@ final readonly class CreateStashFromDiscovery
     /** @return array<string, mixed> */
     private function decodePreflightResult(CommandRecord $command): array
     {
-        $decoded = json_decode($command->resultJson, true);
-
-        if (! is_array($decoded)) {
-            throw new InvalidArgumentException('Preflight result JSON is invalid.');
-        }
-
-        return $decoded;
+        return $command->result ?? throw new InvalidArgumentException('Preflight result is missing.');
     }
 }

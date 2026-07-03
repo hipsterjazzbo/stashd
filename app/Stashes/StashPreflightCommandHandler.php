@@ -43,7 +43,7 @@ final readonly class StashPreflightCommandHandler implements CommandHandler
         $commandId = CommandId::parse((string) $command->id);
         $payload = $this->normalizedPayload($command, $options);
 
-        $command->optionsJson = json_encode($payload, JSON_THROW_ON_ERROR);
+        $command->options = $payload;
         $this->commands->save($command);
 
         $job = $this->jobs->create(

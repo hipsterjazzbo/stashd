@@ -16,12 +16,13 @@ final class StorageCheckRecord
 
     public PrimaryKey $id;
 
+    /** @param array<string, mixed>|null $details */
     public function __construct(
         public string $storageLocationId,
         public StorageCheckType $checkType,
         public StorageCheckState $state,
         public ?string $message = null,
-        public ?string $detailsJson = null,
+        public ?array $details = null,
         public ?DateTime $createdAt = null,
         public ?DateTime $updatedAt = null,
     ) {

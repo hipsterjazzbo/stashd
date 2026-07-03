@@ -68,13 +68,11 @@ final readonly class EventsController
                 while ($iterations < self::MAX_ITERATIONS) {
                     foreach ($this->notifications->listSinceId($lastId) as $notification) {
                         $lastId = (string) $notification->id;
-                        $payload = json_decode($notification->payloadJson, true, flags: JSON_THROW_ON_ERROR);
-
                         yield new ServerSentMessage(
                             data: ApiJson::encode([
                                 'id' => $lastId,
                                 'event' => $notification->eventType,
-                                'payload' => is_array($payload) ? $payload : [],
+                                'payload' => $notification->payload,
                                 'created_at' => $notification->createdAt?->toRfc3339(useZ: true),
                             ]),
                             event: $notification->eventType,

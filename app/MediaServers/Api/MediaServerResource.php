@@ -28,7 +28,7 @@ final readonly class MediaServerResource implements Arrayable
             'name' => $this->connection->name,
             'baseUri' => $this->connection->baseUri,
             'state' => $this->connection->state->value,
-            'settings' => $this->connection->settingsJson?->toArray(),
+            'settings' => $this->connection->settings?->toArray(),
             'lastCheckedAt' => $this->connection->lastCheckedAt,
             'lastError' => $this->connection->lastError,
             'createdAt' => $this->connection->createdAt,

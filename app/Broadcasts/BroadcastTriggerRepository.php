@@ -33,7 +33,7 @@ final class BroadcastTriggerRepository
             type: $type,
             enabled: $enabled,
             state: $state,
-            settingsJson: MediaServerScanTriggerSettings::fromArray($settings),
+            settings: MediaServerScanTriggerSettings::fromArray($settings),
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);

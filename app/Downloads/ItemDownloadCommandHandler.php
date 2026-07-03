@@ -61,7 +61,7 @@ final readonly class ItemDownloadCommandHandler implements CommandHandler
     {
         $commandId = CommandId::parse((string) $command->id);
         $payload = $this->normalizedPayload($options);
-        $command->optionsJson = json_encode($payload, JSON_THROW_ON_ERROR);
+        $command->options = $payload;
         $command->targetType = 'media_item';
         $command->targetId = $payload['media_item_id'];
         $this->commands->save($command);

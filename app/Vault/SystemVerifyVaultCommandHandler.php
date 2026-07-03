@@ -34,7 +34,7 @@ final readonly class SystemVerifyVaultCommandHandler implements CommandHandler
     {
         $commandId = CommandId::parse((string) $command->id);
         $payload = ['scope' => 'vault'];
-        $command->optionsJson = json_encode($payload, JSON_THROW_ON_ERROR);
+        $command->options = $payload;
         $this->commands->save($command);
 
         return [
