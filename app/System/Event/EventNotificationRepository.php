@@ -121,4 +121,23 @@ final class EventNotificationRepository
 
         return (is_int($sequence) || is_string($sequence)) ? (int) $sequence : 0;
     }
+
+    /**
+     * event_notifications is a short-lived SSE relay, not durable history
+     * (ActivityEventRecord is the durable audit log) -- deleting old rows
+     * here has no bearing on domain state. `changes()` reports the DELETE's
+     * affected-row count without a separate COUNT query first.
+     */
+    public function pruneOlderThan(int $hours): int
+    {
+        new Query(
+            "DELETE FROM event_notifications WHERE createdAt < datetime('now', ?)",
+            ["-{$hours} hours"],
+        )->execute();
+
+        $row = new Query('SELECT changes() AS count')->fetchFirst();
+        $count = is_array($row) ? ($row['count'] ?? null) : null;
+
+        return (is_int($count) || is_string($count)) ? (int) $count : 0;
+    }
 }

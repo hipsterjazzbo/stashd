@@ -190,6 +190,29 @@ test('sse stream resumes from Last-Event-ID instead of replaying already-seen no
     gc_collect_cycles();
 });
 
+test('sse notification pruning deletes only rows past the retention window', function (): void {
+    $repository = $this->container->get(\App\System\Event\EventNotificationRepository::class);
+
+    $old = $repository->publish('job.progress', ['job_id' => 'old']);
+    $recent = $repository->publish('job.progress', ['job_id' => 'recent']);
+
+    new \Tempest\Database\Query(
+        "UPDATE event_notifications SET createdAt = datetime('now', '-2 hours') WHERE id = ?",
+        [(string) $old->id],
+    )->execute();
+
+    $pruned = $repository->pruneOlderThan(1);
+
+    expect($pruned)->toBe(1);
+
+    $remainingIds = array_map(
+        static fn (EventNotificationRecord $record): string => (string) $record->id,
+        EventNotificationRecord::select()->all(),
+    );
+    expect($remainingIds)->not->toContain((string) $old->id)
+        ->and($remainingIds)->toContain((string) $recent->id);
+});
+
 test('sse job failed notifications redact secrets in last_error', function (): void {
     $publisher = $this->container->get(EventPublisher::class);
     $job = JobRecord::select()->first();
