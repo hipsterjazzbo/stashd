@@ -1080,6 +1080,14 @@ function stashDetailComponent(stashId: string) {
 			return this.jobs.find((job) => job.entity_type === 'media_item' && job.entity_id === mediaItemId && job.state === 'processing') ?? null
 		},
 
+		// Same idea as activeJobFor, but for a broadcast rebuild/verify/prune/
+		// trigger/rotate_token job (BroadcastCommandHandler records
+		// entity_type 'broadcast') -- the state badge alone only ever said
+		// "processing" with no sense of what's happening or how far along.
+		activeBroadcastJobFor(broadcastId: string): JobSummary | null {
+			return this.jobs.find((job) => job.entity_type === 'broadcast' && job.entity_id === broadcastId && job.state === 'processing') ?? null
+		},
+
 		// Static -- always shown in the status filter regardless of which
 		// states are present, so the dropdown's option list never shifts out
 		// from under the current selection (a <select> whose selected
