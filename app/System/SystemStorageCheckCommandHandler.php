@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\System;
 
 use App\Commands\CommandHandler;
+use App\Commands\CommandId;
 use App\Commands\CommandRecord;
 use App\Commands\CommandType;
 use App\Jobs\JobIntent;
@@ -29,14 +30,14 @@ final readonly class SystemStorageCheckCommandHandler implements CommandHandler
 
     public function createJobs(CommandRecord $command, array $options): array
     {
-        $commandId = PrefixedUlid::parse((string) $command->id);
+        $commandId = CommandId::parse((string) $command->id);
 
         return [
             $this->jobs->create(
                 intent: JobIntent::StorageCheck,
                 commandId: $commandId,
                 entityType: 'system',
-                entityId: $commandId,
+                entityId: PrefixedUlid::parse($commandId->toString()),
                 payload: $options === [] ? null : $options,
             ),
         ];

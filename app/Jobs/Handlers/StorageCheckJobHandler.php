@@ -14,7 +14,6 @@ use App\Jobs\JobProgressUpdate;
 use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
-use App\Support\PrefixedUlid;
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
 use App\System\Health\HealthService;
@@ -91,6 +90,6 @@ final readonly class StorageCheckJobHandler implements JobHandler
             return null;
         }
 
-        return $this->commands->find(PrefixedUlid::parse($job->commandId));
+        return $this->commands->find($job->commandId);
     }
 }

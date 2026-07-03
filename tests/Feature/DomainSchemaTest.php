@@ -88,7 +88,7 @@ test('job requires a valid command foreign key', function (): void {
 
     expect(fn () => $jobs->create(
         intent: \App\Jobs\JobIntent::Preflight,
-        commandId: \App\Support\PrefixedUlid::parse('cmd_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
+        commandId: \App\Commands\CommandId::parse('cmd_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
     ))->toThrow(\Tempest\Database\Exceptions\QueryWasInvalid::class);
 });
 

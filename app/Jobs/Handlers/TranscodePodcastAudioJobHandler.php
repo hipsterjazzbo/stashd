@@ -149,7 +149,7 @@ final readonly class TranscodePodcastAudioJobHandler implements JobHandler
             throw new RuntimeException('Transcode job is missing commandId.');
         }
 
-        return $this->commands->find(PrefixedUlid::parse($job->commandId))
+        return $this->commands->find($job->commandId)
             ?? throw new RuntimeException('Transcode command not found.');
     }
 }

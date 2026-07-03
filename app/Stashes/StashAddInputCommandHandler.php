@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Stashes;
 
 use App\Commands\CommandHandler;
+use App\Commands\CommandId;
 use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandState;
@@ -46,7 +47,7 @@ final readonly class StashAddInputCommandHandler implements CommandHandler
             throw InvalidCommandPayload::withErrors(['preflight_command_id is required.']);
         }
 
-        $command = $this->commands->find($preflightCommandId);
+        $command = CommandId::isValid($preflightCommandId) ? $this->commands->find(CommandId::parse($preflightCommandId)) : null;
 
         if ($command === null || $command->type !== CommandType::StashPreflight) {
             throw InvalidCommandPayload::withErrors(['Preflight command not found.']);
@@ -81,7 +82,7 @@ final readonly class StashAddInputCommandHandler implements CommandHandler
     {
         $stashId = trim((string) ($options['stashId'] ?? $options['stash_id'] ?? ''));
         $preflightCommandId = trim((string) ($options['preflightCommandId'] ?? $options['preflight_command_id'] ?? ''));
-        $commandId = PrefixedUlid::parse((string) $command->id);
+        $commandId = CommandId::parse((string) $command->id);
         $payload = [
             'stash_id' => $stashId,
             'preflight_command_id' => $preflightCommandId,

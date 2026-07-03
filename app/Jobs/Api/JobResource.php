@@ -25,7 +25,7 @@ final readonly class JobResource implements Arrayable
     {
         return ApiJson::encode([
             'id' => (string) $this->job->id,
-            'commandId' => $this->job->commandId,
+            'commandId' => $this->job->commandId === null ? null : (string) $this->job->commandId,
             'intent' => $this->job->intent->value,
             'entityType' => $this->job->entityType,
             'entityId' => $this->job->entityId,

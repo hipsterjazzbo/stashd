@@ -113,7 +113,7 @@ final readonly class MediaServerJobHandler implements JobHandler
             throw new \RuntimeException('Media server job is missing commandId.');
         }
 
-        return $this->commands->find(PrefixedUlid::parse($job->commandId))
+        return $this->commands->find($job->commandId)
             ?? throw new \RuntimeException('Media server command not found.');
     }
 }

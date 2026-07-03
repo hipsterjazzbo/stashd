@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Vault;
 
 use App\Commands\CommandHandler;
+use App\Commands\CommandId;
 use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandType;
@@ -42,7 +43,7 @@ final readonly class AssetVerifyCommandHandler implements CommandHandler
 
     public function createJobs(CommandRecord $command, array $options): array
     {
-        $commandId = PrefixedUlid::parse((string) $command->id);
+        $commandId = CommandId::parse((string) $command->id);
         $payload = [
             'asset_id' => trim((string) ($options['assetId'] ?? $options['asset_id'] ?? '')),
         ];

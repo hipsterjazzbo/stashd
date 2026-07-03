@@ -14,7 +14,6 @@ use App\Jobs\JobProgressUpdate;
 use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
-use App\Support\PrefixedUlid;
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
 use App\System\State\StateTransitionService;
@@ -86,7 +85,7 @@ final readonly class VerifyVaultJobHandler implements JobHandler
             throw new \RuntimeException('Verify vault job is missing commandId.');
         }
 
-        return $this->commands->find(PrefixedUlid::parse($job->commandId))
+        return $this->commands->find($job->commandId)
             ?? throw new \RuntimeException('Verify vault command not found.');
     }
 }

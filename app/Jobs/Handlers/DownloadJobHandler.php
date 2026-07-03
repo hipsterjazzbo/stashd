@@ -138,7 +138,7 @@ final readonly class DownloadJobHandler implements JobHandler
             throw new \RuntimeException('Download job is missing commandId.');
         }
 
-        return $this->commands->find(PrefixedUlid::parse($job->commandId))
+        return $this->commands->find($job->commandId)
             ?? throw new \RuntimeException('Download command not found.');
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Vault;
 
 use App\Commands\CommandHandler;
+use App\Commands\CommandId;
 use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandType;
@@ -31,7 +32,7 @@ final readonly class SystemVerifyVaultCommandHandler implements CommandHandler
 
     public function createJobs(CommandRecord $command, array $options): array
     {
-        $commandId = PrefixedUlid::parse((string) $command->id);
+        $commandId = CommandId::parse((string) $command->id);
         $payload = ['scope' => 'vault'];
         $command->optionsJson = json_encode($payload, JSON_THROW_ON_ERROR);
         $this->commands->save($command);
@@ -41,7 +42,7 @@ final readonly class SystemVerifyVaultCommandHandler implements CommandHandler
                 intent: JobIntent::VerifyVault,
                 commandId: $commandId,
                 entityType: 'vault',
-                entityId: $commandId,
+                entityId: PrefixedUlid::parse($commandId->toString()),
                 payload: $payload,
             ),
         ];

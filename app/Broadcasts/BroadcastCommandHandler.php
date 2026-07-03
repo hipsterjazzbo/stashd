@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Broadcasts;
 
 use App\Commands\CommandHandler;
+use App\Commands\CommandId;
 use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandType;
@@ -47,7 +48,7 @@ final readonly class BroadcastCommandHandler implements CommandHandler
 
     public function createJobs(CommandRecord $command, array $options): array
     {
-        $commandId = PrefixedUlid::parse((string) $command->id);
+        $commandId = CommandId::parse((string) $command->id);
         $payload = $this->normalizedPayload($options);
         $command->optionsJson = json_encode($payload, JSON_THROW_ON_ERROR);
         $command->targetType = 'broadcast';

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs\Handlers;
 
+use App\Commands\CommandId;
 use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandState;
@@ -59,7 +60,7 @@ final readonly class AddInputJobHandler implements JobHandler
 
         $preflightCommandId = (string) ($payload['preflight_command_id'] ?? '');
         $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
-        $preflightCommand = $this->commands->find($preflightCommandId)
+        $preflightCommand = $this->commands->find(CommandId::parse($preflightCommandId))
             ?? throw new RuntimeException('Preflight command not found.');
         $result = $this->stashFromPreflight->commitInput($stash, $preflightCommand, $options);
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Commands\CommandId;
 use App\Support\DurationSecondsCaster;
 use App\Support\DurationSecondsSerializer;
 use Tempest\Database\IsDatabaseModel;
@@ -22,7 +23,7 @@ final class JobRecord
     public PrimaryKey $id;
 
     public function __construct(
-        public ?string $commandId,
+        public ?CommandId $commandId,
         public JobIntent $intent,
         public ?string $entityType,
         public ?string $entityId,

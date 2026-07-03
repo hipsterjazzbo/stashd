@@ -30,7 +30,7 @@ final readonly class CommandResource implements Arrayable
             'targetId' => $this->command->targetId,
             'options' => $this->decodeJson($this->command->optionsJson),
             'result' => $this->decodeJson($this->command->resultJson),
-            'createdByUserId' => $this->command->createdByUserId,
+            'createdByUserId' => $this->command->createdByUserId === null ? null : (string) $this->command->createdByUserId,
             'createdAt' => $this->command->createdAt,
             'updatedAt' => $this->command->updatedAt,
         ]);

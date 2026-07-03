@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Commands;
 
+use App\Auth\UserId;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
@@ -23,7 +24,7 @@ final class CommandRecord
         public ?string $targetId = null,
         public ?string $optionsJson = null,
         public ?string $resultJson = null,
-        public ?string $createdByUserId = null,
+        public ?UserId $createdByUserId = null,
         public ?DateTime $createdAt = null,
         public ?DateTime $updatedAt = null,
     ) {

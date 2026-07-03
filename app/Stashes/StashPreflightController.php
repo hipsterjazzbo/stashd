@@ -6,13 +6,13 @@ namespace App\Stashes;
 
 use App\Auth\AuthContext;
 use App\Commands\CommandDispatchService;
+use App\Commands\CommandId;
 use App\Commands\CommandRepository;
 use App\Commands\CommandType;
 use App\Commands\InvalidCommandPayload;
 use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
-use App\Support\PrefixedUlid;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
@@ -73,7 +73,7 @@ final readonly class StashPreflightController
     #[Get('/api/v1/stashes/preflight/{commandId}/review')]
     public function review(string $commandId): Json
     {
-        $command = $this->commands->find(PrefixedUlid::parse($commandId));
+        $command = CommandId::isValid($commandId) ? $this->commands->find(CommandId::parse($commandId)) : null;
 
         if ($command === null || $command->type !== CommandType::StashPreflight) {
             return new Json([

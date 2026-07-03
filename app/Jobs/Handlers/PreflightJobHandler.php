@@ -16,7 +16,6 @@ use App\Jobs\JobRecord;
 use App\Jobs\JobRepository;
 use App\Jobs\JobState;
 use App\Stashes\DiscoverStashInput;
-use App\Support\PrefixedUlid;
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
 use App\System\State\StateTransitionService;
@@ -80,7 +79,7 @@ final readonly class PreflightJobHandler implements JobHandler
             throw new \RuntimeException('Preflight job is missing commandId.');
         }
 
-        return $this->commands->find(PrefixedUlid::parse($job->commandId))
+        return $this->commands->find($job->commandId)
             ?? throw new \RuntimeException('Preflight command not found.');
     }
 }

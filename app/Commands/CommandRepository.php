@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Commands;
 
+use App\Auth\UserId;
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
 use InvalidArgumentException;
@@ -27,7 +28,7 @@ final class CommandRepository
         ?string $targetType = null,
         ?PrefixedUlid $targetId = null,
         ?array $options = null,
-        ?PrefixedUlid $createdByUserId = null,
+        ?UserId $createdByUserId = null,
     ): CommandRecord {
         $id = $this->ids->generate('cmd')->toString();
         $record = new CommandRecord(
@@ -36,7 +37,7 @@ final class CommandRepository
             targetType: $targetType,
             targetId: $targetId?->toString(),
             optionsJson: $options === null ? null : json_encode($options, JSON_THROW_ON_ERROR),
-            createdByUserId: $createdByUserId?->toString(),
+            createdByUserId: $createdByUserId,
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);
@@ -49,9 +50,9 @@ final class CommandRepository
             ?? throw new InvalidArgumentException('Failed to persist command record.');
     }
 
-    public function find(string|\Stringable $id): ?CommandRecord
+    public function find(CommandId $id): ?CommandRecord
     {
-        return CommandRecord::findById(new PrimaryKey((string) $id));
+        return CommandRecord::findById(new PrimaryKey($id->toString()));
     }
 
     public function save(CommandRecord $record): CommandRecord

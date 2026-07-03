@@ -7,7 +7,6 @@ namespace App\Jobs;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
 use App\Jobs\Api\JobResource;
-use App\Support\PrefixedUlid;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
 use Tempest\Router\Get;
@@ -36,7 +35,7 @@ final readonly class JobController
     #[Get('/api/v1/jobs/{id}')]
     public function show(string $id): Json
     {
-        $job = $this->jobs->find(PrefixedUlid::parse($id));
+        $job = JobId::isValid($id) ? $this->jobs->find(JobId::parse($id)) : null;
 
         if ($job === null) {
             return new Json([

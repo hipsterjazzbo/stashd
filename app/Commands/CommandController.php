@@ -11,7 +11,6 @@ use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
 use App\Jobs\Api\JobResource;
 use App\Jobs\JobRepository;
-use App\Support\PrefixedUlid;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
@@ -76,7 +75,7 @@ final readonly class CommandController
     #[Get('/api/v1/commands/{id}')]
     public function show(string $id): Json
     {
-        $command = $this->commands->find(PrefixedUlid::parse($id));
+        $command = CommandId::isValid($id) ? $this->commands->find(CommandId::parse($id)) : null;
 
         if ($command === null) {
             return new Json([
@@ -91,7 +90,7 @@ final readonly class CommandController
             'command' => CommandResource::fromRecord($command)->toArray(),
             'jobs' => array_map(
                 static fn ($job): array => JobResource::fromRecord($job)->toArray(),
-                $this->jobs->listForCommand((string) $command->id),
+                $this->jobs->listForCommand(CommandId::parse((string) $command->id)),
             ),
         ]);
     }

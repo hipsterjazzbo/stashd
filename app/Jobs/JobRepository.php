@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Commands\CommandId;
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
 use App\System\State\StateTransitionService;
@@ -25,7 +26,7 @@ final class JobRepository
 
     public function create(
         JobIntent $intent,
-        ?PrefixedUlid $commandId = null,
+        ?CommandId $commandId = null,
         ?string $entityType = null,
         ?PrefixedUlid $entityId = null,
         int $priority = 100,
@@ -33,7 +34,7 @@ final class JobRepository
     ): JobRecord {
         $id = $this->ids->generate('job')->toString();
         $record = new JobRecord(
-            commandId: $commandId?->toString(),
+            commandId: $commandId,
             intent: $intent,
             entityType: $entityType,
             entityId: $entityId?->toString(),
@@ -52,9 +53,9 @@ final class JobRepository
             ?? throw new InvalidArgumentException('Failed to persist job record.');
     }
 
-    public function find(string|\Stringable $id): ?JobRecord
+    public function find(JobId $id): ?JobRecord
     {
-        return JobRecord::findById(new PrimaryKey((string) $id));
+        return JobRecord::findById(new PrimaryKey($id->toString()));
     }
 
     public function save(JobRecord $record): JobRecord
@@ -104,10 +105,10 @@ final class JobRepository
     }
 
     /** @return list<JobRecord> */
-    public function listForCommand(string $commandId): array
+    public function listForCommand(CommandId $commandId): array
     {
         return JobRecord::select()
-            ->where('commandId = ?', $commandId)
+            ->where('commandId = ?', $commandId->toString())
             ->orderBy('createdAt', Direction::ASC)
             ->all();
     }

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Commands;
 
+use App\Auth\UserId;
 use App\Auth\UserRecord;
-use App\Support\PrefixedUlid;
 use App\System\Activity\ActivityEventService;
 use App\System\Event\EventPublisher;
 
@@ -29,7 +29,7 @@ final readonly class CommandDispatchService
             type: $type,
             targetType: $handler->type()->value,
             options: $options,
-            createdByUserId: $user === null ? null : PrefixedUlid::parse((string) $user->id),
+            createdByUserId: $user === null ? null : UserId::parse((string) $user->id),
         );
 
         $this->activity->commandAccepted($command);

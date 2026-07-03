@@ -63,7 +63,7 @@ final readonly class ActivityEventService
             entityType: 'job',
             entityId: (string) $job->id,
             jobId: (string) $job->id,
-            commandId: $job->commandId,
+            commandId: $job->commandId?->toString(),
             groupKey: $job->commandId === null ? 'job:' . (string) $job->id : 'command:' . $job->commandId,
         );
 
@@ -100,7 +100,7 @@ final readonly class ActivityEventService
             entityType: 'job',
             entityId: (string) $job->id,
             jobId: (string) $job->id,
-            commandId: $job->commandId,
+            commandId: $job->commandId?->toString(),
             groupKey: $job->commandId === null ? 'job:' . (string) $job->id : 'command:' . $job->commandId,
         );
 
@@ -118,7 +118,7 @@ final readonly class ActivityEventService
             entityType: 'job',
             entityId: (string) $job->id,
             jobId: (string) $job->id,
-            commandId: $job->commandId,
+            commandId: $job->commandId?->toString(),
             groupKey: $job->commandId === null ? 'job:' . (string) $job->id : 'command:' . $job->commandId,
         );
 
@@ -220,7 +220,7 @@ final readonly class ActivityEventService
             entityType: 'job',
             entityId: (string) $job->id,
             jobId: (string) $job->id,
-            commandId: $job->commandId,
+            commandId: $job->commandId?->toString(),
             groupKey: $job->commandId === null ? 'job:' . (string) $job->id : 'command:' . $job->commandId,
             metadata: ['code' => $code],
         );
@@ -556,7 +556,7 @@ final readonly class ActivityEventService
             entityType: 'job',
             entityId: (string) $job->id,
             jobId: (string) $job->id,
-            commandId: $job->commandId,
+            commandId: $job->commandId?->toString(),
             groupKey: $job->commandId === null ? 'job:' . (string) $job->id : 'command:' . $job->commandId,
             metadata: ['code' => $code],
         );

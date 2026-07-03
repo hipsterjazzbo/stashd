@@ -406,7 +406,7 @@ the live status tracker, so "what's left" never again needs a tour of `docs/plan
   replacing raw `PrefixedUlid`/string at boundaries; pass loaded records instead of IDs where the
   caller already has them, keep raw strings only at HTTP/DB/serialization boundaries. Split by
   domain (auth / stashes-vault / broadcasts / jobs-commands / system-storage-activity) if too large
-  for one pass. **Auth, stashes-vault, and broadcasts domains done; jobs-commands / system-storage-activity
+  for one pass. **Auth, stashes-vault, broadcasts, and jobs-commands domains done; system-storage-activity
   still pending.** Built the shared plumbing all future domains reuse: abstract
   `App\Support\Ids\PrefixedId` (wraps the existing `PrefixedUlid` for prefix/ULID validation instead of
   reimplementing it) plus a single auto-discovered `PrefixedIdCaster`/`PrefixedIdSerializer` pair
@@ -485,10 +485,32 @@ the live status tracker, so "what's left" never again needs a tour of `docs/plan
   Result: only 12 failures on first full-suite run, all clean `TypeError`s from stale `PrefixedUlid`
   parses in test fixtures, no silent-bug hunting needed this time. Added `BroadcastItemTypedIdTest.php`
   (insert → multi-column where-lookup → reload) as the standing regression test for this domain.
+  Jobs-commands domain: added `CommandId`, `JobId`. Converted `JobRecord::$commandId` (a genuine
+  single-entity FK — always references a `CommandRecord` — unlike `JobRecord::$entityId`/
+  `CommandRecord::$targetId`, which stay generic `PrefixedUlid`/string on purpose: they're deliberately
+  polymorphic, paired with an `$entityType`/`$targetType` column, so the entity type isn't known at the
+  property level the way it is for `$commandId`). Also converted `CommandRecord::$createdByUserId` by
+  reusing `App\Auth\UserId` from the very first slice — a nice case of an FK belonging to one domain
+  (jobs-commands) pointing at an entity from another (auth), which the shared `PrefixedId` plumbing
+  handles without any special-casing. Two command handlers (`StashPreflightCommandHandler`,
+  `SystemStorageCheckCommandHandler`, `SystemVerifyVaultCommandHandler`) reuse the same generated
+  `CommandId` as both `commandId:` and a job's polymorphic `entityId:` — since `CommandId` and the generic
+  `PrefixedUlid` are different classes (by design — `CommandId` is prefix-specific, `PrefixedUlid` isn't),
+  passing one where the other is expected is a real type mismatch, not just a style choice; fixed by
+  re-wrapping with `PrefixedUlid::parse($commandId->toString())` at the `entityId:` boundary specifically,
+  leaving `commandId:` typed. Found two more `#[Hidden]`-slice-style Resource leaks proactively
+  (`CommandResource::$createdByUserId`, `JobResource::$commandId`) before running the suite, plus the
+  `PrefixedUlid`-vs-`CommandId` mismatch above via `composer test:static` run project-wide immediately
+  after the record conversion — only 2 failures on the first full-suite run, both stale test fixtures.
+  Added `JobCommandTypedIdTest.php` (insert → where-lookup via `listForCommand` → reload) as the standing
+  regression test.
   `docs/plans/stronger-record-types.md`'s Entity Identity References prompt has the domain breakdown and
-  the full ID-class inventory for the remaining domains (jobs-commands: `CommandId`, `JobId`;
-  system-storage-activity: `SecretId`, `StorageLocationId`, `StorageCheckId`, `MediaServerConnectionId`,
-  `ActivityEventId`, `EventNotificationId`).
+  the full ID-class inventory for the remaining domain (system-storage-activity: `SecretId`,
+  `StorageLocationId`, `StorageCheckId`, `MediaServerConnectionId`, `ActivityEventId`,
+  `EventNotificationId` — the last two are worth reconsidering when that slice starts, since
+  `ActivityEventRecord`'s own `$stashId`/`$mediaItemId`/`$broadcastId`/`$commandId`/`$jobId` columns are
+  deliberately generic tag columns shared across many unrelated activity types, not single-entity FKs,
+  which is a different shape than every domain converted so far).
 - [ ] URL & Filesystem Path Values — rename `StashdUri` → `StashdUrl`, move `fake://` support out of
   production URL handling into fake-provider-only URL classes, add YouTube-specific URL classes
   (`YouTubeChannelUrl`/`YouTubeVideoUrl`/`YouTubePlaylistUrl`) behind a marshaller, and introduce

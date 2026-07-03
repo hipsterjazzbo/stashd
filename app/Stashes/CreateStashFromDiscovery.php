@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Stashes;
 
 use App\Commands\CommandDispatchService;
+use App\Commands\CommandId;
 use App\Commands\CommandRecord;
 use App\Commands\CommandRepository;
 use App\Commands\CommandState;
@@ -261,7 +262,7 @@ final readonly class CreateStashFromDiscovery
 
     private function requireCompletedPreflight(CommandRecord $preflightCommand): CommandRecord
     {
-        $command = $this->commands->find((string) $preflightCommand->id);
+        $command = $this->commands->find(CommandId::parse((string) $preflightCommand->id));
 
         if ($command === null || $command->type !== CommandType::StashPreflight) {
             throw new InvalidArgumentException('Preflight command not found.');

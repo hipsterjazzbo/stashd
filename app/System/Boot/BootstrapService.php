@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\System\Boot;
 
+use App\Commands\CommandId;
 use App\Commands\CommandRepository;
 use App\Commands\CommandType;
 use App\Jobs\JobIntent;
 use App\Jobs\JobRepository;
-use App\Support\PrefixedUlid;
 use App\System\Storage\StorageCapabilityChecker;
 use App\System\Storage\StorageRootService;
 use Tempest\Database\Config\SQLiteConfig;
@@ -36,7 +36,7 @@ final readonly class BootstrapService
         $command = $this->commands->create(CommandType::SystemBoot);
         $job = $this->jobs->create(
             intent: JobIntent::Boot,
-            commandId: PrefixedUlid::parse((string) $command->id),
+            commandId: CommandId::parse((string) $command->id),
             entityType: 'system',
             payload: ['phase' => 'boot'],
         );
