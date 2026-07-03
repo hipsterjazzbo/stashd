@@ -7,6 +7,8 @@ namespace App\Broadcasts\Plugins;
 use App\Broadcasts\BroadcastContext;
 use App\Broadcasts\BroadcastContextFactory;
 use App\Broadcasts\BroadcastFilenameBuilder;
+use App\Broadcasts\BroadcastId;
+use App\Broadcasts\BroadcastItemId;
 use App\Broadcasts\BroadcastItemRepository;
 use App\Broadcasts\BroadcastItemState;
 use App\Broadcasts\BroadcastNfoBuilder;
@@ -22,6 +24,7 @@ use App\Broadcasts\BroadcastSidecarWriter;
 use App\Broadcasts\BroadcastVerifyResult;
 use App\Broadcasts\FileKind;
 use App\Broadcasts\HardlinkPublisher;
+use App\Stashes\StashItemId;
 use App\System\State\StateTransitionService;
 use App\Vault\AssetId;
 use App\Vault\AssetKind;
@@ -175,15 +178,15 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
 
         foreach ($plan->files as $planned) {
             $item = $this->broadcastItems->findByBroadcastAndStashItem(
-                $broadcastId,
-                $planned->stashItemId,
+                BroadcastId::parse($broadcastId),
+                StashItemId::parse($planned->stashItemId),
             );
 
             if ($item === null) {
                 $item = $this->broadcastItems->create(
-                    broadcastId: $broadcastId,
-                    stashItemId: $planned->stashItemId,
-                    mediaItemId: $planned->mediaItemId,
+                    broadcastId: BroadcastId::parse($broadcastId),
+                    stashItemId: StashItemId::parse($planned->stashItemId),
+                    mediaItemId: MediaItemId::parse($planned->mediaItemId),
                 );
             }
 
@@ -257,8 +260,8 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
             $plannedByStashItem[$file->stashItemId] = $file;
         }
 
-        foreach ($this->broadcastItems->listForBroadcast($broadcastId) as $item) {
-            $planned = $plannedByStashItem[$item->stashItemId] ?? null;
+        foreach ($this->broadcastItems->listForBroadcast(BroadcastId::parse($broadcastId)) as $item) {
+            $planned = $plannedByStashItem[(string) $item->stashItemId] ?? null;
 
             if ($planned === null) {
                 if ($item->publishedPath !== null && is_file($item->publishedPath)) {
@@ -446,8 +449,8 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
                 relativePath: $relativePath,
                 sizeBytes: is_int($sizeBytes) ? $sizeBytes : null,
             );
-            $asset->broadcastId = $broadcastId;
-            $asset->broadcastItemId = $broadcastItemId;
+            $asset->broadcastId = BroadcastId::parse($broadcastId);
+            $asset->broadcastItemId = BroadcastItemId::parse($broadcastItemId);
             $asset->derivedFromAssetId = AssetId::parse($sourceAssetId);
             $this->assets->save($asset);
 

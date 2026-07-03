@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
+use App\Stashes\StashId;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
@@ -18,7 +19,7 @@ final class BroadcastRecord
     public PrimaryKey $id;
 
     public function __construct(
-        public string $stashId,
+        public StashId $stashId,
         public string $type,
         public string $name,
         public string $slug,

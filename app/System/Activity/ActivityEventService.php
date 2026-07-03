@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\System\Activity;
 
+use App\Broadcasts\BroadcastId;
 use App\Commands\CommandRecord;
 use App\Jobs\JobRecord;
 use App\Stashes\StashRecord;
@@ -253,7 +254,7 @@ final readonly class ActivityEventService
     public function broadcastPlanned(
         CommandRecord $command,
         JobRecord $job,
-        PrefixedUlid $broadcastId,
+        BroadcastId $broadcastId,
         array $plan,
     ): ActivityEventRecord {
         $record = $this->events->create(
@@ -276,7 +277,7 @@ final readonly class ActivityEventService
     public function broadcastRebuildStarted(
         CommandRecord $command,
         JobRecord $job,
-        PrefixedUlid $broadcastId,
+        BroadcastId $broadcastId,
     ): ActivityEventRecord {
         $record = $this->events->create(
             level: ActivityLevel::Info,
@@ -298,7 +299,7 @@ final readonly class ActivityEventService
     public function broadcastPublished(
         CommandRecord $command,
         JobRecord $job,
-        PrefixedUlid $broadcastId,
+        BroadcastId $broadcastId,
         array $publish,
     ): ActivityEventRecord {
         $record = $this->events->create(
@@ -322,7 +323,7 @@ final readonly class ActivityEventService
     public function broadcastVerified(
         CommandRecord $command,
         JobRecord $job,
-        PrefixedUlid $broadcastId,
+        BroadcastId $broadcastId,
         array $verify,
     ): ActivityEventRecord {
         $record = $this->events->create(
@@ -351,7 +352,7 @@ final readonly class ActivityEventService
     public function broadcastStale(
         CommandRecord $command,
         JobRecord $job,
-        PrefixedUlid $broadcastId,
+        BroadcastId $broadcastId,
         array $verify,
     ): ActivityEventRecord {
         $record = $this->events->create(
@@ -376,7 +377,7 @@ final readonly class ActivityEventService
     public function broadcastFailed(
         CommandRecord $command,
         JobRecord $job,
-        PrefixedUlid $broadcastId,
+        BroadcastId $broadcastId,
         string $code,
         string $error,
     ): ActivityEventRecord {
@@ -401,7 +402,7 @@ final readonly class ActivityEventService
     public function broadcastTokenRotated(
         CommandRecord $command,
         JobRecord $job,
-        PrefixedUlid $broadcastId,
+        BroadcastId $broadcastId,
         array $result,
     ): ActivityEventRecord {
         $record = $this->events->create(
@@ -428,7 +429,7 @@ final readonly class ActivityEventService
     public function broadcastPruned(
         CommandRecord $command,
         JobRecord $job,
-        PrefixedUlid $broadcastId,
+        BroadcastId $broadcastId,
         array $prune,
     ): ActivityEventRecord {
         $record = $this->events->create(
@@ -476,7 +477,7 @@ final readonly class ActivityEventService
     public function broadcastTriggerSucceeded(
         CommandRecord $command,
         JobRecord $job,
-        PrefixedUlid $broadcastId,
+        BroadcastId $broadcastId,
         array $trigger,
     ): ActivityEventRecord {
         $record = $this->events->create(
@@ -502,7 +503,7 @@ final readonly class ActivityEventService
     public function broadcastTriggerFailed(
         CommandRecord $command,
         JobRecord $job,
-        PrefixedUlid $broadcastId,
+        BroadcastId $broadcastId,
         array $trigger,
     ): ActivityEventRecord {
         $record = $this->events->create(

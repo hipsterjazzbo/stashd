@@ -98,16 +98,16 @@ test('broadcast belongs to stash via foreign key', function (): void {
 
     $stash = $stashes->create('Broadcast Stash', 'broadcast-stash');
     $broadcast = $broadcasts->create(
-        stashId: \App\Support\PrefixedUlid::parse((string) $stash->id),
+        stashId: \App\Stashes\StashId::parse((string) $stash->id),
         type: 'podcast',
         name: 'Podcast',
         slug: 'podcast',
     );
 
-    expect($broadcast->stashId)->toBe((string) $stash->id);
+    expect((string) $broadcast->stashId)->toBe((string) $stash->id);
 
     expect(fn () => $broadcasts->create(
-        stashId: \App\Support\PrefixedUlid::parse('stash_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
+        stashId: \App\Stashes\StashId::parse('stash_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
         type: 'podcast',
         name: 'Orphan',
         slug: 'orphan',
@@ -149,7 +149,7 @@ test('repository smoke creates stash with input media item stash item and broadc
     );
 
     $broadcast = $broadcasts->create(
-        stashId: \App\Support\PrefixedUlid::parse($stashId->toString()),
+        stashId: $stashId,
         type: 'jellyfin',
         name: 'Demo Series',
         slug: 'demo-series',
@@ -161,7 +161,7 @@ test('repository smoke creates stash with input media item stash item and broadc
         ->and(StashItemRecord::findById($stashItem->id))->not->toBeNull()
         ->and(BroadcastRecord::findById($broadcast->id))->not->toBeNull()
         ->and((string) $stashItem->stashId)->toBe((string) $stash->id)
-        ->and($broadcast->stashId)->toBe((string) $stash->id);
+        ->and((string) $broadcast->stashId)->toBe((string) $stash->id);
 });
 
 function schemaTableExists(Database $database, string $table): bool

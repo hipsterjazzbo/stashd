@@ -7,6 +7,7 @@ namespace App\Broadcasts\Plugins;
 use App\Broadcasts\BroadcastContext;
 use App\Broadcasts\BroadcastContextFactory;
 use App\Broadcasts\BroadcastException;
+use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastItemRecord;
 use App\Broadcasts\BroadcastItemRepository;
 use App\Broadcasts\BroadcastItemState;
@@ -26,6 +27,7 @@ use App\Broadcasts\Podcasts\PodcastMediaKind;
 use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Broadcasts\StashdBroadcast;
 use App\Broadcasts\UiControl;
+use App\Stashes\StashItemId;
 use App\Stashes\StashItemState;
 use App\System\State\StateTransitionService;
 use App\Vault\MediaItemId;
@@ -164,8 +166,8 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
             }
 
             $item = $this->broadcastItems->findByBroadcastAndStashItem(
-                (string) $context->broadcast->id,
-                (string) $stashItem->id,
+                BroadcastId::parse((string) $context->broadcast->id),
+                StashItemId::parse((string) $stashItem->id),
             );
 
             if ($item === null) {
@@ -230,13 +232,13 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
     {
         $broadcastId = (string) $context->broadcast->id;
         $item = $this->broadcastItems->findByBroadcastAndStashItem(
-            $broadcastId,
-            (string) $stashItem->id,
+            BroadcastId::parse($broadcastId),
+            StashItemId::parse((string) $stashItem->id),
         );
 
         return $item ?? $this->broadcastItems->create(
-            broadcastId: $broadcastId,
-            stashItemId: (string) $stashItem->id,
+            broadcastId: BroadcastId::parse($broadcastId),
+            stashItemId: StashItemId::parse((string) $stashItem->id),
             mediaItemId: $stashItem->mediaItemId,
         );
     }

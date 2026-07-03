@@ -17,7 +17,6 @@ use App\Stashes\StashId;
 use App\Stashes\StashInputRepository;
 use App\Stashes\StashRecord;
 use App\Stashes\StashRepository;
-use App\Support\PrefixedUlid;
 use App\System\Storage\PathSanitizer;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
@@ -69,7 +68,7 @@ final readonly class BroadcastController
         return new Json([
             'broadcasts' => array_map(
                 fn ($broadcast): array => $this->mapBroadcast($broadcast),
-                $this->broadcasts->listForStash(PrefixedUlid::parse($stashId)),
+                $this->broadcasts->listForStash(StashId::parse($stashId)),
             ),
         ]);
     }
@@ -120,9 +119,9 @@ final readonly class BroadcastController
             ], Status::BAD_REQUEST);
         }
 
-        $stashUlid = PrefixedUlid::parse($stashId);
+        $typedStashId = StashId::parse($stashId);
 
-        if ($this->broadcasts->findByStashAndSlug($stashUlid, $slug) !== null) {
+        if ($this->broadcasts->findByStashAndSlug($typedStashId, $slug) !== null) {
             return new Json([
                 'error' => [
                     'code' => 'validation_error',
@@ -134,7 +133,7 @@ final readonly class BroadcastController
         $settings = is_array($body['settings'] ?? null) ? ApiJson::encode($body['settings']) : null;
 
         $broadcast = $this->broadcasts->create(
-            stashId: $stashUlid,
+            stashId: $typedStashId,
             type: $typeRaw,
             name: $name,
             slug: $slug,
@@ -150,7 +149,7 @@ final readonly class BroadcastController
     #[Get('/api/v1/broadcasts/{id}')]
     public function show(string $id): Json
     {
-        $broadcast = $this->broadcasts->find(PrefixedUlid::parse($id));
+        $broadcast = $this->findBroadcast($id);
 
         if ($broadcast === null) {
             return $this->notFound('Broadcast not found.');
@@ -164,7 +163,7 @@ final readonly class BroadcastController
     #[Get('/api/v1/broadcasts/{id}/items')]
     public function items(string $id): Json
     {
-        $broadcast = $this->broadcasts->find(PrefixedUlid::parse($id));
+        $broadcast = $this->findBroadcast($id);
 
         if ($broadcast === null) {
             return $this->notFound('Broadcast not found.');
@@ -173,7 +172,7 @@ final readonly class BroadcastController
         return new Json([
             'items' => array_map(
                 static fn ($item): array => BroadcastItemResource::fromRecord($item)->toArray(),
-                $this->broadcastItems->listForBroadcast(PrefixedUlid::parse($id)),
+                $this->broadcastItems->listForBroadcast(BroadcastId::parse($id)),
             ),
         ]);
     }
@@ -181,7 +180,7 @@ final readonly class BroadcastController
     #[Patch('/api/v1/broadcasts/{id}/season-mapping')]
     public function updateSeasonMapping(string $id, Request $request): Json
     {
-        $broadcast = $this->broadcasts->find(PrefixedUlid::parse($id));
+        $broadcast = $this->findBroadcast($id);
 
         if ($broadcast === null) {
             return $this->notFound('Broadcast not found.');
@@ -202,7 +201,7 @@ final readonly class BroadcastController
 
         $validInputIds = array_map(
             static fn ($input): string => (string) $input->id,
-            $this->stashInputs->listForStash(StashId::parse($broadcast->stashId)),
+            $this->stashInputs->listForStash($broadcast->stashId),
         );
 
         $mapping = [];
@@ -302,6 +301,11 @@ final readonly class BroadcastController
     private function findStash(string $id): ?StashRecord
     {
         return StashId::isValid($id) ? $this->stashes->find(StashId::parse($id)) : null;
+    }
+
+    private function findBroadcast(string $id): ?BroadcastRecord
+    {
+        return BroadcastId::isValid($id) ? $this->broadcasts->find(BroadcastId::parse($id)) : null;
     }
 
     private function notFound(string $message): Json

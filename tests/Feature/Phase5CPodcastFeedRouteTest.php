@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastRepository;
 use App\Config\StashdConfig;
 use App\Stashes\StashItemRecord;
 use App\Stashes\StashItemState;
-use App\Support\PrefixedUlid;
 use App\System\Secret\SecretRepository;
 use App\System\Secret\SecretsService;
 use App\System\Secret\SecretType;
@@ -140,7 +140,7 @@ test('a feed token bound to a non-podcast broadcast does not return a feed', fun
     $secret = $this->container->get(SecretRepository::class)->findByKey('test.route_nonpodcast_feed');
 
     $broadcasts = $this->container->get(BroadcastRepository::class);
-    $broadcast = $broadcasts->find(PrefixedUlid::parse($broadcastId));
+    $broadcast = $broadcasts->find(BroadcastId::parse($broadcastId));
     $broadcast->tokenSecretId = (string) $secret->id;
     $broadcasts->save($broadcast);
 

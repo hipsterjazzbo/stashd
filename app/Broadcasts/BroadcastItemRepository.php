@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
+use App\Stashes\StashItemId;
 use App\Support\PrefixedUlidGenerator;
+use App\Vault\MediaItemId;
 use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
 
@@ -21,16 +23,16 @@ final class BroadcastItemRepository
     }
 
     public function create(
-        string|\Stringable $broadcastId,
-        string|\Stringable $stashItemId,
-        string|\Stringable $mediaItemId,
+        BroadcastId $broadcastId,
+        StashItemId $stashItemId,
+        MediaItemId $mediaItemId,
         BroadcastItemState $state = BroadcastItemState::Pending,
     ): BroadcastItemRecord {
         $id = $this->ids->generate('bitem')->toString();
         $record = new BroadcastItemRecord(
-            broadcastId: (string) $broadcastId,
-            stashItemId: (string) $stashItemId,
-            mediaItemId: (string) $mediaItemId,
+            broadcastId: $broadcastId,
+            stashItemId: $stashItemId,
+            mediaItemId: $mediaItemId,
             state: $state,
         );
         $record->id = new PrimaryKey($id);
@@ -46,11 +48,11 @@ final class BroadcastItemRepository
             ?? throw new InvalidArgumentException('Failed to persist broadcast item record.');
     }
 
-    public function find(string|\Stringable $id): ?BroadcastItemRecord
+    public function find(BroadcastItemId $id): ?BroadcastItemRecord
     {
         return BroadcastItemRecord::select()
             ->include('tokenSecretId')
-            ->get(new PrimaryKey((string) $id));
+            ->get(new PrimaryKey($id->toString()));
     }
 
     public function save(BroadcastItemRecord $record): BroadcastItemRecord
@@ -62,30 +64,30 @@ final class BroadcastItemRepository
     }
 
     /** @return list<BroadcastItemRecord> */
-    public function listForBroadcast(string|\Stringable $broadcastId): array
+    public function listForBroadcast(BroadcastId $broadcastId): array
     {
         return BroadcastItemRecord::select()
             ->include('tokenSecretId')
-            ->where('broadcastId = ?', (string) $broadcastId)
+            ->where('broadcastId = ?', $broadcastId->toString())
             ->orderBy('createdAt', \Tempest\Database\Direction::ASC)
             ->all();
     }
 
     public function findByBroadcastAndStashItem(
-        string|\Stringable $broadcastId,
-        string|\Stringable $stashItemId,
+        BroadcastId $broadcastId,
+        StashItemId $stashItemId,
     ): ?BroadcastItemRecord {
         return BroadcastItemRecord::select()
             ->include('tokenSecretId')
-            ->where('broadcastId = ? AND stashItemId = ?', (string) $broadcastId, (string) $stashItemId)
+            ->where('broadcastId = ? AND stashItemId = ?', $broadcastId->toString(), $stashItemId->toString())
             ->first();
     }
 
     /** @return list<BroadcastItemRecord> */
-    public function listForMediaItem(string|\Stringable $mediaItemId): array
+    public function listForMediaItem(MediaItemId $mediaItemId): array
     {
         return BroadcastItemRecord::select()
-            ->where('mediaItemId = ?', (string) $mediaItemId)
+            ->where('mediaItemId = ?', $mediaItemId->toString())
             ->all();
     }
 }

@@ -4,17 +4,19 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastItemRecord;
 use App\Broadcasts\BroadcastItemRepository;
 use App\Broadcasts\BroadcastRepository;
 use App\Broadcasts\Podcasts\PodcastTokenService;
+use App\Stashes\StashItemId;
 use App\Stashes\StashItemRecord;
-use App\Support\PrefixedUlid;
 use App\System\Activity\ActivityEventRecord;
 use App\System\Secret\SecretRecord;
 use App\System\Secret\SecretRepository;
 use App\System\Secret\SecretsService;
 use App\System\Secret\SecretType;
+use App\Vault\MediaItemId;
 use Tempest\Database\Database;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Query;
@@ -38,9 +40,9 @@ test('broadcast item record maps podcast token columns', function (): void {
 
     $stashItem = StashItemRecord::select()->where('stashId = ?', $stashId)->first();
     $item = $this->container->get(BroadcastItemRepository::class)->create(
-        broadcastId: PrefixedUlid::parse($broadcast->body['broadcast']['id']),
-        stashItemId: PrefixedUlid::parse((string) $stashItem->id),
-        mediaItemId: PrefixedUlid::parse($mediaItemId),
+        broadcastId: BroadcastId::parse($broadcast->body['broadcast']['id']),
+        stashItemId: StashItemId::parse((string) $stashItem->id),
+        mediaItemId: MediaItemId::parse($mediaItemId),
     );
     $this->container->get(SecretsService::class)->put(
         'test.broadcast_item_record_token',
@@ -94,7 +96,7 @@ test('podcast broadcast token is encrypted and reconstructed after database relo
     $feedUrl = $create->body['broadcast']['feed_url'];
     $token = podcastTokenFromFeedUrl($feedUrl);
     $broadcast = $this->container->get(BroadcastRepository::class)
-        ->find(PrefixedUlid::parse($create->body['broadcast']['id']));
+        ->find(BroadcastId::parse($create->body['broadcast']['id']));
     $secret = SecretRecord::select()
         ->include('encryptedValue')
         ->get(new PrimaryKey((string) $broadcast->tokenSecretId));
@@ -119,9 +121,9 @@ test('podcast item token is generated and stored encrypted', function (): void {
 
     $stashItem = StashItemRecord::select()->where('stashId = ?', $stashId)->first();
     $item = $this->container->get(BroadcastItemRepository::class)->create(
-        broadcastId: PrefixedUlid::parse($broadcast->body['broadcast']['id']),
-        stashItemId: PrefixedUlid::parse((string) $stashItem->id),
-        mediaItemId: PrefixedUlid::parse($mediaItemId),
+        broadcastId: BroadcastId::parse($broadcast->body['broadcast']['id']),
+        stashItemId: StashItemId::parse((string) $stashItem->id),
+        mediaItemId: MediaItemId::parse($mediaItemId),
     );
 
     $token = $this->container->get(PodcastTokenService::class)->ensureItemToken($item);
@@ -149,7 +151,7 @@ test('broadcast rotate token changes feed url and stores only safe command metad
     $oldUrl = $broadcast->body['broadcast']['feed_url'];
     $oldToken = podcastTokenFromFeedUrl($oldUrl);
     $oldRecord = $this->container->get(BroadcastRepository::class)
-        ->find(PrefixedUlid::parse($broadcast->body['broadcast']['id']));
+        ->find(BroadcastId::parse($broadcast->body['broadcast']['id']));
     $oldSecretId = $oldRecord->tokenSecretId;
 
     $rotate = $this->http->post('/api/v1/commands', [

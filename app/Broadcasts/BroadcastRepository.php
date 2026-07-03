@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
-use App\Support\PrefixedUlid;
+use App\Stashes\StashId;
 use App\Support\PrefixedUlidGenerator;
 use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
@@ -22,7 +22,7 @@ final class BroadcastRepository
     }
 
     public function create(
-        PrefixedUlid $stashId,
+        StashId $stashId,
         string $type,
         string $name,
         string $slug,
@@ -31,7 +31,7 @@ final class BroadcastRepository
     ): BroadcastRecord {
         $id = $this->ids->generate('broadcast')->toString();
         $record = new BroadcastRecord(
-            stashId: $stashId->toString(),
+            stashId: $stashId,
             type: $type,
             name: $name,
             slug: $slug,
@@ -51,7 +51,7 @@ final class BroadcastRepository
             ?? throw new InvalidArgumentException('Failed to persist broadcast record.');
     }
 
-    public function find(PrefixedUlid $id): ?BroadcastRecord
+    public function find(BroadcastId $id): ?BroadcastRecord
     {
         return BroadcastRecord::select()
             ->include('tokenSecretId')
@@ -67,7 +67,7 @@ final class BroadcastRepository
     }
 
     /** @return list<BroadcastRecord> */
-    public function listForStash(PrefixedUlid $stashId): array
+    public function listForStash(StashId $stashId): array
     {
         return BroadcastRecord::select()
             ->include('tokenSecretId')
@@ -76,7 +76,7 @@ final class BroadcastRepository
             ->all();
     }
 
-    public function findByStashAndSlug(PrefixedUlid $stashId, string $slug): ?BroadcastRecord
+    public function findByStashAndSlug(StashId $stashId, string $slug): ?BroadcastRecord
     {
         return BroadcastRecord::select()
             ->where('stashId = ? AND slug = ?', $stashId->toString(), $slug)

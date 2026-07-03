@@ -17,7 +17,7 @@ final class BroadcastTriggerRecord
     public PrimaryKey $id;
 
     public function __construct(
-        public string $broadcastId,
+        public BroadcastId $broadcastId,
         public BroadcastTriggerType $type,
         public bool $enabled,
         public BroadcastTriggerState $state,

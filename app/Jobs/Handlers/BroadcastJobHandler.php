@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs\Handlers;
 
 use App\Broadcasts\BroadcastException;
+use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastLifecycleService;
 use App\Broadcasts\BroadcastRepository;
 use App\Broadcasts\BroadcastState;
@@ -53,7 +54,7 @@ final readonly class BroadcastJobHandler implements JobHandler
             ? []
             : json_decode($job->payloadJson, true, flags: JSON_THROW_ON_ERROR);
 
-        $broadcastId = PrefixedUlid::parse((string) ($payload['broadcast_id'] ?? ''));
+        $broadcastId = BroadcastId::parse((string) ($payload['broadcast_id'] ?? ''));
         $action = (string) ($payload['action'] ?? 'rebuild');
 
         $broadcast = $this->broadcasts->find($broadcastId);
@@ -111,7 +112,7 @@ final readonly class BroadcastJobHandler implements JobHandler
         CommandRecord $command,
         JobRecord $job,
         JobHandlerContext $context,
-        PrefixedUlid $broadcastId,
+        BroadcastId $broadcastId,
     ): array {
         $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Planning broadcast'));
         $plan = $this->lifecycle->plan($broadcastId);
@@ -126,7 +127,7 @@ final readonly class BroadcastJobHandler implements JobHandler
         CommandRecord $command,
         JobRecord $job,
         JobHandlerContext $context,
-        PrefixedUlid $broadcastId,
+        BroadcastId $broadcastId,
     ): array {
         $context->progress($job, JobProgressUpdate::ofSteps(1, 4, 'Planning broadcast rebuild'));
         $this->activity->broadcastRebuildStarted($command, $job, $broadcastId);
@@ -155,7 +156,7 @@ final readonly class BroadcastJobHandler implements JobHandler
         CommandRecord $command,
         JobRecord $job,
         JobHandlerContext $context,
-        PrefixedUlid $broadcastId,
+        BroadcastId $broadcastId,
     ): array {
         $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Triggering media server scan'));
         $trigger = $this->lifecycle->trigger($broadcastId);
@@ -169,7 +170,7 @@ final readonly class BroadcastJobHandler implements JobHandler
     private function recordTriggerActivity(
         CommandRecord $command,
         JobRecord $job,
-        PrefixedUlid $broadcastId,
+        BroadcastId $broadcastId,
         array $trigger,
     ): void {
         if (($trigger['failure_count'] ?? 0) > 0) {
@@ -184,7 +185,7 @@ final readonly class BroadcastJobHandler implements JobHandler
         CommandRecord $command,
         JobRecord $job,
         JobHandlerContext $context,
-        PrefixedUlid $broadcastId,
+        BroadcastId $broadcastId,
     ): array {
         $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Rotating podcast token'));
         $result = $this->lifecycle->rotateToken($broadcastId);
@@ -199,7 +200,7 @@ final readonly class BroadcastJobHandler implements JobHandler
         CommandRecord $command,
         JobRecord $job,
         JobHandlerContext $context,
-        PrefixedUlid $broadcastId,
+        BroadcastId $broadcastId,
     ): array {
         $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Verifying broadcast'));
         $verify = $this->lifecycle->verify($broadcastId);
@@ -219,7 +220,7 @@ final readonly class BroadcastJobHandler implements JobHandler
         CommandRecord $command,
         JobRecord $job,
         JobHandlerContext $context,
-        PrefixedUlid $broadcastId,
+        BroadcastId $broadcastId,
     ): array {
         $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Pruning stale broadcast files'));
         $prune = $this->lifecycle->prune($broadcastId);

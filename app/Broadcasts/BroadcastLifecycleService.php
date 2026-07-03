@@ -6,7 +6,6 @@ namespace App\Broadcasts;
 
 use App\Broadcasts\Podcasts\PodcastTokenRotationResult;
 use App\Broadcasts\Podcasts\PodcastTokenService;
-use App\Support\PrefixedUlid;
 use App\System\State\StateTransitionService;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
@@ -48,7 +47,7 @@ final readonly class BroadcastLifecycleService
     ) {
     }
 
-    public function plan(PrefixedUlid $broadcastId): BroadcastPlan
+    public function plan(BroadcastId $broadcastId): BroadcastPlan
     {
         $broadcast = $this->broadcasts->find($broadcastId)
             ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
@@ -60,7 +59,7 @@ final readonly class BroadcastLifecycleService
         return $plan;
     }
 
-    public function rebuild(PrefixedUlid $broadcastId): BroadcastLifecycleResult
+    public function rebuild(BroadcastId $broadcastId): BroadcastLifecycleResult
     {
         $broadcast = $this->broadcasts->find($broadcastId)
             ?? throw \App\Broadcasts\BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
@@ -95,7 +94,7 @@ final readonly class BroadcastLifecycleService
         );
     }
 
-    public function verify(PrefixedUlid $broadcastId): BroadcastVerifyResult
+    public function verify(BroadcastId $broadcastId): BroadcastVerifyResult
     {
         $broadcast = $this->broadcasts->find($broadcastId)
             ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
@@ -108,7 +107,7 @@ final readonly class BroadcastLifecycleService
         return $verify;
     }
 
-    public function prune(PrefixedUlid $broadcastId): BroadcastPruneResult
+    public function prune(BroadcastId $broadcastId): BroadcastPruneResult
     {
         $broadcast = $this->broadcasts->find($broadcastId)
             ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
@@ -119,7 +118,7 @@ final readonly class BroadcastLifecycleService
         return $plugin->plugin->prune($context);
     }
 
-    public function trigger(PrefixedUlid $broadcastId): BroadcastTriggerResult
+    public function trigger(BroadcastId $broadcastId): BroadcastTriggerResult
     {
         $broadcast = $this->broadcasts->find($broadcastId)
             ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
@@ -127,7 +126,7 @@ final readonly class BroadcastLifecycleService
         return $this->triggers->execute($broadcast, 'manual');
     }
 
-    public function rotateToken(PrefixedUlid $broadcastId): PodcastTokenRotationResult
+    public function rotateToken(BroadcastId $broadcastId): PodcastTokenRotationResult
     {
         $broadcast = $this->broadcasts->find($broadcastId)
             ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');

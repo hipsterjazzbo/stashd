@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Broadcasts\Podcasts;
 
+use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastItemRecord;
 use App\Broadcasts\BroadcastItemRepository;
 use App\Broadcasts\BroadcastRecord;
@@ -108,7 +109,7 @@ final readonly class PodcastTokenService
             return null;
         }
 
-        foreach ($this->broadcastItems->listForBroadcast(PrefixedUlid::parse((string) $broadcast->id)) as $item) {
+        foreach ($this->broadcastItems->listForBroadcast(BroadcastId::parse((string) $broadcast->id)) as $item) {
             $candidate = $this->itemToken($item);
 
             if ($candidate !== null && hash_equals($candidate, $itemToken)) {
@@ -168,7 +169,7 @@ final readonly class PodcastTokenService
         $key = sprintf('podcast:broadcast_item:%s:episode:%s', (string) $item->id, bin2hex(random_bytes(6)));
         $this->secrets->put($key, SecretType::BroadcastToken, $token, [
             'scope' => 'podcast_episode',
-            'broadcast_id' => $item->broadcastId,
+            'broadcast_id' => (string) $item->broadcastId,
             'broadcast_item_id' => (string) $item->id,
         ]);
 

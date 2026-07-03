@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
+use App\Stashes\StashItemId;
+use App\Vault\MediaItemId;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
@@ -18,9 +20,9 @@ final class BroadcastItemRecord
     public PrimaryKey $id;
 
     public function __construct(
-        public string $broadcastId,
-        public string $stashItemId,
-        public string $mediaItemId,
+        public BroadcastId $broadcastId,
+        public StashItemId $stashItemId,
+        public MediaItemId $mediaItemId,
         public BroadcastItemState $state,
         #[Hidden]
         public ?string $tokenSecretId = null,

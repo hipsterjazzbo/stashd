@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
-use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
 use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
@@ -22,7 +21,7 @@ final class BroadcastTriggerRepository
     }
 
     public function create(
-        PrefixedUlid $broadcastId,
+        BroadcastId $broadcastId,
         BroadcastTriggerType $type,
         bool $enabled = true,
         BroadcastTriggerState $state = BroadcastTriggerState::Ready,
@@ -30,7 +29,7 @@ final class BroadcastTriggerRepository
     ): BroadcastTriggerRecord {
         $id = $this->ids->generate('btrigger')->toString();
         $record = new BroadcastTriggerRecord(
-            broadcastId: $broadcastId->toString(),
+            broadcastId: $broadcastId,
             type: $type,
             enabled: $enabled,
             state: $state,
@@ -56,14 +55,14 @@ final class BroadcastTriggerRepository
     }
 
     /** @return list<BroadcastTriggerRecord> */
-    public function listForBroadcast(PrefixedUlid $broadcastId): array
+    public function listForBroadcast(BroadcastId $broadcastId): array
     {
         return BroadcastTriggerRecord::select()
             ->where('broadcastId = ?', $broadcastId->toString())
             ->all();
     }
 
-    public function findEnabledScanTrigger(PrefixedUlid $broadcastId, BroadcastTriggerType $type): ?BroadcastTriggerRecord
+    public function findEnabledScanTrigger(BroadcastId $broadcastId, BroadcastTriggerType $type): ?BroadcastTriggerRecord
     {
         return BroadcastTriggerRecord::select()
             ->where('broadcastId = ? AND type = ? AND enabled = 1', $broadcastId->toString(), $type)

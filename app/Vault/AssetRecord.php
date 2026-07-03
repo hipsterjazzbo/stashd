@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Vault;
 
+use App\Broadcasts\BroadcastId;
+use App\Broadcasts\BroadcastItemId;
 use App\Support\DurationSecondsCaster;
 use App\Support\DurationSecondsSerializer;
 use Tempest\Database\IsDatabaseModel;
@@ -26,8 +28,8 @@ final class AssetRecord
         public AssetKind $kind,
         public AssetState $state,
         public ?MediaItemId $mediaItemId = null,
-        public ?string $broadcastId = null,
-        public ?string $broadcastItemId = null,
+        public ?BroadcastId $broadcastId = null,
+        public ?BroadcastItemId $broadcastItemId = null,
         public ?string $path = null,
         public ?string $relativePath = null,
         public ?string $mimeType = null,

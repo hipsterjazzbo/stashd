@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastItemRepository;
 use App\Broadcasts\BroadcastRepository;
 use App\Broadcasts\Podcasts\PodcastTokenService;
+use App\Stashes\StashItemId;
 use App\Stashes\StashItemRecord;
-use App\Support\PrefixedUlid;
 use App\System\Secret\SecretRecord;
+use App\Vault\MediaItemId;
 use Tempest\Database\PrimaryKey;
 use Tempest\Http\Status;
 
@@ -24,7 +26,7 @@ test('podcast broadcast resources expose only intended token fields', function (
 
     $feedToken = apiResourcePodcastTokenFromFeedUrl($create->body['broadcast']['feed_url']);
     $broadcast = $this->container->get(BroadcastRepository::class)
-        ->find(PrefixedUlid::parse($create->body['broadcast']['id']));
+        ->find(BroadcastId::parse($create->body['broadcast']['id']));
     $secret = SecretRecord::select()
         ->include('encryptedValue')
         ->get(new PrimaryKey((string) $broadcast->tokenSecretId));
@@ -40,9 +42,9 @@ test('podcast broadcast resources expose only intended token fields', function (
 
     $stashItem = StashItemRecord::select()->where('stashId = ?', $stashId)->first();
     $item = $this->container->get(BroadcastItemRepository::class)->create(
-        broadcastId: PrefixedUlid::parse($create->body['broadcast']['id']),
-        stashItemId: PrefixedUlid::parse((string) $stashItem->id),
-        mediaItemId: PrefixedUlid::parse($mediaItemId),
+        broadcastId: BroadcastId::parse($create->body['broadcast']['id']),
+        stashItemId: StashItemId::parse((string) $stashItem->id),
+        mediaItemId: MediaItemId::parse($mediaItemId),
     );
     $itemToken = $this->container->get(PodcastTokenService::class)->ensureItemToken($item);
 

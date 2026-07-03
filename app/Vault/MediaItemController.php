@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Vault;
 
 use App\Broadcasts\Api\BroadcastResource;
+use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastItemRepository;
 use App\Broadcasts\BroadcastRepository;
 use App\Http\Middleware\RequireAuthMiddleware;
@@ -13,7 +14,6 @@ use App\Stashes\Api\StashResource;
 use App\Stashes\StashId;
 use App\Stashes\StashItemRepository;
 use App\Stashes\StashRepository;
-use App\Support\PrefixedUlid;
 use App\Vault\Api\AssetResource;
 use App\Vault\Api\MediaItemResource;
 use Tempest\Http\Responses\Json;
@@ -77,11 +77,11 @@ final readonly class MediaItemController
 
         $broadcastNamesById = [];
         foreach ($assets as $asset) {
-            if ($asset->broadcastId === null || array_key_exists($asset->broadcastId, $broadcastNamesById)) {
+            if ($asset->broadcastId === null || array_key_exists((string) $asset->broadcastId, $broadcastNamesById)) {
                 continue;
             }
 
-            $broadcastNamesById[$asset->broadcastId] = $this->broadcasts->find(PrefixedUlid::parse($asset->broadcastId))?->name;
+            $broadcastNamesById[(string) $asset->broadcastId] = $this->broadcasts->find($asset->broadcastId)?->name;
         }
 
         return new Json([
@@ -90,7 +90,7 @@ final readonly class MediaItemController
                     $asset,
                     AssetRegenerationGuidance::forAsset(
                         asset: $asset,
-                        broadcastName: $asset->broadcastId === null ? null : $broadcastNamesById[$asset->broadcastId],
+                        broadcastName: $asset->broadcastId === null ? null : $broadcastNamesById[(string) $asset->broadcastId],
                         vaultOriginalReady: $vaultOriginalReady,
                         mediaItemUpstreamState: $mediaItem->upstreamState,
                     ),
@@ -143,12 +143,12 @@ final readonly class MediaItemController
         $mediaItemId = MediaItemId::parse((string) $mediaItem->id);
 
         $broadcastIds = array_values(array_unique(array_map(
-            static fn ($broadcastItem): string => $broadcastItem->broadcastId,
+            static fn ($broadcastItem): string => (string) $broadcastItem->broadcastId,
             $this->broadcastItems->listForMediaItem($mediaItemId),
         )));
 
         $broadcasts = array_filter(array_map(
-            fn (string $broadcastId) => $this->broadcasts->find(PrefixedUlid::parse($broadcastId)),
+            fn (string $broadcastId) => $this->broadcasts->find(BroadcastId::parse($broadcastId)),
             $broadcastIds,
         ));
 

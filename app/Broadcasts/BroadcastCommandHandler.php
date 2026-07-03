@@ -31,7 +31,7 @@ final readonly class BroadcastCommandHandler implements CommandHandler
     public function validate(array $options): void
     {
         $broadcastId = $this->broadcastIdFromOptions($options);
-        $broadcast = $this->broadcasts->find(PrefixedUlid::parse($broadcastId));
+        $broadcast = BroadcastId::isValid($broadcastId) ? $this->broadcasts->find(BroadcastId::parse($broadcastId)) : null;
 
         if ($broadcast === null) {
             throw InvalidCommandPayload::withErrors(['Broadcast not found.']);

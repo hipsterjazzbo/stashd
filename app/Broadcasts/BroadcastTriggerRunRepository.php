@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
-use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
 use InvalidArgumentException;
 use Tempest\Database\PrimaryKey;
@@ -22,13 +21,13 @@ final class BroadcastTriggerRunRepository
     }
 
     public function create(
-        PrefixedUlid $triggerId,
+        BroadcastTriggerId $triggerId,
         BroadcastTriggerRunState $state = BroadcastTriggerRunState::Pending,
         ?string $reason = null,
     ): BroadcastTriggerRunRecord {
         $id = $this->ids->generate('btrun')->toString();
         $record = new BroadcastTriggerRunRecord(
-            triggerId: $triggerId->toString(),
+            triggerId: $triggerId,
             state: $state,
             reason: $reason,
             startedAt: DateTime::now(Timezone::UTC),

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
-use App\Stashes\StashId;
 use App\Stashes\StashItemRepository;
 use App\Stashes\StashItemState;
 use App\Stashes\StashRepository;
@@ -27,7 +26,7 @@ final readonly class BroadcastContextFactory
 
     public function build(BroadcastRecord $broadcast): BroadcastContext
     {
-        $stashId = StashId::parse($broadcast->stashId);
+        $stashId = $broadcast->stashId;
 
         $stash = $this->stashes->find($stashId)
             ?? throw BroadcastException::withCode('stash_not_found', 'Stash not found.');

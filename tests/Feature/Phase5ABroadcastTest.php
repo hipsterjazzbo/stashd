@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Broadcasts\BroadcastFilenameBuilder;
+use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastLifecycleService;
 use App\Broadcasts\HardlinkPublisher;
 use App\Config\StashdConfig;
@@ -49,7 +50,7 @@ test('broadcast.plan produces intended files without writing to disk', function 
 
     $config = $this->container->get(StashdConfig::class);
     $planner = $this->container->get(BroadcastLifecycleService::class);
-    $plan = $planner->plan(\App\Support\PrefixedUlid::parse($broadcastId));
+    $plan = $planner->plan(BroadcastId::parse($broadcastId));
 
     expect($plan->files)->toHaveCount(1)
         ->and($plan->files[0]->absolutePath)->toStartWith($config->broadcastsPath())

@@ -25,7 +25,7 @@ final readonly class BroadcastResource implements Arrayable
     {
         $payload = [
             'id' => (string) $this->broadcast->id,
-            'stashId' => $this->broadcast->stashId,
+            'stashId' => (string) $this->broadcast->stashId,
             'type' => $this->broadcast->type,
             'name' => $this->broadcast->name,
             'slug' => $this->broadcast->slug,

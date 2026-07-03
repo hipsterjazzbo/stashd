@@ -10,7 +10,6 @@ use App\Broadcasts\Podcasts\PodcastMediaKind;
 use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
-use App\Vault\MediaItemId;
 use Generator;
 use SensitiveParameter;
 use Tempest\Http\ContentType;
@@ -74,7 +73,7 @@ final readonly class PodcastEpisodeController
             return $this->notRevealed();
         }
 
-        $mediaItemId = MediaItemId::parse($item->mediaItemId);
+        $mediaItemId = $item->mediaItemId;
         $selection = match (PodcastMediaKind::forBroadcast($broadcast)) {
             PodcastMediaKind::Audio => $this->assets->audioAsset($mediaItemId),
             PodcastMediaKind::Video => $this->assets->videoAsset($mediaItemId),

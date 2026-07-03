@@ -126,8 +126,8 @@ final readonly class TranscodePodcastAudioJobHandler implements JobHandler
     {
         $broadcastIds = [];
 
-        foreach ($this->broadcastItems->listForMediaItem(PrefixedUlid::parse($mediaItemId)) as $item) {
-            $broadcast = $this->broadcasts->find(PrefixedUlid::parse($item->broadcastId));
+        foreach ($this->broadcastItems->listForMediaItem(MediaItemId::parse($mediaItemId)) as $item) {
+            $broadcast = $this->broadcasts->find($item->broadcastId);
 
             if (
                 $broadcast !== null

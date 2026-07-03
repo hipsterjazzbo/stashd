@@ -24,9 +24,9 @@ final readonly class BroadcastItemResource implements Arrayable
     {
         return ApiJson::encode([
             'id' => (string) $this->item->id,
-            'broadcastId' => $this->item->broadcastId,
-            'stashItemId' => $this->item->stashItemId,
-            'mediaItemId' => $this->item->mediaItemId,
+            'broadcastId' => (string) $this->item->broadcastId,
+            'stashItemId' => (string) $this->item->stashItemId,
+            'mediaItemId' => (string) $this->item->mediaItemId,
             'state' => $this->item->state->value,
             'tokenPreview' => $this->item->tokenPreview,
             'publishedPath' => $this->item->publishedPath,

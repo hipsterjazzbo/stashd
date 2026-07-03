@@ -406,7 +406,7 @@ the live status tracker, so "what's left" never again needs a tour of `docs/plan
   replacing raw `PrefixedUlid`/string at boundaries; pass loaded records instead of IDs where the
   caller already has them, keep raw strings only at HTTP/DB/serialization boundaries. Split by
   domain (auth / stashes-vault / broadcasts / jobs-commands / system-storage-activity) if too large
-  for one pass. **Auth and stashes-vault domains done; broadcasts / jobs-commands / system-storage-activity
+  for one pass. **Auth, stashes-vault, and broadcasts domains done; jobs-commands / system-storage-activity
   still pending.** Built the shared plumbing all future domains reuse: abstract
   `App\Support\Ids\PrefixedId` (wraps the existing `PrefixedUlid` for prefix/ULID validation instead of
   reimplementing it) plus a single auto-discovered `PrefixedIdCaster`/`PrefixedIdSerializer` pair
@@ -461,8 +461,34 @@ the live status tracker, so "what's left" never again needs a tour of `docs/plan
   one crash at a time. Added `StashItemTypedIdTest.php` (insert → multi-column where-lookup → reload) and
   value-shape assertions in two existing feature tests (`Phase4AHardeningTest`, `Phase6StashesVaultTest`)
   proving the API output is a plain string, not just present.
+  Broadcasts domain: added `BroadcastId`, `BroadcastItemId`, `BroadcastTriggerId` (each a two-line
+  `PrefixedId` subclass; skipped `BroadcastTriggerRunId` — nothing looks up a trigger run by its own ID,
+  so a class with zero real call sites would just be speculative). Converted `BroadcastRecord::$stashId`
+  (reusing `StashId`), `BroadcastItemRecord::$broadcastId`/`$stashItemId`/`$mediaItemId` (reusing
+  `StashItemId`/`MediaItemId`), `BroadcastTriggerRecord::$broadcastId`, `BroadcastTriggerRunRecord::$triggerId`,
+  and finally closed out `AssetRecord::$broadcastId`/`$broadcastItemId` — the two fields deliberately left
+  as raw strings in the stashes-vault slice specifically because this domain hadn't landed yet. Applied
+  this session's lesson from the start instead of discovering it again: ran `composer test:static` against
+  the *whole project* immediately after the record/repository conversions (not scoped to `app/Broadcasts`),
+  which surfaced all ~15 consumer files in one pass — `BroadcastContextFactory`, `BroadcastController`,
+  `BroadcastLifecycleService`, `BroadcastTriggerService`, both series/podcast broadcast plugins,
+  `PodcastEpisodeController`, `PodcastTokenService`, `MediaItemController`, two job handlers — instead of
+  finding them one `composer test:parallel` TypeError at a time. Also proactively tightened 10
+  `ActivityEventService::broadcast*()` method parameters from generic `PrefixedUlid` to `BroadcastId`
+  (each already broadcast-specific by name and by the entity it's called with, so no scope creep into the
+  System/Activity domain itself — `ActivityEventRecord`'s own `$broadcastId`/`$stashId`/`$mediaItemId`
+  columns stay untouched, they're generic tag columns shared across many unrelated activity types, not a
+  single-entity FK). Proactively grepped for both known bug classes (API Resources leaking the object,
+  test fixtures doing `===` against a typed property) *before* running the suite this time, based on
+  exactly what broke last slice — found and fixed three more Resource leaks (`BroadcastResource::$stashId`,
+  `BroadcastItemResource`'s three ID fields, `AssetResource::$broadcastId`) and zero new `===` bugs.
+  Result: only 12 failures on first full-suite run, all clean `TypeError`s from stale `PrefixedUlid`
+  parses in test fixtures, no silent-bug hunting needed this time. Added `BroadcastItemTypedIdTest.php`
+  (insert → multi-column where-lookup → reload) as the standing regression test for this domain.
   `docs/plans/stronger-record-types.md`'s Entity Identity References prompt has the domain breakdown and
-  the full ID-class inventory for the remaining domains.
+  the full ID-class inventory for the remaining domains (jobs-commands: `CommandId`, `JobId`;
+  system-storage-activity: `SecretId`, `StorageLocationId`, `StorageCheckId`, `MediaServerConnectionId`,
+  `ActivityEventId`, `EventNotificationId`).
 - [ ] URL & Filesystem Path Values — rename `StashdUri` → `StashdUrl`, move `fake://` support out of
   production URL handling into fake-provider-only URL classes, add YouTube-specific URL classes
   (`YouTubeChannelUrl`/`YouTubeVideoUrl`/`YouTubePlaylistUrl`) behind a marshaller, and introduce

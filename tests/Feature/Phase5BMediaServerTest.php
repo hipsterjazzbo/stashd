@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastLifecycleService;
 use App\Broadcasts\BroadcastNfoBuilder;
 use App\Broadcasts\BroadcastTriggerRecord;
@@ -33,7 +34,7 @@ test('jellyfin_series broadcast plan includes SxxExxx filenames and nfo sidecars
     $this->processAllJobs();
 
     $plan = $this->container->get(BroadcastLifecycleService::class)
-        ->plan(\App\Support\PrefixedUlid::parse($broadcastId));
+        ->plan(BroadcastId::parse($broadcastId));
 
     expect($plan->files[0]->filename)->toMatch('/^S\d{2}E\d{3} - /')
         ->and($plan->sidecars)->not->toBeEmpty();

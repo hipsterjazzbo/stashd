@@ -17,7 +17,7 @@ final class BroadcastTriggerRunRecord
     public PrimaryKey $id;
 
     public function __construct(
-        public string $triggerId,
+        public BroadcastTriggerId $triggerId,
         public BroadcastTriggerRunState $state,
         public ?string $reason = null,
         public ?DateTime $startedAt = null,
