@@ -314,7 +314,14 @@ const EVENT_TYPES = ['job.created', 'job.progress', 'job.completed', 'job.failed
  * Opens one EventSource, re-running `checkTerminal` on every relevant SSE
  * event (and once immediately, in case the thing it's waiting on already
  * finished before this connection opened), and closes the connection as soon
- * as it returns true.
+ * as it returns true. Returns a cancel function the caller can invoke to
+ * close it early (e.g. the user backed out of the flow that started it) --
+ * without this, backing out and retrying while a previous wait is still
+ * pending (a stuck preflight, say) leaks one EventSource per retry, none of
+ * which stop polling until the *original* command they were watching
+ * eventually resolves. Each leaked connection ties up a RoadRunner HTTP
+ * worker for the wait's whole duration; see the num_workers history in
+ * .rr.yaml for how cheaply that pool has starved before.
  *
  * Only for short, one-shot waits (preflight/add-input steps) — never held
  * open for a page's whole lifetime like Dashboard/Activity/Stash detail.
@@ -322,21 +329,24 @@ const EVENT_TYPES = ['job.created', 'job.progress', 'job.completed', 'job.failed
  * regardless of how soon the client closes (see docs/TODO.md's SSE note), so
  * this is used once or twice per input added, not perpetually.
  */
-function awaitSseTerminal(checkTerminal: () => Promise<boolean>): void {
-	if (!('EventSource' in window)) {
-		void checkTerminal()
-		return
-	}
-
-	const source = new EventSource('/api/v1/events')
+function awaitSseTerminal(checkTerminal: () => Promise<boolean>): () => void {
 	let closed = false
+	let fallback: ReturnType<typeof setInterval> | null = null
+	let source: EventSource | null = null
 
 	const finish = () => {
 		if (closed) return
 		closed = true
-		source.close()
-		clearInterval(fallback)
+		source?.close()
+		if (fallback !== null) clearInterval(fallback)
 	}
+
+	if (!('EventSource' in window)) {
+		void checkTerminal()
+		return finish
+	}
+
+	source = new EventSource('/api/v1/events')
 
 	const tick = async () => {
 		if (closed) return
@@ -350,9 +360,11 @@ function awaitSseTerminal(checkTerminal: () => Promise<boolean>): void {
 	// ponytail: SSE delivery isn't guaranteed (dropped connection, missed
 	// event) — this poll guarantees the caller eventually notices a terminal
 	// state even if every SSE event is lost.
-	const fallback = setInterval(() => void tick(), 3000)
+	fallback = setInterval(() => void tick(), 3000)
 
 	void tick()
+
+	return finish
 }
 
 interface StorageLocation {
@@ -984,6 +996,7 @@ function stashDetailComponent(stashId: string) {
 		addInputError: null as string | null,
 		addInputPreflightCommandId: null as string | null,
 		addInputCommitCommandId: null as string | null,
+		addInputSseCancel: null as (() => void) | null,
 		addInputResolved: null as ResolvedInputSummary | null,
 		addInputEstimatedItemCount: null as number | null,
 		addInputEstimatedTotalDurationSeconds: null as number | null,
@@ -1424,7 +1437,6 @@ function stashDetailComponent(stashId: string) {
 					return
 				}
 				this.newBroadcastName = ''
-				this.newBroadcastSettings = {}
 				this.broadcastPreview = null
 				this.error = null
 				await this.refresh()
@@ -1508,6 +1520,8 @@ function stashDetailComponent(stashId: string) {
 		},
 
 		cancelAddInput() {
+			this.addInputSseCancel?.()
+			this.addInputSseCancel = null
 			this.addInputOpen = false
 			this.addInputStep = 'paste'
 			this.addInputPreflightCommandId = null
@@ -1516,6 +1530,10 @@ function stashDetailComponent(stashId: string) {
 
 		async submitAddInputPreflight() {
 			if (this.addInputSourceUri.trim() === '') return
+			// A previous attempt against this same modal (retried after
+			// backing out of a stuck one) may still be polling -- only one
+			// wait should ever be live at a time.
+			this.addInputSseCancel?.()
 			this.addInputSubmitting = true
 			try {
 				const response = await apiFetch('/api/v1/stashes/preflight', {
@@ -1535,7 +1553,7 @@ function stashDetailComponent(stashId: string) {
 				this.addInputPreflightCommandId = body.command_id
 				this.addInputError = null
 				this.addInputStep = 'reviewing'
-				awaitSseTerminal(() => this.checkAddInputPreflightTerminal())
+				this.addInputSseCancel = awaitSseTerminal(() => this.checkAddInputPreflightTerminal())
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
 				this.addInputError = 'Could not reach the server.'
@@ -1585,6 +1603,10 @@ function stashDetailComponent(stashId: string) {
 
 		async confirmAddInput() {
 			if (!this.addInputPreflightCommandId) return
+			// The preflight wait should already be done by the time review is
+			// shown, but cancel defensively so only the commit wait started
+			// below is ever live.
+			this.addInputSseCancel?.()
 			this.addInputSubmitting = true
 			try {
 				const response = await apiFetch(`/api/v1/stashes/${stashId}/inputs`, {
@@ -1608,7 +1630,7 @@ function stashDetailComponent(stashId: string) {
 				this.addInputCommitCommandId = body.command_id
 				this.addInputError = null
 				this.addInputStep = 'committing'
-				awaitSseTerminal(() => this.checkAddInputCommitTerminal())
+				this.addInputSseCancel = awaitSseTerminal(() => this.checkAddInputCommitTerminal())
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
 				this.addInputError = 'Could not reach the server.'

@@ -110,6 +110,8 @@ test('previewing an unsupported broadcast type is rejected', function (): void {
     $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts/preview', [
         'type' => 'not_a_real_type',
     ], headers: $headers)->assertStatus(Status::BAD_REQUEST);
+});
+
 test('creating a broadcast without a name defaults to "{stash} {plugin label}"', function (): void {
     $headers = $this->authHeaders();
 
