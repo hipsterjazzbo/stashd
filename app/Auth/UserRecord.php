@@ -19,7 +19,7 @@ final class UserRecord implements Authenticatable
     public PrimaryKey $id;
 
     public function __construct(
-        public string $email,
+        public string $username,
         #[Hidden]
         public string $passwordHash,
         public UserRole $role,

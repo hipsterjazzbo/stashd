@@ -41,20 +41,20 @@ final readonly class AuthController
         }
 
         $body = $request->body;
-        $email = trim((string) ($body['email'] ?? ''));
+        $username = trim((string) ($body['username'] ?? ''));
         $password = (string) ($body['password'] ?? '');
 
-        if ($email === '' || $password === '') {
+        if ($username === '' || $password === '') {
             return new Json([
                 'error' => [
                     'code' => 'validation_error',
-                    'message' => 'email and password are required.',
+                    'message' => 'username and password are required.',
                 ],
             ], Status::BAD_REQUEST);
         }
 
         try {
-            $user = $this->auth->setupAdmin($email, $password);
+            $user = $this->auth->setupAdmin($username, $password);
         } catch (SetupAlreadyCompleted) {
             return new Json([
                 'error' => [
@@ -76,20 +76,20 @@ final readonly class AuthController
     public function login(Request $request): Json
     {
         $body = $request->body;
-        $email = trim((string) ($body['email'] ?? ''));
+        $username = trim((string) ($body['username'] ?? ''));
         $password = (string) ($body['password'] ?? '');
 
-        if ($email === '' || $password === '') {
+        if ($username === '' || $password === '') {
             return new Json([
                 'error' => [
                     'code' => 'validation_error',
-                    'message' => 'email and password are required.',
+                    'message' => 'username and password are required.',
                 ],
             ], Status::BAD_REQUEST);
         }
 
         try {
-            $user = $this->auth->login($email, $password);
+            $user = $this->auth->login($username, $password);
         } catch (SetupRequired) {
             return new Json([
                 'error' => [
@@ -101,7 +101,7 @@ final readonly class AuthController
             return new Json([
                 'error' => [
                     'code' => 'invalid_credentials',
-                    'message' => 'Invalid email or password.',
+                    'message' => 'Invalid username or password.',
                 ],
             ], Status::UNAUTHORIZED);
         }
@@ -202,7 +202,7 @@ final readonly class AuthController
     {
         return [
             'id' => (string) $user->id,
-            'email' => $user->email,
+            'username' => $user->username,
             'role' => $user->role->value,
         ];
     }

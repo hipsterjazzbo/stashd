@@ -33,8 +33,8 @@
 			<div id="auth-error" class="hidden rounded border border-error/50 bg-error/10 px-3 py-2 text-[13px] text-error"></div>
 
 			<label class="block">
-				<span class="mb-1 block text-[12px] text-muted">Email</span>
-				<input name="email" type="email" autocomplete="username" required
+				<span class="mb-1 block text-[12px] text-muted">Username</span>
+				<input name="username" type="text" autocomplete="username" required
 					class="w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
 			</label>
 

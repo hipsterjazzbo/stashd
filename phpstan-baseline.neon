@@ -37,7 +37,7 @@ parameters:
 			path: app/Auth/AuthService.php
 
 		-
-			message: '#^Method App\\Auth\\UserRepository\:\:findByEmail\(\) should return App\\Auth\\UserRecord\|null but returns mixed\.$#'
+			message: '#^Method App\\Auth\\UserRepository\:\:findByUsername\(\) should return App\\Auth\\UserRecord\|null but returns mixed\.$#'
 			identifier: return.type
 			count: 1
 			path: app/Auth/UserRepository.php

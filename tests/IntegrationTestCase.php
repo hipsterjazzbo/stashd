@@ -18,11 +18,11 @@ abstract class IntegrationTestCase extends IntegrationTest
 
         if ($auth->isSetupRequired()) {
             $user = $users->createAdmin(
-                email: 'owner@stashd.test',
+                username: 'owner',
                 passwordHash: password_hash('secret-password', PASSWORD_DEFAULT),
             );
         } else {
-            $user = $users->findByEmail('owner@stashd.test')
+            $user = $users->findByUsername('owner')
                 ?? throw new \RuntimeException('Expected admin user for auth headers.');
         }
 

@@ -20,9 +20,9 @@ final class UserRepository
     ) {
     }
 
-    public function findByEmail(string $email): ?UserRecord
+    public function findByUsername(string $username): ?UserRecord
     {
-        return UserRecord::select()->where('email = ?', $email)->include('passwordHash')->first();
+        return UserRecord::select()->where('username = ?', $username)->include('passwordHash')->first();
     }
 
     public function findById(UserId $id): ?UserRecord
@@ -30,7 +30,7 @@ final class UserRepository
         return UserRecord::findById($id->toPrimaryKey());
     }
 
-    public function createAdmin(string $email, string $passwordHash): UserRecord
+    public function createAdmin(string $username, string $passwordHash): UserRecord
     {
         if (UserRecord::count()->execute() > 0) {
             throw new InvalidArgumentException('Admin account already exists.');
@@ -38,7 +38,7 @@ final class UserRepository
 
         $id = $this->ids->generate('user')->toString();
         $record = new UserRecord(
-            email: $email,
+            username: $username,
             passwordHash: $passwordHash,
             role: UserRole::Admin,
         );

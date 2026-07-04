@@ -998,7 +998,6 @@ Single-owner model for v1, but table allows later expansion.
 
 ```text
 id
-email
 username
 password_hash
 role                  owner
