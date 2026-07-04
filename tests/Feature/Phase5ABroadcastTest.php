@@ -110,6 +110,50 @@ test('previewing an unsupported broadcast type is rejected', function (): void {
     $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts/preview', [
         'type' => 'not_a_real_type',
     ], headers: $headers)->assertStatus(Status::BAD_REQUEST);
+test('creating a broadcast without a name defaults to "{stash} {plugin label}"', function (): void {
+    $headers = $this->authHeaders();
+
+    $stash = $this->http->post('/api/v1/stashes', [
+        'name' => 'My Channel',
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $stashId = $stash->body['stash']['id'];
+
+    $response = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'jellyfin',
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    expect($response->body['broadcast']['name'])->toBe('My Channel Jellyfin Series')
+        ->and($response->body['broadcast']['slug'])->toBe('my-channel-jellyfin-series');
+});
+
+test('a second unnamed broadcast of the same type gets a deduped slug instead of erroring', function (): void {
+    $headers = $this->authHeaders();
+
+    $stash = $this->http->post('/api/v1/stashes', [
+        'name' => 'My Channel',
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $stashId = $stash->body['stash']['id'];
+
+    $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'jellyfin',
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    $second = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'jellyfin',
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    expect($second->body['broadcast']['name'])->toBe('My Channel Jellyfin Series')
+        ->and($second->body['broadcast']['slug'])->toBe('my-channel-jellyfin-series-2');
+});
+
+test('a podcast broadcast can be created with no name and no settings at all', function (): void {
+    [$headers, $stashId] = array_slice($this->bootstrapFakeDownloadStash('podcast-defaults'), 0, 2);
+
+    $response = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'podcast',
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    expect($response->body['broadcast']['name'])->toContain('Podcast');
 });
 
 test('broadcast.plan produces intended files without writing to disk', function (): void {

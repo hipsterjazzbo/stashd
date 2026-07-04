@@ -35,14 +35,14 @@ final readonly class AuthService
         return UserRecord::count()->execute() === 0;
     }
 
-    public function setupAdmin(string $email, #[SensitiveParameter] string $password): UserRecord
+    public function setupAdmin(string $username, #[SensitiveParameter] string $password): UserRecord
     {
         if (! $this->isSetupRequired()) {
             throw new SetupAlreadyCompleted('Admin account already exists.');
         }
 
         $user = $this->users->createAdmin(
-            email: $email,
+            username: $username,
             passwordHash: $this->hashPassword($password),
         );
 
@@ -51,16 +51,16 @@ final readonly class AuthService
         return $user;
     }
 
-    public function login(string $email, #[SensitiveParameter] string $password): UserRecord
+    public function login(string $username, #[SensitiveParameter] string $password): UserRecord
     {
         if ($this->isSetupRequired()) {
             throw new SetupRequired('Complete admin setup before logging in.');
         }
 
-        $user = $this->users->findByEmail($email);
+        $user = $this->users->findByUsername($username);
 
         if ($user === null || ! password_verify($password, $user->passwordHash)) {
-            throw new InvalidCredentials('Invalid email or password.');
+            throw new InvalidCredentials('Invalid username or password.');
         }
 
         $this->context->set($user);

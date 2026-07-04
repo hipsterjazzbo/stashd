@@ -11,6 +11,7 @@ use App\Commands\InvalidCommandPayload;
 use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
+use App\Jobs\JobRepository;
 use App\Stashes\Api\StashInputResource;
 use App\Stashes\Api\StashItemResource;
 use App\Stashes\Api\StashResource;
@@ -39,6 +40,7 @@ final readonly class StashController
         private ActivityEventService $activity,
         private MediaItemRepository $mediaItems,
         private AssetRepository $assets,
+        private JobRepository $jobs,
     ) {
     }
 
@@ -134,6 +136,7 @@ final readonly class StashController
 
         $mediaItemsById = $this->mediaItems->listByIds($mediaItemIds);
         $totalSizeByMediaItem = $this->assets->totalSizeBytesByMediaItem($mediaItemIds);
+        $downloadFailureByMediaItem = $this->jobs->latestDownloadFailureByMediaItem($mediaItemIds);
 
         return new Json([
             'items' => array_map(
@@ -141,6 +144,7 @@ final readonly class StashController
                     $item,
                     $mediaItemsById[(string) $item->mediaItemId] ?? null,
                     $totalSizeByMediaItem[(string) $item->mediaItemId] ?? null,
+                    $downloadFailureByMediaItem[(string) $item->mediaItemId] ?? null,
                 )->toArray(),
                 $stashItems,
             ),

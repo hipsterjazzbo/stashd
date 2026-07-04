@@ -85,7 +85,17 @@
 				<section class="rounded-lg border border-line bg-panel/60">
 					<div class="flex items-center justify-between border-b border-line px-4 py-3">
 						<h2 class="text-[13px] font-semibold text-cream">Items</h2>
-						<p class="text-[12px] text-muted" x-text="itemsSummary()"></p>
+						<div class="flex flex-wrap items-center gap-x-1 text-[12px] text-muted" x-show="items.length > 0">
+							<button type="button" class="transition-colors hover:text-cream" x-bind:class="itemStatusFilter === 'all' ? 'text-cream' : ''" x-on:click="itemStatusFilter = 'all'">
+								<span x-text="items.length"></span> item<span x-show="items.length !== 1">s</span>
+							</button>
+							<template x-for="chip in itemStatusSummary()" x-bind:key="chip.filter">
+								<span>·
+									<button type="button" class="transition-colors hover:text-cream" x-bind:class="itemStatusFilter === chip.filter ? 'text-cream' : ''" x-on:click="itemStatusFilter = chip.filter" x-text="chip.label"></button>
+								</span>
+							</template>
+						</div>
+						<p class="text-[12px] text-muted" x-show="items.length === 0">No items</p>
 					</div>
 
 					<div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2" x-show="items.length > 0">
@@ -142,10 +152,17 @@
 									</template>
 									<template x-if="row.type === 'item'">
 										<td class="px-4 py-2">
-											<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(row.item.media_item?.state).text">
+											<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(row.item.media_item?.state).text"
+												x-bind:title="row.item.media_item?.state === 'failed' ? (row.item.media_item?.failure_reason ?? 'Unknown error') : null">
 												<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(row.item.media_item?.state).dot, statusBadge(row.item.media_item?.state).pulse ? 'pulse-dot' : '']"></span>
 												<span x-text="statusBadge(row.item.media_item?.state).label"></span>
 											</span>
+											<button type="button" x-show="row.item.media_item?.state === 'failed'"
+												class="ml-2 rounded border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:text-cream disabled:opacity-50"
+												x-bind:disabled="actionPending === row.item.id + ':retry'"
+												x-on:click="retryDownload(row.item)">
+												retry
+											</button>
 											<p class="mt-1 text-[12px] text-muted" x-show="row.item.state === 'ignored'" x-text="'ignored: ' + (row.item.ignored_reason ?? 'unknown reason').replace(/_/g, ' ')"></p>
 										</td>
 									</template>
@@ -154,7 +171,6 @@
 											<div class="flex items-center gap-2">
 												<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber pulse-dot"></span>
 												<span class="shrink-0 text-[11px] text-muted" x-text="row.job.progress_label ?? row.job.intent.replace(/_/g, ' ')"></span>
-												<span class="shrink-0 text-[11px] text-muted" x-text="Math.round(row.job.progress_percent ?? 0) + '%'"></span>
 												<div class="h-1.5 flex-1 rounded-full bg-espresso">
 													<div class="h-1.5 rounded-full bg-amber" x-bind:style="'width: ' + (row.job.progress_percent ?? 0) + '%'"></div>
 												</div>
@@ -188,6 +204,17 @@
 								</div>
 
 								<p class="mt-1 text-[12px] text-error" x-show="broadcast.last_error" x-text="broadcast.last_error"></p>
+
+								<template x-if="activeBroadcastJobFor(broadcast.id)">
+									<div class="mt-2 flex items-center gap-2">
+										<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber pulse-dot"></span>
+										<span class="shrink-0 text-[11px] text-muted" x-text="activeBroadcastJobFor(broadcast.id).progress_label ?? activeBroadcastJobFor(broadcast.id).intent.replace(/_/g, ' ')"></span>
+										<div class="h-1.5 flex-1 rounded-full bg-espresso">
+											<div class="h-1.5 rounded-full bg-amber" x-bind:style="'width: ' + (activeBroadcastJobFor(broadcast.id).progress_percent ?? 0) + '%'"></div>
+										</div>
+										<span class="shrink-0 text-[11px] text-muted" x-text="Math.round(activeBroadcastJobFor(broadcast.id).progress_percent ?? 0) + '%'"></span>
+									</div>
+								</template>
 
 								<div class="mt-2 flex flex-wrap gap-2">
 									<button type="button"
@@ -232,34 +259,35 @@
 									<p class="mt-1 text-[12px] text-warn">Anyone with this link can listen — treat it like a password.</p>
 								</div>
 
-								<div class="mt-3 rounded border border-line bg-espresso p-2"
-									x-show="isSeriesBroadcastType(broadcast.type) && inputs.length > 0"
-									x-init="ensureSeasonMappingDraft(broadcast)">
-									<p class="text-[11px] uppercase tracking-wide text-muted">Season mapping</p>
-									<p class="mt-1 text-[12px] text-muted">Assign each input to a season. Leave blank for the default (Season 01).</p>
-									<div class="mt-2 space-y-1">
-										<template x-for="input in inputs" x-bind:key="input.id">
-											<div class="flex items-center gap-2">
-												<span class="flex-1 truncate text-[12px] text-cream" x-text="input.title ?? input.provider_input_id"></span>
-												<input type="number" min="1" placeholder="default"
-													x-model="seasonMappingDrafts[broadcast.id][input.id]"
-													class="w-20 rounded border border-line bg-panel px-2 py-1 text-[12px] text-cream outline-none focus:border-amber"/>
-											</div>
-										</template>
+								<template x-if="isSeriesBroadcastType(broadcast.type) && inputs.length > 0">
+									<div class="mt-3 rounded border border-line bg-espresso p-2"
+										x-init="ensureSeasonMappingDraft(broadcast)">
+										<p class="text-[11px] uppercase tracking-wide text-muted">Season mapping</p>
+										<p class="mt-1 text-[12px] text-muted">Assign each input to a season. Leave blank for the default (Season 01).</p>
+										<div class="mt-2 space-y-1">
+											<template x-for="input in inputs" x-bind:key="input.id">
+												<div class="flex items-center gap-2">
+													<span class="flex-1 truncate text-[12px] text-cream" x-text="input.title ?? input.provider_input_id"></span>
+													<input type="number" min="1" placeholder="default"
+														x-model="seasonMappingDrafts[broadcast.id][input.id]"
+														class="w-20 rounded border border-line bg-panel px-2 py-1 text-[12px] text-cream outline-none focus:border-amber"/>
+												</div>
+											</template>
+										</div>
+										<button type="button" x-on:click="saveSeasonMapping(broadcast.id)"
+											x-bind:disabled="savingSeasonMapping === broadcast.id"
+											class="mt-2 rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-60">
+											Save season mapping
+										</button>
 									</div>
-									<button type="button" x-on:click="saveSeasonMapping(broadcast.id)"
-										x-bind:disabled="savingSeasonMapping === broadcast.id"
-										class="mt-2 rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-60">
-										Save season mapping
-									</button>
-								</div>
+								</template>
 							</li>
 						</template>
 					</ul>
 
 					<div class="border-t border-line p-4">
 						<div class="flex items-center gap-2">
-							<select x-model="newBroadcastType" x-on:change="newBroadcastSettings = {}; onBroadcastTypeChanged()"
+							<select x-model="newBroadcastType" x-on:change="onBroadcastTypeChanged()"
 								class="rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber">
 								<template x-for="plugin in broadcastPlugins" x-bind:key="plugin.key">
 									<option x-bind:value="plugin.key" x-text="plugin.label"></option>
@@ -270,10 +298,12 @@
 								<option value="audio">Audio episodes</option>
 								<option value="video">Video episodes</option>
 							</select>
-							<input type="text" x-model="newBroadcastName" placeholder="Broadcast name"
+							<input type="text" x-model="newBroadcastName" placeholder="Name (optional)"
 								class="flex-1 rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
 							<button type="button" x-show="!broadcastPreview" x-on:click="previewBroadcastCreation()"
 								x-bind:disabled="loadingBroadcastPreview || newBroadcastName.trim() === ''"
+							<button type="button" x-on:click="createBroadcast()"
+								x-bind:disabled="creatingBroadcast"
 								class="shrink-0 rounded bg-amber px-3 py-2 text-[13px] font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-60">
 								<span x-show="loadingBroadcastPreview">Loading…</span>
 								<span x-show="!loadingBroadcastPreview">Preview</span>

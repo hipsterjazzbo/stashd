@@ -538,6 +538,7 @@ interface StashItemSummary {
 		duration_seconds: number | null
 		content_type: string | null
 		published_at: string | null
+		failure_reason: string | null
 	} | null
 	total_asset_size_bytes: number | null
 }
@@ -955,7 +956,6 @@ function stashDetailComponent(stashId: string) {
 		newBroadcastType: 'podcast',
 		newBroadcastMediaKind: 'audio',
 		newBroadcastName: '',
-		newBroadcastSettings: {} as Record<string, string>,
 		creatingBroadcast: false,
 		broadcastPreview: null as BroadcastCreationPreviewSummary | null,
 		loadingBroadcastPreview: false,
@@ -1074,20 +1074,20 @@ function stashDetailComponent(stashId: string) {
 			return plugin !== undefined && plugin.supported_file_kinds.length === 1 && plugin.supported_file_kinds[0] === 'video'
 		},
 
-		// media_kind has its own dedicated select (with bespoke show/hide
-		// logic tied to newBroadcastMediaKind), so it's excluded here to
-		// avoid rendering it twice.
-		currentBroadcastExtraControls(): BroadcastPluginUiControl[] {
-			const plugin = this.broadcastPlugins.find((candidate) => candidate.key === this.newBroadcastType)
-			return (plugin?.ui_controls ?? []).filter((control) => control.name !== 'media_kind')
-		},
-
 		// Download/metadata jobs record entity_type 'media_item' + entity_id on
 		// creation (ItemDownloadCommandHandler) — matching on that, rather than
 		// a per-item field, is what lets one items-list query (T11) show live
 		// progress without the backend needing to know about jobs at all.
 		activeJobFor(mediaItemId: string): JobSummary | null {
 			return this.jobs.find((job) => job.entity_type === 'media_item' && job.entity_id === mediaItemId && job.state === 'processing') ?? null
+		},
+
+		// Same idea as activeJobFor, but for a broadcast rebuild/verify/prune/
+		// trigger/rotate_token job (BroadcastCommandHandler records
+		// entity_type 'broadcast') -- the state badge alone only ever said
+		// "processing" with no sense of what's happening or how far along.
+		activeBroadcastJobFor(broadcastId: string): JobSummary | null {
+			return this.jobs.find((job) => job.entity_type === 'broadcast' && job.entity_id === broadcastId && job.state === 'processing') ?? null
 		},
 
 		// Static -- always shown in the status filter regardless of which
@@ -1162,21 +1162,21 @@ function stashDetailComponent(stashId: string) {
 			})
 		},
 
-		// Header summary, e.g. "218 items · 3 downloading · 4 ignored".
-		itemsSummary(): string {
-			const total = this.items.length
-			if (total === 0) return 'No items'
+		// Header summary chips, e.g. "218 items" · "12 downloading" · "3
+		// failed" -- clicking a chip sets itemStatusFilter to it, so the
+		// summary doubles as a set of filter shortcuts.
+		itemStatusSummary(): Array<{ label: string; filter: string }> {
+			const counts = new Map<string, number>()
+			for (const item of this.items) {
+				const status = item.media_item?.state
+				if (!status) continue
+				counts.set(status, (counts.get(status) ?? 0) + 1)
+			}
 
-			const downloading = this.items.filter((item) => this.isDownloading(item)).length
-			const ignored = this.items.filter((item) => item.state === 'ignored').length
-			const failed = this.items.filter((item) => item.media_item?.state === 'failed').length
-
-			const parts = [`${total} item${total === 1 ? '' : 's'}`]
-			if (downloading > 0) parts.push(`${downloading} downloading`)
-			if (failed > 0) parts.push(`${failed} failed`)
-			if (ignored > 0) parts.push(`${ignored} ignored`)
-
-			return parts.join(' · ')
+			return ITEM_STATUS_OPTIONS.filter((status) => counts.has(status)).map((status) => ({
+				label: `${counts.get(status)} ${status.replace(/_/g, ' ')}`,
+				filter: status,
+			}))
 		},
 
 		// Flattens items + their active job (if any) into one list so the items
@@ -1195,6 +1195,29 @@ function stashDetailComponent(stashId: string) {
 				}
 			}
 			return rows
+		},
+
+		// Re-dispatches item.download for a failed item -- MediaItemState
+		// allows Failed -> DownloadPending -> Downloading, so this is exactly
+		// the same command the initial download used, just issued again.
+		async retryDownload(item: StashItemSummary) {
+			this.actionPending = `${item.id}:retry`
+			try {
+				await apiFetch('/api/v1/commands', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						type: 'item.download',
+						options: { media_item_id: item.media_item_id, stash_id: item.stash_id },
+					}),
+				})
+				await this.refresh()
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not retry that download.'
+			} finally {
+				this.actionPending = null
+			}
 		},
 
 		async runBroadcastAction(broadcastId: string, action: 'rebuild' | 'verify' | 'prune' | 'rotate_token') {
@@ -1382,19 +1405,16 @@ function stashDetailComponent(stashId: string) {
 		},
 
 		async createBroadcast() {
-			if (this.newBroadcastName.trim() === '') return
 			this.creatingBroadcast = true
-			const settings = {
-				...this.newBroadcastSettings,
-				...(this.newBroadcastType === 'podcast' ? { media_kind: this.newBroadcastMediaKind } : {}),
-			}
+			const settings = this.newBroadcastType === 'podcast' ? { media_kind: this.newBroadcastMediaKind } : {}
+			const name = this.newBroadcastName.trim()
 			try {
 				const response = await apiFetch(`/api/v1/stashes/${stashId}/broadcasts`, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
 						type: this.newBroadcastType,
-						name: this.newBroadcastName.trim(),
+						...(name !== '' ? { name } : {}),
 						...(Object.keys(settings).length > 0 ? { settings } : {}),
 					}),
 				})
@@ -1705,7 +1725,7 @@ function settingsComponent() {
 	return {
 		loading: true,
 		error: null as string | null,
-		me: null as { id: string; email: string; role: string } | null,
+		me: null as { id: string; username: string; role: string } | null,
 		health: null as HealthReport | null,
 		tokens: [] as ApiTokenSummary[],
 		mediaServers: [] as MediaServerSummary[],

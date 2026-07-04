@@ -12,7 +12,7 @@ test('login page renders the owner auth form', async ({ page }) => {
     await page.goto('/login');
 
     await expect(page.locator('#auth-form')).toBeVisible();
-    await expect(page.locator('input[name="email"]')).toBeVisible();
+    await expect(page.locator('input[name="username"]')).toBeVisible();
     await expect(page.locator('input[name="password"]')).toBeVisible();
     await expect(page.locator('#auth-submit')).toBeVisible();
 });

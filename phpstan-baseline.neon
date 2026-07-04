@@ -37,7 +37,7 @@ parameters:
 			path: app/Auth/AuthService.php
 
 		-
-			message: '#^Method App\\Auth\\UserRepository\:\:findByEmail\(\) should return App\\Auth\\UserRecord\|null but returns mixed\.$#'
+			message: '#^Method App\\Auth\\UserRepository\:\:findByUsername\(\) should return App\\Auth\\UserRecord\|null but returns mixed\.$#'
 			identifier: return.type
 			count: 1
 			path: app/Auth/UserRepository.php
@@ -209,6 +209,12 @@ parameters:
 			identifier: assign.propertyType
 			count: 1
 			path: app/Broadcasts/BroadcastPluginRegistry.php
+
+		-
+			message: '#^Parameter \#1 \$callback of function array_map expects \(callable\(mixed\)\: mixed\)\|null, Closure\(App\\Broadcasts\\BroadcastRecord\)\: string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Broadcasts/BroadcastRepository.php
 
 		-
 			message: '#^Method App\\Broadcasts\\BroadcastRepository\:\:findByStashAndSlug\(\) should return App\\Broadcasts\\BroadcastRecord\|null but returns mixed\.$#'
@@ -727,7 +733,19 @@ parameters:
 			path: app/Jobs/JobRepository.php
 
 		-
+			message: '#^Cannot access property \$entityId on mixed\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Jobs/JobRepository.php
+
+		-
 			message: '#^Cannot access property \$id on mixed\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Jobs/JobRepository.php
+
+		-
+			message: '#^Cannot access property \$state on mixed\.$#'
 			identifier: property.nonObject
 			count: 1
 			path: app/Jobs/JobRepository.php
@@ -735,13 +753,13 @@ parameters:
 		-
 			message: '#^Cannot cast mixed to string\.$#'
 			identifier: cast.string
-			count: 1
+			count: 2
 			path: app/Jobs/JobRepository.php
 
 		-
 			message: '#^Cannot access property \$lastError on mixed\.$#'
 			identifier: property.nonObject
-			count: 1
+			count: 3
 			path: app/Jobs/JobRepository.php
 
 		-
@@ -764,6 +782,12 @@ parameters:
 
 		-
 			message: '#^Method App\\Jobs\\JobRepository\:\:listProcessingStale\(\) should return list\<App\\Jobs\\JobRecord\> but returns array\<mixed\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Jobs/JobRepository.php
+
+		-
+			message: '#^Method App\\Jobs\\JobRepository\:\:latestDownloadFailureByMediaItem\(\) should return array\<string, string\> but returns array\<string, mixed\>\.$#'
 			identifier: return.type
 			count: 1
 			path: app/Jobs/JobRepository.php

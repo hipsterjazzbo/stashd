@@ -237,7 +237,7 @@ test('event publisher writes sse notification rows', function (): void {
 test('events endpoint requires authentication', function (): void {
     $users = $this->container->get(\App\Auth\UserRepository::class);
     $users->createAdmin(
-        email: 'owner@stashd.test',
+        username: 'owner',
         passwordHash: password_hash('secret-password', PASSWORD_DEFAULT),
     );
 
@@ -266,7 +266,7 @@ test('api token uses stashd_pat prefix and supports lookup and revoke', function
     $users = $this->container->get(\App\Auth\UserRepository::class);
     $auth = $this->container->get(AuthService::class);
     $user = $users->createAdmin(
-        email: 'owner@stashd.test',
+        username: 'owner',
         passwordHash: password_hash('secret-password', PASSWORD_DEFAULT),
     );
 
