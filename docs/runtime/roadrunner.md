@@ -49,7 +49,10 @@ php -S localhost:8474 -t public public/index.php
 The container entrypoint runs `stashd:boot`, then supervisord starts:
 
 - RoadRunner (`stashd serve`)
-- Job poll loop (`stashd worker`)
+- Job poll loops, one per lane (`stashd worker interactive|discovery|bulk`) —
+  interactive jobs (preflight/add-input) never queue behind downloads or
+  channel backfills; `stashd worker` with no lane processes everything
+  (local dev)
 - Scheduler loop (`stashd scheduler`)
 
 See `docker/supervisord.conf` and `docker/entrypoint.sh`.

@@ -161,7 +161,9 @@ case "$ROLE" in
         ;;
     worker)
         export_runtime_env
-        run_app php tempest stashd worker
+        # Optional second arg picks a worker lane (interactive, discovery,
+        # bulk); supervisord runs one program per lane. No arg = all lanes.
+        run_app php tempest stashd worker ${2:+"$2"}
         ;;
     scheduler)
         export_runtime_env

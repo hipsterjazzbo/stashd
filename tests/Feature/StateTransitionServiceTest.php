@@ -49,7 +49,7 @@ test('job repository claims pending jobs via state transition service', function
     $jobs->create(intent: JobIntent::Preflight, priority: 10);
     $jobs->create(intent: JobIntent::Preflight, priority: 5);
 
-    $claimed = $jobs->claimNextPending($transitions);
+    $claimed = $jobs->claimNextPending();
 
     expect($claimed)->not->toBeNull()
         ->and($claimed->state)->toBe(JobState::Processing);

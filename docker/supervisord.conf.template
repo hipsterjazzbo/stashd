@@ -4,21 +4,61 @@ logfile=/dev/null
 pidfile=/tmp/supervisord.pid
 user=root
 
+; startsecs/startretries on every program: supervisord's defaults give up
+; (FATAL) after 3 failed starts, leaving a running container with a dead
+; service inside -- the worst failure mode for an appliance. A huge retry
+; budget keeps it trying forever, and supervisord's per-retry delay grows
+; with each attempt, giving natural crash-loop backoff.
+
 [program:roadrunner]
 command=/usr/local/bin/stashd-entrypoint serve
 directory=__APP_DIR__
 autostart=true
 autorestart=true
+startsecs=10
+startretries=999999
 stdout_logfile=/dev/fd/1
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/fd/2
 stderr_logfile_maxbytes=0
 
-[program:worker]
-command=/usr/local/bin/stashd-entrypoint worker
+; One worker program per lane: interactive jobs (preflights, add-input --
+; things a human is watching) never queue behind bulk work (downloads,
+; transcodes, broadcast rebuilds), and fresh-channel discovery doesn't wait
+; on either. Lanes stay in one container / PID namespace so stale-job
+; recovery can verify owner-process liveness across lanes.
+
+[program:worker-interactive]
+command=/usr/local/bin/stashd-entrypoint worker interactive
 directory=__APP_DIR__
 autostart=true
 autorestart=true
+startsecs=10
+startretries=999999
+stdout_logfile=/dev/fd/1
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/fd/2
+stderr_logfile_maxbytes=0
+
+[program:worker-discovery]
+command=/usr/local/bin/stashd-entrypoint worker discovery
+directory=__APP_DIR__
+autostart=true
+autorestart=true
+startsecs=10
+startretries=999999
+stdout_logfile=/dev/fd/1
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/fd/2
+stderr_logfile_maxbytes=0
+
+[program:worker-bulk]
+command=/usr/local/bin/stashd-entrypoint worker bulk
+directory=__APP_DIR__
+autostart=true
+autorestart=true
+startsecs=10
+startretries=999999
 stdout_logfile=/dev/fd/1
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/fd/2
@@ -29,6 +69,8 @@ command=/usr/local/bin/stashd-entrypoint scheduler
 directory=__APP_DIR__
 autostart=true
 autorestart=true
+startsecs=10
+startretries=999999
 stdout_logfile=/dev/fd/1
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/fd/2

@@ -7,7 +7,7 @@ namespace App\Jobs;
 use App\Commands\CommandId;
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
-use App\System\State\StateTransitionService;
+use Tempest\Database\Connection\Connection;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
@@ -20,6 +20,7 @@ final class JobRepository
 {
     public function __construct(
         private PrefixedUlidGenerator $ids,
+        private Connection $connection,
     ) {
     }
 
@@ -65,25 +66,58 @@ final class JobRepository
         return $record;
     }
 
-    public function claimNextPending(StateTransitionService $transitions): ?JobRecord
+    /**
+     * The Pending -> Processing flip happens as a single guarded UPDATE
+     * (`WHERE id = ? AND state = 'pending'`, rowCount checked) rather than
+     * through StateTransitionService's read-mutate-save: multiple worker
+     * lanes claim concurrently, and separate statements leave a race window
+     * where two claimers select the same pending job before either saves.
+     * Losing a guarded UPDATE (rowCount 0) means another lane won that job;
+     * the next candidate is tried. The transition itself stays valid by
+     * construction -- the WHERE clause only ever moves pending to processing.
+     *
+     * $ownerToken records which OS process claimed the job, so stale-job
+     * recovery can verify the owner is actually dead before re-queuing (see
+     * WorkerProcessProbe / JobWorkerService::recoverStaleJobs).
+     */
+    public function claimNextPending(?JobLane $lane = null, ?string $ownerToken = null): ?JobRecord
     {
-        $record = JobRecord::select()
+        $query = JobRecord::select()
             ->where('state = ? AND (scheduledAt IS NULL OR scheduledAt <= ?)', JobState::Pending, DateTime::now(Timezone::UTC))
             ->orderBy('priority', Direction::ASC)
             ->orderBy('createdAt', Direction::ASC)
-            ->first();
+            ->limit(5);
 
-        if ($record === null) {
-            return null;
+        if ($lane !== null) {
+            $query = $query->whereIn('intent', array_map(
+                static fn (JobIntent $intent): string => $intent->value,
+                $lane->intents(),
+            ));
         }
 
-        $record->attempts++;
-        $record->startedAt = DateTime::now(Timezone::UTC);
-        $record->heartbeatAt = DateTime::now(Timezone::UTC);
-        $record->lastError = null;
-        $this->save($record);
+        foreach ($query->all() as $candidate) {
+            $statement = $this->connection->prepare(
+                'UPDATE jobs
+                 SET state = :processing, attempts = attempts + 1,
+                     startedAt = CURRENT_TIMESTAMP, heartbeatAt = CURRENT_TIMESTAMP,
+                     updatedAt = CURRENT_TIMESTAMP, lastError = NULL, ownerToken = :ownerToken
+                 WHERE id = :id AND state = :pending',
+            );
+            $statement->execute([
+                'processing' => JobState::Processing->value,
+                'ownerToken' => $ownerToken,
+                'id' => (string) $candidate->id,
+                'pending' => JobState::Pending->value,
+            ]);
 
-        return $transitions->transitionJob($record, JobState::Processing);
+            if ($statement->rowCount() !== 1) {
+                continue;
+            }
+
+            return JobRecord::findById($candidate->id);
+        }
+
+        return null;
     }
 
     /** @return list<JobRecord> */

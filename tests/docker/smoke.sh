@@ -155,9 +155,11 @@ if ! $CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite "SELECT name FROM sqlit
     exit 1
 fi
 
-echo "Checking supervisord worker + scheduler + roadrunner programs..."
+echo "Checking supervisord worker lanes + scheduler + roadrunner programs..."
 assert_supervisor_program roadrunner
-assert_supervisor_program worker
+assert_supervisor_program worker-interactive
+assert_supervisor_program worker-discovery
+assert_supervisor_program worker-bulk
 assert_supervisor_program scheduler
 
 echo "Creating owner account for authenticated API checks..."

@@ -47,6 +47,7 @@ function retryableDownloadWorker(GenericContainer $container, DownloadException 
         handlers: new JobHandlerRegistry([$handler]),
         activity: $container->get(ActivityEventService::class),
         publisher: $container->get(EventPublisher::class),
+        probe: $container->get(\App\Jobs\WorkerProcessProbe::class),
     );
 }
 
@@ -68,7 +69,7 @@ test('a retryable download failure is parked as pending with a future scheduledA
         ->and($job->scheduledAt->isAfter(DateTime::now(Timezone::UTC)))->toBeTrue();
 
     // A scheduled-for-later job is not claimed by the next tick.
-    expect($jobs->claimNextPending($this->container->get(StateTransitionService::class)))->toBeNull();
+    expect($jobs->claimNextPending())->toBeNull();
 });
 
 test('a retryable download failure fails permanently once maxAttempts is exhausted', function (): void {
@@ -101,7 +102,7 @@ test('claimNextPending skips a job scheduled for the future and claims one sched
     $past->scheduledAt = DateTime::now(Timezone::UTC)->minusSeconds(300);
     $jobs->save($past);
 
-    $claimed = $jobs->claimNextPending($transitions);
+    $claimed = $jobs->claimNextPending();
 
     expect((string) $claimed->id)->toBe((string) $past->id);
 });

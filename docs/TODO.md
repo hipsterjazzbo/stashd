@@ -384,6 +384,24 @@ Full task breakdown (T1-T20) in `docs/plans/phase-6-slice-6/plan.md`; `docs/plan
   `YouTubeUris::channelVideosPage()`/`playlistPage()` builders for the URLs yt-dlp needs (feed/API
   builders weren't reusable — yt-dlp needs the actual page URL, not a feed URL).
 
+### Worker/runtime reliability follow-ups (out of scope of the worker-lanes slice)
+
+- [ ] ytdlphp timeout semantics — `YtDlp`'s `timeout` is **total runtime** per invocation
+  (`vendor/hazel/ytdlphp/src/YtDlp.php`), and `YtdlpGatewayImpl` passes
+  `STASHD_YTDLP_TIMEOUT` (default 600s) to every call, including `download()`. Any single
+  download taking longer than 10 minutes (big file, slow NAS uplink) is killed mid-transfer
+  today even while making healthy progress. Fix in ytdlphp (idle/no-output timeout instead
+  of total), or give download calls a separate, much larger timeout than probe/extract calls.
+- [ ] `PodcastFeedController` buffers the whole feed XML via `file_get_contents($feedPath)`
+  before responding — same unbounded-buffering shape as the fixed episode-serving OOM crash
+  (RoadRunner workers die at `max_worker_memory` 128MB). Feed XML is text so it needs a very
+  large item count to hurt, but it should stream through `GeneratorFileStream` like episode
+  bodies do.
+- [ ] Orphaned yt-dlp grandchildren — when stale-job recovery hard-kills a hung worker tick
+  (dead-NFS case), a yt-dlp child of that tick is orphaned rather than killed. It exits on
+  its own within its ytdlphp timeout (≤600s) and only writes to staging temp, so this is
+  accepted for now; revisit with process-group kills if it ever bites.
+
 ## Phase 8 — Stronger typing & Tempest-native refactor (ongoing, not gating v1)
 
 Driven by AGENTS.md's "use Tempest-native facilities by default" preference. Full ready-to-run

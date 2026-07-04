@@ -45,6 +45,7 @@ final class JobRecord
         #[SerializeWith(DurationSecondsSerializer::class)]
         public ?Duration $progressEtaSeconds = null,
         public ?string $lastError = null,
+        public ?string $ownerToken = null,
         public ?array $payload = null,
         public ?DateTime $createdAt = null,
         public ?DateTime $updatedAt = null,

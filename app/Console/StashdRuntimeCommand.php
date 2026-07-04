@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console;
 
+use App\Jobs\JobLane;
 use App\System\RoadRunner\RoadRunnerProcessLauncher;
 use Tempest\Console\ConsoleArgument;
 use Tempest\Console\ConsoleCommand;
@@ -28,11 +29,13 @@ final readonly class StashdRuntimeCommand
     public function __invoke(
         #[ConsoleArgument(description: 'Role to run', aliases: ['role'])]
         string $role = 'all',
+        #[ConsoleArgument(description: 'Worker lane (interactive, discovery, bulk); omit to process all lanes')]
+        ?string $lane = null,
     ): ExitCode {
         return match ($role) {
             'all' => $this->runAll(),
             'serve' => $this->roadRunner->serve(),
-            'worker' => $this->runWorker(),
+            'worker' => $this->runWorker($lane),
             'scheduler' => $this->runScheduler(),
             default => $this->unknownRole($role),
         };
@@ -46,13 +49,25 @@ final readonly class StashdRuntimeCommand
         return $this->roadRunner->serve();
     }
 
-    private function runWorker(): ExitCode
+    private function runWorker(?string $lane): ExitCode
     {
-        $this->console->info('Job worker started. Polling for pending jobs…');
+        if ($lane !== null && JobLane::tryFrom($lane) === null) {
+            $this->console->error("Unknown worker lane: {$lane}");
+            $this->console->info('Valid lanes: interactive, discovery, bulk');
+
+            return ExitCode::ERROR;
+        }
+
+        $this->console->info('Job worker started' . ($lane !== null ? " (lane: {$lane})" : '') . '. Polling for pending jobs…');
+
+        $tick = 'php tempest stashd:worker-tick' . ($lane !== null ? " {$lane}" : '');
 
         while (true) {
-            $this->processes->run('php tempest stashd:worker-tick');
-            sleep(2);
+            $result = $this->processes->run($tick);
+
+            // Idle queues poll gently: with one loop per lane, a 2s cadence
+            // per loop adds up to constant PHP boots on a small NAS.
+            sleep($result->exitCode === 0 ? 2 : 5);
         }
     }
 
