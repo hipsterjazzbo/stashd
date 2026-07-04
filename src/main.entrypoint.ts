@@ -538,6 +538,7 @@ interface StashItemSummary {
 		duration_seconds: number | null
 		content_type: string | null
 		published_at: string | null
+		failure_reason: string | null
 	} | null
 	total_asset_size_bytes: number | null
 }
@@ -1152,21 +1153,21 @@ function stashDetailComponent(stashId: string) {
 			})
 		},
 
-		// Header summary, e.g. "218 items · 3 downloading · 4 ignored".
-		itemsSummary(): string {
-			const total = this.items.length
-			if (total === 0) return 'No items'
+		// Header summary chips, e.g. "218 items" · "12 downloading" · "3
+		// failed" -- clicking a chip sets itemStatusFilter to it, so the
+		// summary doubles as a set of filter shortcuts.
+		itemStatusSummary(): Array<{ label: string; filter: string }> {
+			const counts = new Map<string, number>()
+			for (const item of this.items) {
+				const status = item.media_item?.state
+				if (!status) continue
+				counts.set(status, (counts.get(status) ?? 0) + 1)
+			}
 
-			const downloading = this.items.filter((item) => this.isDownloading(item)).length
-			const ignored = this.items.filter((item) => item.state === 'ignored').length
-			const failed = this.items.filter((item) => item.media_item?.state === 'failed').length
-
-			const parts = [`${total} item${total === 1 ? '' : 's'}`]
-			if (downloading > 0) parts.push(`${downloading} downloading`)
-			if (failed > 0) parts.push(`${failed} failed`)
-			if (ignored > 0) parts.push(`${ignored} ignored`)
-
-			return parts.join(' · ')
+			return ITEM_STATUS_OPTIONS.filter((status) => counts.has(status)).map((status) => ({
+				label: `${counts.get(status)} ${status.replace(/_/g, ' ')}`,
+				filter: status,
+			}))
 		},
 
 		// Flattens items + their active job (if any) into one list so the items
@@ -1185,6 +1186,29 @@ function stashDetailComponent(stashId: string) {
 				}
 			}
 			return rows
+		},
+
+		// Re-dispatches item.download for a failed item -- MediaItemState
+		// allows Failed -> DownloadPending -> Downloading, so this is exactly
+		// the same command the initial download used, just issued again.
+		async retryDownload(item: StashItemSummary) {
+			this.actionPending = `${item.id}:retry`
+			try {
+				await apiFetch('/api/v1/commands', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						type: 'item.download',
+						options: { media_item_id: item.media_item_id, stash_id: item.stash_id },
+					}),
+				})
+				await this.refresh()
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not retry that download.'
+			} finally {
+				this.actionPending = null
+			}
 		},
 
 		async runBroadcastAction(broadcastId: string, action: 'rebuild' | 'verify' | 'prune' | 'rotate_token') {
