@@ -592,6 +592,35 @@ paths:
         "400": { $ref: "#/components/responses/ValidationError" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/v1/stashes/{stashId}/broadcasts/preview:
+    post:
+      operationId: previewBroadcastCreation
+      tags: [Broadcasts]
+      summary: Preview what creating a broadcast would do, before creating it
+      parameters:
+        - $ref: "#/components/parameters/StashIdInPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type: { $ref: "#/components/schemas/BroadcastType" }
+                mediaKind: { type: string, description: "PodcastMediaKind (audio/video); only relevant for type=podcast." }
+      responses:
+        "200":
+          description: Preview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  preview: { $ref: "#/components/schemas/BroadcastCreationPreview" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/v1/broadcasts/{id}:
     get:
       operationId: showBroadcast
@@ -1483,6 +1512,22 @@ components:
         compatible_download_policies:
           type: array
           items: { $ref: "#/components/schemas/DownloadPolicy" }
+
+    BroadcastCreationPreview:
+      type: object
+      description: >
+        Storage-impact preview for a broadcast that doesn't exist yet.
+        Computed against the stash's current items -- nothing is created or
+        persisted. Every type hardlinks (near-zero extra space) except audio
+        podcasts sourced from a video original, which get transcoded;
+        transcoded output size isn't known ahead of time, so those items are
+        reported as a count (transcode_item_count), not a byte estimate.
+      properties:
+        eligible_item_count: { type: integer, description: "Active stash items with a ready Vault original." }
+        skipped_item_count: { type: integer, description: "Stash items excluded: not downloaded, removed, or missing their Vault original." }
+        vault_size_bytes: { type: integer, description: "Combined size of the eligible items' existing Vault originals." }
+        hardlinked_item_count: { type: integer, description: "Eligible items published via hardlink, at ~zero extra space." }
+        transcode_item_count: { type: integer, description: "Eligible items that will be transcoded: extra space, unknown size until it happens." }
 
     DeleteImpact:
       type: object

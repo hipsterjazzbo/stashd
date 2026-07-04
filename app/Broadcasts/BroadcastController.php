@@ -39,6 +39,7 @@ final readonly class BroadcastController
         private BroadcastItemRepository $broadcastItems,
         private PodcastTokenService $podcastTokens,
         private PodcastEpisodeUrlBuilder $podcastUrls,
+        private BroadcastLifecycleService $lifecycle,
     ) {
     }
 
@@ -71,6 +72,33 @@ final readonly class BroadcastController
                 $this->broadcasts->listForStash(StashId::parse($stashId)),
             ),
         ]);
+    }
+
+    #[Post('/api/v1/stashes/{stashId}/broadcasts/preview')]
+    public function preview(string $stashId, Request $request): Json
+    {
+        $stash = $this->findStash($stashId);
+
+        if ($stash === null) {
+            return $this->notFound('Stash not found.');
+        }
+
+        $body = ApiJson::normalizeRequest($request->body);
+        $typeRaw = trim((string) ($body['type'] ?? ''));
+
+        if (! in_array($typeRaw, BroadcastPluginRegistry::broadcastKeys(), true)) {
+            return new Json([
+                'error' => [
+                    'code' => 'validation_error',
+                    'message' => 'Unsupported broadcast type.',
+                ],
+            ], Status::BAD_REQUEST);
+        }
+
+        $mediaKind = isset($body['mediaKind']) ? trim((string) $body['mediaKind']) : null;
+        $preview = $this->lifecycle->preview(StashId::parse($stashId), $typeRaw, $mediaKind);
+
+        return new Json(['preview' => ApiJson::encode($preview->toArray())]);
     }
 
     #[Post('/api/v1/stashes/{stashId}/broadcasts')]
