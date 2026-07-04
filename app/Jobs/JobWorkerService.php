@@ -17,6 +17,15 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
 {
     private const int STALE_SECONDS = 120;
 
+    /**
+     * An owner that is still alive but hasn't heartbeated for this long is
+     * assumed wedged on something no in-process timeout covers (e.g. a dead
+     * network mount) and gets killed so its job can be recovered. Every
+     * subprocess boundary (yt-dlp, ffmpeg, HTTP) has its own shorter timeout,
+     * so a healthy handler can't legitimately go silent this long.
+     */
+    private const int HARD_STALL_SECONDS = 1800;
+
     /** Backoff before retrying a rate-limited/bot-checked download, indexed by attempt number (capped at the last value). */
     private const array RETRY_BACKOFF_SECONDS = [30, 120, 480];
 
@@ -27,17 +36,36 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
         private JobHandlerRegistry $handlers,
         private ActivityEventService $activity,
         private EventPublisher $publisher,
+        private WorkerProcessProbe $probe,
     ) {
     }
 
+    /**
+     * A heartbeat-stale job is only re-queued once its owning process is
+     * provably dead -- with concurrent worker lanes, a time-only rule would
+     * re-queue jobs whose handler is merely between heartbeats (yt-dlp
+     * metadata calls can legitimately block for minutes) and run them twice.
+     * Jobs claimed before ownerToken existed (NULL) recover on time alone,
+     * matching the old behavior.
+     */
     public function recoverStaleJobs(): int
     {
         $staleBefore = DateTime::now(Timezone::UTC)->minusSeconds(self::STALE_SECONDS);
+        $hardStallBefore = DateTime::now(Timezone::UTC)->minusSeconds(self::HARD_STALL_SECONDS);
         $recovered = 0;
 
         foreach ($this->jobs->listProcessingStale($staleBefore) as $job) {
+            if ($job->ownerToken !== null && $this->probe->isAlive($job->ownerToken)) {
+                if ($job->heartbeatAt === null || ! $job->heartbeatAt->isBefore($hardStallBefore)) {
+                    continue;
+                }
+
+                $this->probe->kill($job->ownerToken);
+            }
+
             $message = 'Job stalled without heartbeat and was recovered.';
             $job->lastError = $message;
+            $job->ownerToken = null;
 
             if ($job->attempts >= $job->maxAttempts) {
                 $this->transitions->transitionJob($job, JobState::Failed);
@@ -59,11 +87,11 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
         return $recovered;
     }
 
-    public function processNextJob(): bool
+    public function processNextJob(?JobLane $lane = null): bool
     {
         $this->recoverStaleJobs();
 
-        $job = $this->jobs->claimNextPending($this->transitions);
+        $job = $this->jobs->claimNextPending($lane, $this->probe->currentToken());
 
         if ($job === null) {
             return false;
@@ -137,6 +165,7 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
         $job->lastError = $error;
         $job->startedAt = null;
         $job->heartbeatAt = null;
+        $job->ownerToken = null;
         $job->scheduledAt = DateTime::now(Timezone::UTC)->plusSeconds(self::RETRY_BACKOFF_SECONDS[$index]);
         $this->jobs->save($job);
         $this->transitions->transitionJob($job, JobState::Pending);
@@ -154,6 +183,7 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
 
         $job->lastError = $error;
         $job->finishedAt = DateTime::now(Timezone::UTC);
+        $job->ownerToken = null;
         $this->jobs->save($job);
         $this->transitions->transitionJob($job, JobState::Failed);
         $this->failCommandIfNeeded($job, $error);
