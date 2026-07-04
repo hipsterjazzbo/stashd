@@ -249,34 +249,35 @@
 									<p class="mt-1 text-[12px] text-warn">Anyone with this link can listen — treat it like a password.</p>
 								</div>
 
-								<div class="mt-3 rounded border border-line bg-espresso p-2"
-									x-show="isSeriesBroadcastType(broadcast.type) && inputs.length > 0"
-									x-init="ensureSeasonMappingDraft(broadcast)">
-									<p class="text-[11px] uppercase tracking-wide text-muted">Season mapping</p>
-									<p class="mt-1 text-[12px] text-muted">Assign each input to a season. Leave blank for the default (Season 01).</p>
-									<div class="mt-2 space-y-1">
-										<template x-for="input in inputs" x-bind:key="input.id">
-											<div class="flex items-center gap-2">
-												<span class="flex-1 truncate text-[12px] text-cream" x-text="input.title ?? input.provider_input_id"></span>
-												<input type="number" min="1" placeholder="default"
-													x-model="seasonMappingDrafts[broadcast.id][input.id]"
-													class="w-20 rounded border border-line bg-panel px-2 py-1 text-[12px] text-cream outline-none focus:border-amber"/>
-											</div>
-										</template>
+								<template x-if="isSeriesBroadcastType(broadcast.type) && inputs.length > 0">
+									<div class="mt-3 rounded border border-line bg-espresso p-2"
+										x-init="ensureSeasonMappingDraft(broadcast)">
+										<p class="text-[11px] uppercase tracking-wide text-muted">Season mapping</p>
+										<p class="mt-1 text-[12px] text-muted">Assign each input to a season. Leave blank for the default (Season 01).</p>
+										<div class="mt-2 space-y-1">
+											<template x-for="input in inputs" x-bind:key="input.id">
+												<div class="flex items-center gap-2">
+													<span class="flex-1 truncate text-[12px] text-cream" x-text="input.title ?? input.provider_input_id"></span>
+													<input type="number" min="1" placeholder="default"
+														x-model="seasonMappingDrafts[broadcast.id][input.id]"
+														class="w-20 rounded border border-line bg-panel px-2 py-1 text-[12px] text-cream outline-none focus:border-amber"/>
+												</div>
+											</template>
+										</div>
+										<button type="button" x-on:click="saveSeasonMapping(broadcast.id)"
+											x-bind:disabled="savingSeasonMapping === broadcast.id"
+											class="mt-2 rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-60">
+											Save season mapping
+										</button>
 									</div>
-									<button type="button" x-on:click="saveSeasonMapping(broadcast.id)"
-										x-bind:disabled="savingSeasonMapping === broadcast.id"
-										class="mt-2 rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-60">
-										Save season mapping
-									</button>
-								</div>
+								</template>
 							</li>
 						</template>
 					</ul>
 
 					<div class="border-t border-line p-4">
 						<div class="flex items-center gap-2">
-							<select x-model="newBroadcastType" x-on:change="newBroadcastSettings = {}; onBroadcastTypeChanged()"
+							<select x-model="newBroadcastType" x-on:change="onBroadcastTypeChanged()"
 								class="rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber">
 								<template x-for="plugin in broadcastPlugins" x-bind:key="plugin.key">
 									<option x-bind:value="plugin.key" x-text="plugin.label"></option>
@@ -287,33 +288,13 @@
 								<option value="audio">Audio episodes</option>
 								<option value="video">Video episodes</option>
 							</select>
-							<input type="text" x-model="newBroadcastName" placeholder="Broadcast name"
+							<input type="text" x-model="newBroadcastName" placeholder="Name (optional)"
 								class="flex-1 rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
 							<button type="button" x-on:click="createBroadcast()"
-								x-bind:disabled="creatingBroadcast || newBroadcastName.trim() === ''"
+								x-bind:disabled="creatingBroadcast"
 								class="shrink-0 rounded bg-amber px-3 py-2 text-[13px] font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-60">
 								Add broadcast
 							</button>
-						</div>
-
-						<div class="mt-3 flex flex-wrap items-center gap-2" x-show="currentBroadcastExtraControls().length > 0">
-							<template x-for="control in currentBroadcastExtraControls()" x-bind:key="control.name">
-								<label class="min-w-[160px] flex-1">
-									<span class="mb-1 block text-[11px] uppercase tracking-wide text-muted" x-text="control.label"></span>
-									<template x-if="control.type === 'select'">
-										<select x-model="newBroadcastSettings[control.name]"
-											class="w-full rounded border border-line bg-espresso px-2 py-1 text-[13px] text-cream outline-none focus:border-amber">
-											<template x-for="option in control.options" x-bind:key="option">
-												<option x-bind:value="option" x-text="option"></option>
-											</template>
-										</select>
-									</template>
-									<template x-if="control.type !== 'select'">
-										<input type="text" x-model="newBroadcastSettings[control.name]"
-											class="w-full rounded border border-line bg-espresso px-2 py-1 text-[13px] text-cream outline-none focus:border-amber"/>
-									</template>
-								</label>
-							</template>
 						</div>
 
 						<div class="mt-3 rounded border border-warn/40 bg-warn/10 p-3" x-show="broadcastPolicyMismatchMessage()">

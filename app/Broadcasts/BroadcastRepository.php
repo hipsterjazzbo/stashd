@@ -85,6 +85,42 @@ final class BroadcastRepository
     }
 
     /**
+     * Returns `$base` if it is free within this stash, otherwise the lowest
+     * unused `$base-N` (N starts at 2) -- mirrors StashRepository's slug
+     * dedup so an auto-generated broadcast name doesn't collide the second
+     * time a user adds the same broadcast type to a stash.
+     */
+    public function nextAvailableSlug(StashId $stashId, string $base): string
+    {
+        $taken = array_map(
+            static fn (BroadcastRecord $broadcast): string => $broadcast->slug,
+            BroadcastRecord::select()
+                ->where('stashId = ? AND (slug = ? OR slug LIKE ?)', $stashId->toString(), $base, $base . '-%')
+                ->all(),
+        );
+
+        if (! in_array($base, $taken, true)) {
+            return $base;
+        }
+
+        $usedOrdinals = [];
+
+        foreach ($taken as $slug) {
+            if (preg_match('/^' . preg_quote($base, '/') . '-(\d+)$/', $slug, $match)) {
+                $usedOrdinals[(int) $match[1]] = true;
+            }
+        }
+
+        $ordinal = 2;
+
+        while (isset($usedOrdinals[$ordinal])) {
+            $ordinal++;
+        }
+
+        return "{$base}-{$ordinal}";
+    }
+
+    /**
      * Podcast broadcasts that carry a feed token, used to resolve a raw feed
      * token back to its broadcast for the public feed route.
      *

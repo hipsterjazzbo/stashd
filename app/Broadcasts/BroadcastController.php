@@ -82,22 +82,26 @@ final readonly class BroadcastController
             return $this->notFound('Stash not found.');
         }
 
+        $typedStashId = StashId::parse($stashId);
+
         $body = ApiJson::normalizeRequest($request->body);
         $typeRaw = trim((string) ($body['type'] ?? ''));
         $name = trim((string) ($body['name'] ?? ''));
         $slugRaw = trim((string) ($body['slug'] ?? ''));
 
-        if ($typeRaw === '' || $name === '') {
+        if ($typeRaw === '') {
             return new Json([
                 'error' => [
                     'code' => 'validation_error',
-                    'message' => 'type and name are required.',
+                    'message' => 'type is required.',
                 ],
             ], Status::BAD_REQUEST);
         }
 
         // Validate against known plugin keys.
-        if (! in_array($typeRaw, BroadcastPluginRegistry::broadcastKeys(), true)) {
+        $discoveredPlugin = BroadcastPluginRegistry::findByKey($typeRaw);
+
+        if ($discoveredPlugin === null) {
             return new Json([
                 'error' => [
                     'code' => 'validation_error',
@@ -106,7 +110,21 @@ final readonly class BroadcastController
             ], Status::BAD_REQUEST);
         }
 
+        // A name is a formality here, not something worth blocking on --
+        // default to "{stash} {plugin label}" (e.g. "My Channel Podcast")
+        // and dedupe the slug automatically so adding a second broadcast of
+        // the same type to a stash just works.
+        $nameWasProvided = $name !== '';
+
+        if (! $nameWasProvided) {
+            $name = trim($stash->name . ' ' . $discoveredPlugin->name);
+        }
+
         $slug = $slugRaw !== '' ? $slugRaw : str($name)->slug()->toString();
+
+        if (! $nameWasProvided && $slugRaw === '') {
+            $slug = $this->broadcasts->nextAvailableSlug($typedStashId, $slug);
+        }
 
         try {
             $slug = PathSanitizer::sanitizeSegment($slug);
@@ -118,8 +136,6 @@ final readonly class BroadcastController
                 ],
             ], Status::BAD_REQUEST);
         }
-
-        $typedStashId = StashId::parse($stashId);
 
         if ($this->broadcasts->findByStashAndSlug($typedStashId, $slug) !== null) {
             return new Json([
