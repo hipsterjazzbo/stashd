@@ -336,26 +336,6 @@
 							</div>
 						</div>
 
-						<div class="mt-3 flex flex-wrap items-center gap-2" x-show="currentBroadcastExtraControls().length > 0">
-							<template x-for="control in currentBroadcastExtraControls()" x-bind:key="control.name">
-								<label class="min-w-[160px] flex-1">
-									<span class="mb-1 block text-[11px] uppercase tracking-wide text-muted" x-text="control.label"></span>
-									<template x-if="control.type === 'select'">
-										<select x-model="newBroadcastSettings[control.name]"
-											class="w-full rounded border border-line bg-espresso px-2 py-1 text-[13px] text-cream outline-none focus:border-amber">
-											<template x-for="option in control.options" x-bind:key="option">
-												<option x-bind:value="option" x-text="option"></option>
-											</template>
-										</select>
-									</template>
-									<template x-if="control.type !== 'select'">
-										<input type="text" x-model="newBroadcastSettings[control.name]"
-											class="w-full rounded border border-line bg-espresso px-2 py-1 text-[13px] text-cream outline-none focus:border-amber"/>
-									</template>
-								</label>
-							</template>
-						</div>
-
 						<div class="mt-3 rounded border border-warn/40 bg-warn/10 p-3" x-show="broadcastPolicyMismatchMessage()">
 							<p class="text-[12px] text-warn" x-text="broadcastPolicyMismatchMessage()"></p>
 							<p class="mt-1 text-[12px] text-muted">It'll still be created — there just won't be anything to publish yet.</p>
@@ -488,10 +468,17 @@
 				</template>
 
 				<template x-if="addInputStep === 'reviewing'">
-					<p class="mt-3 flex items-center gap-2 text-[13px] text-muted">
-						<span class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
-						Looking up that source…
-					</p>
+					<div class="mt-3">
+						<p class="flex items-center gap-2 text-[13px] text-muted">
+							<span class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
+							Looking up that source…
+						</p>
+						<p class="mt-2 text-[12px] text-muted">This can take a while for a slow or rate-limited source. It'll keep running in the background even if you close this.</p>
+						<div class="mt-4 flex justify-end gap-2">
+							<button type="button" x-on:click="cancelAddInput()"
+								class="rounded border border-line px-3 py-2 text-[13px] text-muted transition-colors hover:text-cream">Close</button>
+						</div>
+					</div>
 				</template>
 
 				<template x-if="addInputStep === 'review'">
