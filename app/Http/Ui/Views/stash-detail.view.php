@@ -171,7 +171,6 @@
 											<div class="flex items-center gap-2">
 												<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber pulse-dot"></span>
 												<span class="shrink-0 text-[11px] text-muted" x-text="row.job.progress_label ?? row.job.intent.replace(/_/g, ' ')"></span>
-												<span class="shrink-0 text-[11px] text-muted" x-text="Math.round(row.job.progress_percent ?? 0) + '%'"></span>
 												<div class="h-1.5 flex-1 rounded-full bg-espresso">
 													<div class="h-1.5 rounded-full bg-amber" x-bind:style="'width: ' + (row.job.progress_percent ?? 0) + '%'"></div>
 												</div>
@@ -205,6 +204,17 @@
 								</div>
 
 								<p class="mt-1 text-[12px] text-error" x-show="broadcast.last_error" x-text="broadcast.last_error"></p>
+
+								<template x-if="activeBroadcastJobFor(broadcast.id)">
+									<div class="mt-2 flex items-center gap-2">
+										<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber pulse-dot"></span>
+										<span class="shrink-0 text-[11px] text-muted" x-text="activeBroadcastJobFor(broadcast.id).progress_label ?? activeBroadcastJobFor(broadcast.id).intent.replace(/_/g, ' ')"></span>
+										<div class="h-1.5 flex-1 rounded-full bg-espresso">
+											<div class="h-1.5 rounded-full bg-amber" x-bind:style="'width: ' + (activeBroadcastJobFor(broadcast.id).progress_percent ?? 0) + '%'"></div>
+										</div>
+										<span class="shrink-0 text-[11px] text-muted" x-text="Math.round(activeBroadcastJobFor(broadcast.id).progress_percent ?? 0) + '%'"></span>
+									</div>
+								</template>
 
 								<div class="mt-2 flex flex-wrap gap-2">
 									<button type="button"
