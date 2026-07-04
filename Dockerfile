@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM docker.io/composer:2 AS composer
 
 # Build the front-end assets (Vite + Tailwind + Alpine) into public/build/.
@@ -99,10 +100,15 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --no-script
 
 COPY . .
 COPY --from=assets /app/public/build ./public/build
-RUN git config --global --add safe.directory /var/www/html \
+# `rr get` hits the GitHub API to resolve/download the release; anonymous
+# requests are capped at 60/hr and get rate-limited under CI/shared-IP load
+# (this has broken at least one image publish). The secret is mounted (not
+# an ARG/ENV) so it never lands in image layers or history.
+RUN --mount=type=secret,id=github_token \
+    git config --global --add safe.directory /var/www/html \
     && composer dump-autoload --optimize \
     && php vendor/bin/tempest discovery:generate --no-interaction \
-    && vendor/bin/rr get --no-config \
+    && GITHUB_TOKEN=$(cat /run/secrets/github_token 2>/dev/null || true) vendor/bin/rr get --no-config \
     && rm -rf .tempest
 
 RUN chown -R stashd:stashd /var/www/html
