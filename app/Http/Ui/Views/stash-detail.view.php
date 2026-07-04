@@ -302,8 +302,6 @@
 								class="flex-1 rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
 							<button type="button" x-show="!broadcastPreview" x-on:click="previewBroadcastCreation()"
 								x-bind:disabled="loadingBroadcastPreview || newBroadcastName.trim() === ''"
-							<button type="button" x-on:click="createBroadcast()"
-								x-bind:disabled="creatingBroadcast"
 								class="shrink-0 rounded bg-amber px-3 py-2 text-[13px] font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-60">
 								<span x-show="loadingBroadcastPreview">Loading…</span>
 								<span x-show="!loadingBroadcastPreview">Preview</span>
