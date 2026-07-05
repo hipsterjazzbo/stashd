@@ -146,7 +146,11 @@ function formatRelativeTime(iso: string | null | undefined): string {
 	if (abs < 60) return `${abs}s ${suffix}`
 	if (abs < 3600) return `${Math.round(abs / 60)}m ${suffix}`
 	if (abs < 86400) return `${Math.round(abs / 3600)}h ${suffix}`
-	return `${Math.round(abs / 86400)}d ${suffix}`
+	if (abs < 86400 * 30) return `${Math.round(abs / 86400)}d ${suffix}`
+
+	// Past a month, a relative count (e.g. "2856d ago") stops being useful --
+	// an absolute date is.
+	return new Date(then).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 interface Badge {
