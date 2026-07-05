@@ -309,6 +309,34 @@ function summarizeRecentActivity(events: ActivityLogEntry[], limit = 8): Activit
 	return groups.slice(0, limit)
 }
 
+/**
+ * The Activity page's live feed renders `ActivityEvent`s straight off Mercure
+ * (event name + raw payload); its initial backfill instead comes from the
+ * persisted `ActivityLogEntry` log, a differently-shaped resource. A
+ * persisted entry is exactly what happens at rest when an `activity.created`
+ * event fires, so it's adapted to that same shape here rather than teaching
+ * every render helper (eventBadge, summarizeEvent) a second event shape.
+ */
+function activityLogEntryToEvent(entry: ActivityLogEntry): ActivityEvent {
+	return {
+		id: entry.id,
+		event: 'activity.created',
+		payload: {
+			level: entry.level,
+			message: entry.message,
+			type: entry.type,
+			entity_type: entry.entity_type,
+			entity_id: entry.entity_id,
+			stash_id: entry.stash_id,
+			media_item_id: entry.media_item_id,
+			broadcast_id: entry.broadcast_id,
+			job_id: entry.job_id,
+			command_id: entry.command_id,
+		},
+		created_at: entry.created_at,
+	}
+}
+
 // The full, fixed set of event names MercurePublisher ever emits
 // (app/System/Event/EventPublisher.php).
 const EVENT_TYPES = ['job.created', 'job.progress', 'job.completed', 'job.failed', 'activity.created'] as const
@@ -798,6 +826,7 @@ function dashboardComponent() {
 
 function activityComponent() {
 	return {
+		loading: true,
 		events: [] as ActivityEvent[],
 		connected: false,
 		// SSE replaces `events` wholesale on every notification; tracking
@@ -817,7 +846,20 @@ function activityComponent() {
 			}
 		},
 
-		init() {
+		async init() {
+			try {
+				const response = await apiFetch('/api/v1/activity')
+				const entries = ((await response.json()).events as ActivityLogEntry[]) ?? []
+				this.events = entries.map(activityLogEntryToEvent)
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				// Backfill failing shouldn't block the live feed below -- an
+				// empty list here just means "No activity yet" until the
+				// first live event arrives, same as before this existed.
+			} finally {
+				this.loading = false
+			}
+
 			if (!('EventSource' in window)) return
 
 			subscribeToConnectionState((connected) => {

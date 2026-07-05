@@ -8,7 +8,12 @@
 			</p>
 		</div>
 
-		<p class="text-[13px] text-muted" x-show="events.length === 0">No activity yet.</p>
+		<p class="flex items-center gap-2 text-[13px] text-muted" x-show="loading">
+			<span class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
+			Loading…
+		</p>
+
+		<p class="text-[13px] text-muted" x-show="!loading && events.length === 0">No activity yet.</p>
 
 		<ul class="space-y-2" x-show="events.length > 0">
 			<template x-for="event in events" x-bind:key="event.id">
