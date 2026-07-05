@@ -17,5 +17,15 @@
 	@buildAssets path /build/*
 	header @buildAssets Cache-Control "public, max-age=31536000, immutable"
 
+	# Embedded real-time hub at /.well-known/mercure. No `anonymous`: every
+	# subscriber needs a JWT minted by the authenticated
+	# GET /api/v1/events/subscription endpoint. publisher_jwt/subscriber_jwt
+	# share one secret -- Stashd only ever publishes to itself, so splitting
+	# them would add two env vars for a distinction nothing uses.
+	mercure {
+		publisher_jwt {$MERCURE_JWT_SECRET}
+		subscriber_jwt {$MERCURE_JWT_SECRET}
+	}
+
 	php_server
 }

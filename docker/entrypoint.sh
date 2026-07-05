@@ -124,11 +124,53 @@ ensure_signing_key() {
     fi
 }
 
+ensure_mercure_secret() {
+    if [ -n "${MERCURE_JWT_SECRET:-}" ]; then
+        log "using operator-supplied MERCURE_JWT_SECRET"
+        export MERCURE_JWT_SECRET
+        return 0
+    fi
+
+    # Same $DATA_DIR/.env roundtrip as ensure_signing_key, and for the same
+    # reason (see its comment). Generated here rather than via a Tempest
+    # console command like SIGNING_KEY's, because this secret must also
+    # reach Caddy (a separate process from PHP, via the Caddyfile's
+    # `{$MERCURE_JWT_SECRET}` placeholder) -- so it's `export`ed below, not
+    # just left in .env for Dotenv to load into PHP later.
+    if [ "$APP_DIR" = "/var/www/html" ]; then
+        persisted_env="$DATA_DIR/.env"
+
+        if [ -f "$persisted_env" ]; then
+            cp "$persisted_env" "$APP_DIR/.env" || true
+            if [ "$(id -u)" -eq 0 ]; then
+                chown "${PUID}:${PGID}" "$APP_DIR/.env" || true
+            fi
+        fi
+
+        if ! grep -q '^MERCURE_JWT_SECRET=' "$APP_DIR/.env" 2>/dev/null; then
+            printf 'MERCURE_JWT_SECRET=%s\n' "$(head -c32 /dev/urandom | base64 | tr -d '\n')" >> "$APP_DIR/.env"
+        fi
+
+        cp "$APP_DIR/.env" "$persisted_env"
+        if [ "$(id -u)" -eq 0 ]; then
+            chown "${PUID}:${PGID}" "$persisted_env" || true
+        fi
+    else
+        if ! grep -q '^MERCURE_JWT_SECRET=' "$APP_DIR/.env" 2>/dev/null; then
+            printf 'MERCURE_JWT_SECRET=%s\n' "$(head -c32 /dev/urandom | base64 | tr -d '\n')" >> "$APP_DIR/.env"
+        fi
+    fi
+
+    MERCURE_JWT_SECRET="$(grep '^MERCURE_JWT_SECRET=' "$APP_DIR/.env" | tail -1 | cut -d= -f2-)"
+    export MERCURE_JWT_SECRET
+}
+
 prepare_runtime() {
     cd "$APP_DIR"
     git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
     ensure_writable
     ensure_signing_key
+    ensure_mercure_secret
     export STASHD_DATA_PATH="$DATA_DIR"
     export STASHD_MEDIA_PATH="$MEDIA_DIR"
     export TEMPEST_INTERNAL_STORAGE="${DATA_DIR}/.tempest"
