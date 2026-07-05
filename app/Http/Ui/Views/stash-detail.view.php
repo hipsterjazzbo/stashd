@@ -308,6 +308,10 @@
 							</button>
 						</div>
 
+						<p class="mt-2 text-[12px] text-muted" x-show="isSeriesBroadcastType(newBroadcastType) && inputs.length > 1">
+							Multiple inputs go into Season 01 by default — you can map each one to its own season from this broadcast's card once it's created.
+						</p>
+
 						<div class="mt-3 rounded border border-line bg-espresso p-3" x-show="broadcastPreview">
 							<p class="text-[11px] uppercase tracking-wide text-muted">What this will do</p>
 							<p class="mt-1 text-[12px] text-cream">
