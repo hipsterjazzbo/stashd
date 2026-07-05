@@ -118,6 +118,7 @@ final class StashRepository
     public function update(
         StashRecord $stash,
         ?string $name = null,
+        ?string $slug = null,
         ?string $description = null,
         ?SyncMode $syncMode = null,
         ?DownloadPolicy $downloadPolicy = null,
@@ -126,6 +127,10 @@ final class StashRepository
     ): StashRecord {
         if ($name !== null) {
             $stash->name = $name;
+        }
+
+        if ($slug !== null) {
+            $stash->slug = $slug;
         }
 
         if ($description !== null) {
