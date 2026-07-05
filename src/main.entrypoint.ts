@@ -770,6 +770,19 @@ interface LibrarySummary {
 	type: string | null
 }
 
+async function describeFailedResponse(response: Response): Promise<string> {
+	try {
+		const body = (await response.json()) as { error?: { message?: string } }
+		return body.error?.message ?? `HTTP ${response.status}`
+	} catch {
+		return `HTTP ${response.status}`
+	}
+}
+
+function describeFailureReason(cause: unknown): string {
+	return cause instanceof Error ? cause.message : String(cause)
+}
+
 function dashboardComponent() {
 	return {
 		loading: true,
@@ -804,22 +817,55 @@ function dashboardComponent() {
 		},
 
 		async refresh() {
-			try {
-				const [healthResponse, stashesResponse, itemsResponse, activityResponse] = await Promise.all([
-					apiFetch('/api/v1/system/health'),
-					apiFetch('/api/v1/stashes'),
-					apiFetch('/api/v1/items'),
-					apiFetch('/api/v1/activity'),
-				])
-				this.health = await healthResponse.json()
-				this.stashCount = ((await stashesResponse.json()).stashes as unknown[]).length
-				this.vaultCount = ((await itemsResponse.json()).items as unknown[]).length
-				this.activitySummary = summarizeRecentActivity((await activityResponse.json()).events as ActivityLogEntry[])
-				this.error = null
-			} catch (cause) {
-				if (cause instanceof UnauthenticatedError) return
-				this.error = 'Could not reach the server.'
+			// Each endpoint runs independently (Promise.allSettled, not
+			// Promise.all) so one bad endpoint doesn't hide which one it was
+			// behind a single generic "could not reach the server" message.
+			const endpoints: Array<{ label: string; run: () => Promise<void> }> = [
+				{
+					label: 'system health',
+					run: async () => {
+						const response = await apiFetch('/api/v1/system/health')
+						if (!response.ok) throw new Error(await describeFailedResponse(response))
+						this.health = await response.json()
+					},
+				},
+				{
+					label: 'stashes',
+					run: async () => {
+						const response = await apiFetch('/api/v1/stashes')
+						if (!response.ok) throw new Error(await describeFailedResponse(response))
+						this.stashCount = ((await response.json()).stashes as unknown[]).length
+					},
+				},
+				{
+					label: 'vault items',
+					run: async () => {
+						const response = await apiFetch('/api/v1/items')
+						if (!response.ok) throw new Error(await describeFailedResponse(response))
+						this.vaultCount = ((await response.json()).items as unknown[]).length
+					},
+				},
+				{
+					label: 'activity',
+					run: async () => {
+						const response = await apiFetch('/api/v1/activity')
+						if (!response.ok) throw new Error(await describeFailedResponse(response))
+						this.activitySummary = summarizeRecentActivity((await response.json()).events as ActivityLogEntry[])
+					},
+				},
+			]
+
+			const results = await Promise.allSettled(endpoints.map((endpoint) => endpoint.run()))
+
+			if (results.some((result) => result.status === 'rejected' && result.reason instanceof UnauthenticatedError)) {
+				return
 			}
+
+			const failures = results
+				.map((result, index) => (result.status === 'rejected' ? `${endpoints[index].label} (${describeFailureReason(result.reason)})` : null))
+				.filter((message): message is string => message !== null)
+
+			this.error = failures.length > 0 ? `Could not reach: ${failures.join(', ')}.` : null
 		},
 	}
 }
