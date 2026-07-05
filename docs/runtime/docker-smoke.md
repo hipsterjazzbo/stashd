@@ -5,7 +5,7 @@ The Docker smoke test builds the Stashd image, starts a disposable container, an
 - container boot and `/health`
 - SQLite migrations
 - storage root creation
-- supervisord-managed RoadRunner, worker, and scheduler
+- supervisord-managed FrankenPHP, worker, and scheduler
 - authenticated system health
 - fake-provider preflight and create-from-preflight
 - fake download into the Vault

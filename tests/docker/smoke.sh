@@ -106,11 +106,21 @@ wait_for_health() {
 
 assert_supervisor_program() {
     program="$1"
-    if ! $CONTAINER exec "$NAME" supervisorctl status "$program" 2>/dev/null | grep -q RUNNING; then
-        echo "smoke failed: supervisord program not running: ${program}" >&2
-        $CONTAINER exec "$NAME" supervisorctl status 2>&1 || true
-        exit 1
-    fi
+    # /health goes green as soon as Caddy binds the port, which can be well
+    # before supervisord's startsecs grace period has elapsed for that
+    # program (STARTING -> RUNNING is time-gated, not instant) -- poll
+    # instead of checking once to avoid racing that transition.
+    deadline=$(( $(date +%s) + 15 ))
+    while [ "$(date +%s)" -lt "$deadline" ]; do
+        if $CONTAINER exec "$NAME" supervisorctl status "$program" 2>/dev/null | grep -q RUNNING; then
+            return 0
+        fi
+        sleep 1
+    done
+
+    echo "smoke failed: supervisord program not running: ${program}" >&2
+    $CONTAINER exec "$NAME" supervisorctl status 2>&1 || true
+    exit 1
 }
 
 wait_for_health
@@ -155,8 +165,8 @@ if ! $CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite "SELECT name FROM sqlit
     exit 1
 fi
 
-echo "Checking supervisord worker lanes + scheduler + roadrunner programs..."
-assert_supervisor_program roadrunner
+echo "Checking supervisord worker lanes + scheduler + frankenphp programs..."
+assert_supervisor_program frankenphp
 assert_supervisor_program worker-interactive
 assert_supervisor_program worker-discovery
 assert_supervisor_program worker-bulk
@@ -170,7 +180,7 @@ setup_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/auth/setup" \
     -d '{"username":"smoke","password":"smoke-password"}')"
 echo "$setup_body"
 
-echo "Logging in to establish session (setup cookie alone is not persisted across RR requests)..."
+echo "Logging in to establish session (setup does not itself establish one)..."
 login_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/auth/login" \
     -H 'Content-Type: application/json' \
     -c /tmp/stashd-smoke-cookies-$$ \

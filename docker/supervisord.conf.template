@@ -10,7 +10,7 @@ user=root
 ; budget keeps it trying forever, and supervisord's per-retry delay grows
 ; with each attempt, giving natural crash-loop backoff.
 
-[program:roadrunner]
+[program:frankenphp]
 command=/usr/local/bin/stashd-entrypoint serve
 directory=__APP_DIR__
 autostart=true

@@ -18,7 +18,6 @@ description: Triage Stashd Docker smoke/runtime failures without drowning Claude
 ```text
 Dockerfile
 docker-compose.yml
-.rr.yaml
 docker/
 .env.example
 tests/docker/

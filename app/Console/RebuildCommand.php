@@ -16,7 +16,7 @@ final readonly class RebuildCommand
 {
     use HasConsole;
 
-    private const array SUPERVISED_ROLES = ['worker', 'scheduler', 'roadrunner'];
+    private const array SUPERVISED_ROLES = ['worker', 'scheduler', 'frankenphp'];
 
     #[ConsoleCommand(
         name: 'stashd:rebuild',
@@ -29,15 +29,15 @@ final readonly class RebuildCommand
         // across the schema drop below. Gracefully skipped (and the restart
         // below skipped too) when supervisorctl isn't reachable -- plain
         // `php tempest serve` dev setups without supervisord are unaffected.
-        $supervised = $this->console->task('Stop worker/scheduler/roadrunner', $this->supervisorctl('stop'));
+        $supervised = $this->console->task('Stop worker/scheduler/frankenphp', $this->supervisorctl('stop'));
 
         $this->console->call(MigrateFreshCommand::class);
         $this->console->call(BootCommand::class);
 
         if ($supervised) {
-            $this->console->task('Restart worker/scheduler/roadrunner', $this->supervisorctl('start'));
+            $this->console->task('Restart worker/scheduler/frankenphp', $this->supervisorctl('start'));
         } else {
-            $this->console->warning('supervisorctl unreachable -- worker/scheduler/roadrunner were not restarted.');
+            $this->console->warning('supervisorctl unreachable -- worker/scheduler/frankenphp were not restarted.');
         }
 
         return ExitCode::SUCCESS;

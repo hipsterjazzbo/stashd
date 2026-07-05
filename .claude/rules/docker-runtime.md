@@ -2,7 +2,6 @@
 paths:
   - "Dockerfile"
   - "docker-compose.yml"
-  - ".rr.yaml"
   - "docker/**/*"
   - "scripts/**/*"
   - "tests/docker/**/*"
@@ -23,7 +22,7 @@ copy → paste → docker compose up → works
 
 - Default port: `8474`.
 - No Nginx/PHP-FPM required in the default deployment.
-- RoadRunner serves HTTP and supports worker/runtime roles.
+- FrankenPHP (classic mode) serves HTTP; `stashd` console command supports worker/scheduler/serve runtime roles.
 - SQLite, app key/secrets, storage roots, and migrations must survive restart.
 - Error messages should be clear and actionable for homelab users.
 
@@ -36,7 +35,7 @@ composer test:docker-smoke:no-build
 composer test:docker-smoke
 ```
 
-Docker smoke should cover boot, RoadRunner, Tempest, SQLite migration, storage roots, health, setup/auth, worker/scheduler, fake provider/download, fake broadcast, SSE, restart persistence, and clean shutdown.
+Docker smoke should cover boot, FrankenPHP, Tempest, SQLite migration, storage roots, health, setup/auth, worker/scheduler, fake provider/download, fake broadcast, SSE, restart persistence, and clean shutdown.
 
 ## Avoid
 

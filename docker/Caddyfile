@@ -1,0 +1,21 @@
+# FrankenPHP (Caddy) config for Stashd, classic (non-worker) mode.
+#
+# A bare ":port" address (no hostname) is HTTP-only by nature -- Caddy's
+# automatic HTTPS only activates for addresses it could plausibly get a
+# certificate for, so this needs no explicit `auto_https off` for the
+# homelab default of a bare IP/port with no public domain.
+#
+# `php_server` serves anything under public/ as a static file first (built
+# assets, favicon) and falls through to public/index.php otherwise -- the
+# same precedence .rr.yaml's `static` middleware gave RoadRunner, without
+# needing an explicit forbid list: root is scoped to public/, which never
+# contains .env/.htaccess/other .php files.
+:{$STASHD_HTTP_PORT:-8474} {
+	root * public
+	encode zstd gzip
+
+	@buildAssets path /build/*
+	header @buildAssets Cache-Control "public, max-age=31536000, immutable"
+
+	php_server
+}

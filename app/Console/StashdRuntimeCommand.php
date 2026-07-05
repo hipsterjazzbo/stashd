@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Console;
 
 use App\Jobs\JobLane;
-use App\System\RoadRunner\RoadRunnerProcessLauncher;
+use App\System\FrankenPhp\FrankenPhpProcessLauncher;
 use Tempest\Console\ConsoleArgument;
 use Tempest\Console\ConsoleCommand;
 use Tempest\Console\ExitCode;
@@ -18,7 +18,7 @@ final readonly class StashdRuntimeCommand
 
     public function __construct(
         private ProcessExecutor $processes,
-        private RoadRunnerProcessLauncher $roadRunner,
+        private FrankenPhpProcessLauncher $frankenPhp,
     ) {
     }
 
@@ -34,7 +34,7 @@ final readonly class StashdRuntimeCommand
     ): ExitCode {
         return match ($role) {
             'all' => $this->runAll(),
-            'serve' => $this->roadRunner->serve(),
+            'serve' => $this->frankenPhp->serve(),
             'worker' => $this->runWorker($lane),
             'scheduler' => $this->runScheduler(),
             default => $this->unknownRole($role),
@@ -46,7 +46,7 @@ final readonly class StashdRuntimeCommand
         $this->console->info('Starting Stashd all-in-one runtime (supervisord expected in Docker).');
         $this->console->warn('Local dev: run `stashd serve`, `stashd worker`, and `stashd scheduler` in separate terminals.');
 
-        return $this->roadRunner->serve();
+        return $this->frankenPhp->serve();
     }
 
     private function runWorker(?string $lane): ExitCode

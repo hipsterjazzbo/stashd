@@ -157,7 +157,13 @@ case "$ROLE" in
         ;;
     serve)
         export_runtime_env
-        run_app ./rr serve -c .rr.yaml
+        # Caddy (inside frankenphp) wants a writable config/data dir for its
+        # own state; the gosu'd PUID may have no usable $HOME, so point it at
+        # DATA_DIR, which is chowned to PUID:PGID by ensure_writable() (run as
+        # part of the "all"/"boot" roles before this one starts in Docker).
+        export XDG_CONFIG_HOME="${DATA_DIR}/.config"
+        export XDG_DATA_HOME="${DATA_DIR}/.local/share"
+        run_app frankenphp run --config docker/Caddyfile
         ;;
     worker)
         export_runtime_env

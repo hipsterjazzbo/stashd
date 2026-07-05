@@ -10,7 +10,7 @@ Stashd follows applicable [PHP-FIG](https://www.php-fig.org/psr/) standards. Enf
 | **PSR-4** | Autoloading | `App\` → `app/`, `Tests\` → `tests/` (`composer.json`) |
 | **PSR-12** | Code style | Laravel Pint preset `psr12` (`pint.json`) |
 | **PSR-3** | Logging | Via Tempest log package when used (not custom loggers in domain) |
-| **PSR-7 / 17** | HTTP messages | RoadRunner bridge uses `nyholm/psr7`; Tempest handles request/response internally |
+| **PSR-7 / 17** | HTTP messages | Tempest handles request/response internally (classic-mode SAPI; no PSR-7 bridge) |
 | **PSR-11** | Container | Tempest `Container` / DI; prefer constructor injection |
 | **PSR-15** | HTTP middleware | `RequireAuthMiddleware` implements Tempest `HttpMiddleware` |
 
