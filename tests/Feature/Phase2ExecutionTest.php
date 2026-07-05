@@ -12,8 +12,6 @@ use App\Jobs\JobRecord;
 use App\Jobs\JobState;
 use App\Jobs\JobWorkerService;
 use App\System\Activity\ActivityEventRecord;
-use App\System\Event\EventNotificationRecord;
-use App\System\Event\EventPublisher;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 use Tempest\Http\Status;
@@ -188,7 +186,7 @@ test('stale processing jobs are recovered or failed based on attempts', function
     expect($job->state)->toBe(JobState::Failed);
 });
 
-test('command dispatch writes activity and notification events', function (): void {
+test('command dispatch writes activity events', function (): void {
     $headers = $this->authHeaders();
 
     $this->http->post('/api/v1/commands', [
@@ -206,42 +204,33 @@ test('command dispatch writes activity and notification events', function (): vo
         ->and($types)->toContain('job.started')
         ->and($types)->toContain('storage_check.completed')
         ->and($types)->toContain('command.completed');
-
-    $notifications = EventNotificationRecord::select()->all();
-    expect($notifications)->not->toBeEmpty();
 });
 
-test('event publisher writes sse notification rows', function (): void {
-    $publisher = $this->container->get(EventPublisher::class);
-    $job = JobRecord::select()->first();
-
-    if ($job === null) {
-        $headers = $this->authHeaders();
-        $created = $this->http->post('/api/v1/commands', [
-            'type' => 'system.storage_check',
-            'options' => [],
-        ], headers: $headers);
-        $job = JobRecord::findById(new \Tempest\Database\PrimaryKey($created->body['job_ids'][0]));
-    }
-
-    $publisher->jobProgress($job);
-
-    $notification = EventNotificationRecord::select()
-        ->where('eventType = ?', 'job.progress')
-        ->orderBy('createdAt', \Tempest\Database\Direction::DESC)
-        ->first();
-
-    expect($notification)->not->toBeNull();
-});
-
-test('events endpoint requires authentication', function (): void {
+test('events subscription endpoint requires authentication and sets a scoped cookie', function (): void {
     $users = $this->container->get(\App\Auth\UserRepository::class);
     $users->createAdmin(
         username: 'owner',
         passwordHash: password_hash('secret-password', PASSWORD_DEFAULT),
     );
 
-    $this->http->get('/api/v1/events')->assertStatus(Status::UNAUTHORIZED);
+    $this->http->get('/api/v1/events/subscription')->assertStatus(Status::UNAUTHORIZED);
+
+    $headers = $this->authHeaders();
+    $response = $this->http->get('/api/v1/events/subscription', headers: $headers)->assertOk();
+
+    $setCookie = $response->response->getHeader('set-cookie')?->values ?? [];
+    $mercureCookie = null;
+
+    foreach ($setCookie as $value) {
+        $cookie = \Tempest\Http\Cookie\Cookie::createFromString($value);
+        if ($cookie->key === 'mercureAuthorization') {
+            $mercureCookie = $cookie;
+        }
+    }
+
+    expect($mercureCookie)->not->toBeNull()
+        ->and($mercureCookie->path)->toBe('/.well-known/mercure')
+        ->and($mercureCookie->httpOnly)->toBeTrue();
 });
 
 test('request auth context does not leak between http requests', function (): void {

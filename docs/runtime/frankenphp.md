@@ -42,6 +42,10 @@ See `docker/supervisord.conf.template` and `docker/entrypoint.sh`.
 
 Tempest's stock `GenericResponseSender` only knows how to stream a `Generator` body when it's wrapped in `EventStream` (SSE framing) — any other Generator body (e.g. `PodcastEpisodeController`'s bounded-chunk file reads, used so a hundreds-of-MB episode is never buffered whole in memory) falls through to `echo $body`, which throws, corrupting the response after headers are already sent. `App\Http\Routing\StreamingResponseSender` decorates the framework's `ResponseSender` (via Tempest's `#[Decorates]` mechanism) to stream those chunks directly instead.
 
+## Real-time updates
+
+Replaced the RoadRunner-era SQLite-poll SSE endpoint with FrankenPHP's embedded Mercure hub (`docker/Caddyfile`'s `mercure` block). `App\System\Event\MercurePublisher` publishes the same five event types over HTTP to `/.well-known/mercure` (from both web requests and out-of-process worker/scheduler CLI roles, which can't use the `mercure_publish()` function). Subscribers need a JWT: `GET /api/v1/events/subscription` (behind `RequireAuthMiddleware`) mints one via `AuthService::issueMercureSubscriberToken()` and sets it as the `mercureAuthorization` cookie, scoped to `/.well-known/mercure`. The frontend consolidates what used to be five separate `/api/v1/events` connections into one shared `EventSource` against the hub (`src/main.entrypoint.ts`'s `subscribeToEvents`).
+
 ## Not yet done
 
-Real-time updates (`/api/v1/events`) and podcast episode file serving still use the same hand-rolled SQLite-poll / range-request code that ran under RoadRunner (just no longer crashing under classic mode, per above) — porting them to FrankenPHP's built-in Mercure hub and X-Sendfile support is separate, later work.
+Podcast episode file serving still uses the same hand-rolled range-request code that ran under RoadRunner (just no longer crashing under classic mode, per above) — porting it to FrankenPHP's X-Sendfile support is separate, later work.

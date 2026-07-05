@@ -305,57 +305,102 @@ function summarizeRecentActivity(events: ActivityLogEntry[], limit = 8): Activit
 	return groups.slice(0, limit)
 }
 
-// The full, fixed set of named SSE events EventsController ever emits
-// (app/System/Event/EventPublisher.php) — EventSource has no "any event"
-// listener, so every name has to be wired up individually.
+// The full, fixed set of event names MercurePublisher ever emits
+// (app/System/Event/EventPublisher.php).
 const EVENT_TYPES = ['job.created', 'job.progress', 'job.completed', 'job.failed', 'activity.created'] as const
 
+type MercureListener = (event: ActivityEvent) => void
+type ConnectionListener = (connected: boolean) => void
+
+// One EventSource shared by every page component, opened against FrankenPHP's
+// embedded Mercure hub instead of each component (and the old
+// awaitSseTerminal one-shot helper) dialing its own /api/v1/events poll-loop
+// connection -- consolidating avoids the browser's 6-connections-per-host
+// HTTP/1.1 cap and the worker-starvation math the old poll loop required.
+const mercureListeners = new Map<string, Set<MercureListener>>()
+const mercureConnectionListeners = new Set<ConnectionListener>()
+let mercureSource: EventSource | null = null
+
+// The hub requires a subscriber JWT (no `anonymous`); this mints one and
+// sets it as the `mercureAuthorization` cookie the browser then sends
+// automatically to the same-origin /.well-known/mercure endpoint.
+async function refreshMercureSubscription(): Promise<void> {
+	await apiFetch('/api/v1/events/subscription')
+}
+
+function ensureMercureConnection(): void {
+	if (mercureSource || !('EventSource' in window)) return
+
+	mercureSource = new EventSource(`/.well-known/mercure?topic=${encodeURIComponent('stashd/events')}`)
+
+	mercureSource.onopen = () => {
+		for (const listener of mercureConnectionListeners) listener(true)
+	}
+
+	mercureSource.onerror = () => {
+		for (const listener of mercureConnectionListeners) listener(false)
+		// The JWT is short-lived (~1h) -- remint on every drop so the
+		// browser's automatic reconnect carries a fresh cookie.
+		void refreshMercureSubscription().catch(() => {})
+	}
+
+	mercureSource.onmessage = (raw: MessageEvent<string>) => {
+		const { event, ...payload } = JSON.parse(raw.data) as { event: string } & Record<string, unknown>
+		const wrapped: ActivityEvent = { id: crypto.randomUUID(), event, payload, created_at: new Date().toISOString() }
+
+		for (const listener of mercureListeners.get(event) ?? []) listener(wrapped)
+	}
+}
+
+/** Subscribes to the given event names on the shared Mercure connection; returns an unsubscribe function. */
+function subscribeToEvents(types: readonly string[], listener: MercureListener): () => void {
+	void refreshMercureSubscription().then(ensureMercureConnection).catch(() => {})
+
+	for (const type of types) {
+		if (!mercureListeners.has(type)) mercureListeners.set(type, new Set())
+		mercureListeners.get(type)?.add(listener)
+	}
+
+	return () => {
+		for (const type of types) mercureListeners.get(type)?.delete(listener)
+	}
+}
+
+function subscribeToConnectionState(listener: ConnectionListener): () => void {
+	void refreshMercureSubscription().then(ensureMercureConnection).catch(() => {})
+	mercureConnectionListeners.add(listener)
+
+	return () => mercureConnectionListeners.delete(listener)
+}
+
 /**
- * Opens one EventSource, re-running `checkTerminal` on every relevant SSE
- * event (and once immediately, in case the thing it's waiting on already
- * finished before this connection opened), and closes the connection as soon
- * as it returns true. Returns a cancel function the caller can invoke to
- * close it early (e.g. the user backed out of the flow that started it) --
- * without this, backing out and retrying while a previous wait is still
- * pending (a stuck preflight, say) leaks one EventSource per retry, none of
- * which stop polling until the *original* command they were watching
- * eventually resolves. Each leaked connection ties up a RoadRunner HTTP
- * worker for the wait's whole duration; see the num_workers history in
- * .rr.yaml for how cheaply that pool has starved before.
+ * Resolves once `checkTerminal` returns true, subscribing to the shared
+ * Mercure connection rather than opening its own (as the old
+ * per-EventSource-per-retry version did). Returns a cancel function the
+ * caller can invoke to stop watching early (e.g. the user backed out of the
+ * flow that started it).
  *
  * Only for short, one-shot waits (preflight/add-input steps) — never held
  * open for a page's whole lifetime like Dashboard/Activity/Stash detail.
- * EventsController holds a RoadRunner worker for its full poll-loop duration
- * regardless of how soon the client closes (see docs/TODO.md's SSE note), so
- * this is used once or twice per input added, not perpetually.
  */
 function awaitSseTerminal(checkTerminal: () => Promise<boolean>): () => void {
 	let closed = false
 	let fallback: ReturnType<typeof setInterval> | null = null
-	let source: EventSource | null = null
+	let unsubscribe: (() => void) | null = null
 
 	const finish = () => {
 		if (closed) return
 		closed = true
-		source?.close()
+		unsubscribe?.()
 		if (fallback !== null) clearInterval(fallback)
 	}
-
-	if (!('EventSource' in window)) {
-		void checkTerminal()
-		return finish
-	}
-
-	source = new EventSource('/api/v1/events')
 
 	const tick = async () => {
 		if (closed) return
 		if (await checkTerminal()) finish()
 	}
 
-	for (const type of EVENT_TYPES) {
-		source.addEventListener(type, () => void tick())
-	}
+	unsubscribe = subscribeToEvents(EVENT_TYPES, () => void tick())
 
 	// ponytail: SSE delivery isn't guaranteed (dropped connection, missed
 	// event) — this poll guarantees the caller eventually notices a terminal
@@ -720,10 +765,7 @@ function dashboardComponent() {
 			this.loading = false
 
 			if ('EventSource' in window) {
-				const source = new EventSource('/api/v1/events')
-				for (const type of EVENT_TYPES) {
-					source.addEventListener(type, () => void this.refresh())
-				}
+				subscribeToEvents(EVENT_TYPES, () => void this.refresh())
 			} else {
 				setInterval(() => void this.refresh(), 5000)
 			}
@@ -774,20 +816,12 @@ function activityComponent() {
 		init() {
 			if (!('EventSource' in window)) return
 
-			const source = new EventSource('/api/v1/events')
-			source.onopen = () => {
-				this.connected = true
-			}
-			source.onerror = () => {
-				this.connected = false
-			}
-
-			for (const type of EVENT_TYPES) {
-				source.addEventListener(type, (raw) => {
-					const parsed = JSON.parse((raw as MessageEvent<string>).data) as ActivityEvent
-					this.events = [parsed, ...this.events.filter((event) => event.id !== parsed.id)].slice(0, 200)
-				})
-			}
+			subscribeToConnectionState((connected) => {
+				this.connected = connected
+			})
+			subscribeToEvents(EVENT_TYPES, (parsed) => {
+				this.events = [parsed, ...this.events.filter((event) => event.id !== parsed.id)].slice(0, 200)
+			})
 		},
 	}
 }
@@ -1024,10 +1058,7 @@ function stashDetailComponent(stashId: string) {
 			}
 
 			if ('EventSource' in window) {
-				const source = new EventSource('/api/v1/events')
-				for (const type of EVENT_TYPES) {
-					source.addEventListener(type, () => void this.refresh())
-				}
+				subscribeToEvents(EVENT_TYPES, () => void this.refresh())
 			}
 		},
 
@@ -1715,10 +1746,7 @@ function vaultDetailComponent(itemId: string) {
 			this.loading = false
 
 			if ('EventSource' in window) {
-				const source = new EventSource('/api/v1/events')
-				for (const type of EVENT_TYPES) {
-					source.addEventListener(type, () => void this.refresh())
-				}
+				subscribeToEvents(EVENT_TYPES, () => void this.refresh())
 			}
 		},
 

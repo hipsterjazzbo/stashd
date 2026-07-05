@@ -93,23 +93,28 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/ActivityEvent" }
 
-  /api/v1/events:
+  /api/v1/events/subscription:
     get:
-      operationId: streamEvents
+      operationId: mintEventsSubscription
       tags: [Events]
-      summary: Server-Sent Events stream of ephemeral notifications
+      summary: Mints a subscriber JWT for the real-time events hub
       description: >
-        text/event-stream. Polls for new notifications and pushes them as
-        they occur; the connection ends after a bounded number of
-        iterations (clients should reconnect, which EventSource does by
-        default). Capped concurrently per server — once full, a new
-        connection receives a single retry-directive event and no data.
+        Mints a short-lived (~1h), subscribe-only JWT for the
+        `stashd/events` topic and sets it as the `mercureAuthorization`
+        cookie, scoped to `/.well-known/mercure`. Real-time updates
+        (job/activity events) are then delivered via FrankenPHP's embedded
+        Mercure hub at `/.well-known/mercure?topic=stashd/events`, not
+        through this app's own API — the frontend calls this endpoint
+        before opening that connection and again on reconnect errors.
       responses:
         "200":
-          description: SSE stream
+          description: Subscription cookie set
           content:
-            text/event-stream:
-              schema: { type: string }
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
 
   /api/v1/auth/setup:
     post:
