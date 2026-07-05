@@ -22,26 +22,7 @@ use App\Vault\MediaItemState;
 use Tempest\Database\PrimaryKey;
 use Tempest\Http\Status;
 
-/**
- * Episode bodies are now streamed as a generator of byte chunks (so large
- * files never buffer in the worker); drain it back to a string for assertions.
- */
-function podcastEpisodeBody(mixed $body): string
-{
-    if ($body instanceof \Generator) {
-        $bytes = '';
-
-        foreach ($body as $chunk) {
-            $bytes .= $chunk;
-        }
-
-        return $bytes;
-    }
-
-    return (string) $body;
-}
-
-test('valid audio podcast episode token returns the audio bytes with expected headers', function (): void {
+test('valid audio podcast episode token returns an X-Accel-Redirect to the Vault asset', function (): void {
     [$headers, $stashId, $mediaItemId] = podcastEpisodeReadyStash($this, 'episode-audio');
     $config = $this->container->get(StashdConfig::class);
     podcastEpisodeCreateAsset(
@@ -77,13 +58,12 @@ test('valid audio podcast episode token returns the audio bytes with expected he
 
     $response->assertStatus(Status::OK)
         ->assertHeaderContains('Content-Type', 'audio/mpeg')
-        ->assertHeaderContains('Content-Length', (string) strlen('episode-audio-bytes'))
-        ->assertHeaderContains('Accept-Ranges', 'bytes');
+        ->assertHeaderContains('X-Accel-Redirect', podcastEpisodeExpectedAccelPath($mediaItemId, 'original.mp3'));
 
-    expect(podcastEpisodeBody($response->body))->toBe('episode-audio-bytes');
+    expect($response->body)->toBeNull();
 });
 
-test('valid video podcast episode token returns the video bytes with expected headers', function (): void {
+test('valid video podcast episode token returns an X-Accel-Redirect to the Vault asset', function (): void {
     [$headers, $stashId, $mediaItemId] = podcastEpisodeReadyStash($this, 'episode-video');
     $config = $this->container->get(StashdConfig::class);
     podcastEpisodeCreateAsset(
@@ -119,10 +99,9 @@ test('valid video podcast episode token returns the video bytes with expected he
 
     $response->assertStatus(Status::OK)
         ->assertHeaderContains('Content-Type', 'video/mp4')
-        ->assertHeaderContains('Content-Length', (string) strlen('episode-video-bytes'))
-        ->assertHeaderContains('Accept-Ranges', 'bytes');
+        ->assertHeaderContains('X-Accel-Redirect', podcastEpisodeExpectedAccelPath($mediaItemId, 'original.mp4'));
 
-    expect(podcastEpisodeBody($response->body))->toBe('episode-video-bytes');
+    expect($response->body)->toBeNull();
 });
 
 test('episode route requires path tokens, not a query parameter', function (): void {
@@ -444,340 +423,6 @@ test('podcast rebuild and episode requests do not leak raw tokens into activity'
         ->and($activity)->not->toContain($parts['itemToken']);
 });
 
-test('a mid-file range request returns 206 with the exact partial bytes and headers', function (): void {
-    [$headers, $stashId, $mediaItemId] = podcastEpisodeReadyStash($this, 'episode-range-mid');
-    $config = $this->container->get(StashdConfig::class);
-    $content = podcastEpisodeRangeFixtureContent();
-    podcastEpisodeCreateAsset(
-        $config,
-        $this->container->get(AssetRepository::class),
-        $mediaItemId,
-        AssetKind::Audio,
-        'original.mp3',
-        'audio/mpeg',
-        $content,
-    );
-
-    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'podcast',
-        'name' => 'Range Mid',
-        'slug' => 'episode-range-mid-' . bin2hex(random_bytes(3)),
-    ], headers: $headers)->assertStatus(Status::CREATED);
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $feedXml = (string) file_get_contents(podcastEpisodeFeedPath($config, $broadcast->body['broadcast']['id']));
-    $parts = podcastEpisodeUrlParts(podcastEpisodeEnclosureUrlFromFeed($feedXml));
-
-    $response = $this->http->get(
-        '/b/' . rawurlencode($parts['broadcastToken']) . '/items/' . rawurlencode($parts['itemToken']) . '/episode.' . $parts['ext'],
-        headers: ['Range' => 'bytes=2-5'],
-    );
-
-    $response->assertStatus(Status::PARTIAL_CONTENT)
-        ->assertHeaderContains('Content-Range', 'bytes 2-5/' . strlen($content))
-        ->assertHeaderContains('Content-Length', '4')
-        ->assertHeaderContains('Accept-Ranges', 'bytes');
-
-    expect(podcastEpisodeBody($response->body))->toBe(substr($content, 2, 4));
-});
-
-test('a range covering the entire file returns 206, not 200', function (): void {
-    [$headers, $stashId, $mediaItemId] = podcastEpisodeReadyStash($this, 'episode-range-full');
-    $config = $this->container->get(StashdConfig::class);
-    $content = podcastEpisodeRangeFixtureContent();
-    podcastEpisodeCreateAsset(
-        $config,
-        $this->container->get(AssetRepository::class),
-        $mediaItemId,
-        AssetKind::Audio,
-        'original.mp3',
-        'audio/mpeg',
-        $content,
-    );
-
-    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'podcast',
-        'name' => 'Range Full',
-        'slug' => 'episode-range-full-' . bin2hex(random_bytes(3)),
-    ], headers: $headers)->assertStatus(Status::CREATED);
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $feedXml = (string) file_get_contents(podcastEpisodeFeedPath($config, $broadcast->body['broadcast']['id']));
-    $parts = podcastEpisodeUrlParts(podcastEpisodeEnclosureUrlFromFeed($feedXml));
-    $lastByte = strlen($content) - 1;
-
-    $response = $this->http->get(
-        '/b/' . rawurlencode($parts['broadcastToken']) . '/items/' . rawurlencode($parts['itemToken']) . '/episode.' . $parts['ext'],
-        headers: ['Range' => 'bytes=0-' . $lastByte],
-    );
-
-    $response->assertStatus(Status::PARTIAL_CONTENT)
-        ->assertHeaderContains('Content-Range', 'bytes 0-' . $lastByte . '/' . strlen($content))
-        ->assertHeaderContains('Content-Length', (string) strlen($content));
-
-    expect(podcastEpisodeBody($response->body))->toBe($content);
-});
-
-test('a suffix range request returns 206 with the trailing bytes', function (): void {
-    [$headers, $stashId, $mediaItemId] = podcastEpisodeReadyStash($this, 'episode-range-suffix');
-    $config = $this->container->get(StashdConfig::class);
-    $content = podcastEpisodeRangeFixtureContent();
-    podcastEpisodeCreateAsset(
-        $config,
-        $this->container->get(AssetRepository::class),
-        $mediaItemId,
-        AssetKind::Audio,
-        'original.mp3',
-        'audio/mpeg',
-        $content,
-    );
-
-    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'podcast',
-        'name' => 'Range Suffix',
-        'slug' => 'episode-range-suffix-' . bin2hex(random_bytes(3)),
-    ], headers: $headers)->assertStatus(Status::CREATED);
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $feedXml = (string) file_get_contents(podcastEpisodeFeedPath($config, $broadcast->body['broadcast']['id']));
-    $parts = podcastEpisodeUrlParts(podcastEpisodeEnclosureUrlFromFeed($feedXml));
-
-    $response = $this->http->get(
-        '/b/' . rawurlencode($parts['broadcastToken']) . '/items/' . rawurlencode($parts['itemToken']) . '/episode.' . $parts['ext'],
-        headers: ['Range' => 'bytes=-5'],
-    );
-
-    $response->assertStatus(Status::PARTIAL_CONTENT)
-        ->assertHeaderContains('Content-Range', 'bytes ' . (strlen($content) - 5) . '-' . (strlen($content) - 1) . '/' . strlen($content))
-        ->assertHeaderContains('Content-Length', '5');
-
-    expect(podcastEpisodeBody($response->body))->toBe(substr($content, -5));
-});
-
-test('an open-ended range request returns 206 with the trailing bytes', function (): void {
-    [$headers, $stashId, $mediaItemId] = podcastEpisodeReadyStash($this, 'episode-range-open');
-    $config = $this->container->get(StashdConfig::class);
-    $content = podcastEpisodeRangeFixtureContent();
-    podcastEpisodeCreateAsset(
-        $config,
-        $this->container->get(AssetRepository::class),
-        $mediaItemId,
-        AssetKind::Audio,
-        'original.mp3',
-        'audio/mpeg',
-        $content,
-    );
-
-    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'podcast',
-        'name' => 'Range Open',
-        'slug' => 'episode-range-open-' . bin2hex(random_bytes(3)),
-    ], headers: $headers)->assertStatus(Status::CREATED);
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $feedXml = (string) file_get_contents(podcastEpisodeFeedPath($config, $broadcast->body['broadcast']['id']));
-    $parts = podcastEpisodeUrlParts(podcastEpisodeEnclosureUrlFromFeed($feedXml));
-
-    $response = $this->http->get(
-        '/b/' . rawurlencode($parts['broadcastToken']) . '/items/' . rawurlencode($parts['itemToken']) . '/episode.' . $parts['ext'],
-        headers: ['Range' => 'bytes=10-'],
-    );
-
-    $response->assertStatus(Status::PARTIAL_CONTENT)
-        ->assertHeaderContains('Content-Range', 'bytes 10-' . (strlen($content) - 1) . '/' . strlen($content))
-        ->assertHeaderContains('Content-Length', (string) (strlen($content) - 10));
-
-    expect(podcastEpisodeBody($response->body))->toBe(substr($content, 10));
-});
-
-test('a range entirely beyond the end of the file returns 416 without leaking the path', function (): void {
-    [$headers, $stashId, $mediaItemId] = podcastEpisodeReadyStash($this, 'episode-range-beyond-eof');
-    $config = $this->container->get(StashdConfig::class);
-    $content = podcastEpisodeRangeFixtureContent();
-    podcastEpisodeCreateAsset(
-        $config,
-        $this->container->get(AssetRepository::class),
-        $mediaItemId,
-        AssetKind::Audio,
-        'original.mp3',
-        'audio/mpeg',
-        $content,
-    );
-
-    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'podcast',
-        'name' => 'Range Beyond EOF',
-        'slug' => 'episode-range-beyond-eof-' . bin2hex(random_bytes(3)),
-    ], headers: $headers)->assertStatus(Status::CREATED);
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $feedXml = (string) file_get_contents(podcastEpisodeFeedPath($config, $broadcast->body['broadcast']['id']));
-    $parts = podcastEpisodeUrlParts(podcastEpisodeEnclosureUrlFromFeed($feedXml));
-
-    $response = $this->http->get(
-        '/b/' . rawurlencode($parts['broadcastToken']) . '/items/' . rawurlencode($parts['itemToken']) . '/episode.' . $parts['ext'],
-        headers: ['Range' => 'bytes=10000-10010'],
-    );
-
-    $response->assertStatus(Status::RANGE_NOT_SATISFIABLE)
-        ->assertHeaderContains('Content-Range', 'bytes */' . strlen($content));
-
-    $body = json_encode($response->body, JSON_THROW_ON_ERROR);
-    expect($body)->not->toContain($config->vaultPath())
-        ->and($body)->not->toContain($config->broadcastsPath());
-});
-
-test('a malformed range header is ignored and the full file is served', function (): void {
-    [$headers, $stashId, $mediaItemId] = podcastEpisodeReadyStash($this, 'episode-range-malformed');
-    $config = $this->container->get(StashdConfig::class);
-    $content = podcastEpisodeRangeFixtureContent();
-    podcastEpisodeCreateAsset(
-        $config,
-        $this->container->get(AssetRepository::class),
-        $mediaItemId,
-        AssetKind::Audio,
-        'original.mp3',
-        'audio/mpeg',
-        $content,
-    );
-
-    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'podcast',
-        'name' => 'Range Malformed',
-        'slug' => 'episode-range-malformed-' . bin2hex(random_bytes(3)),
-    ], headers: $headers)->assertStatus(Status::CREATED);
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $feedXml = (string) file_get_contents(podcastEpisodeFeedPath($config, $broadcast->body['broadcast']['id']));
-    $parts = podcastEpisodeUrlParts(podcastEpisodeEnclosureUrlFromFeed($feedXml));
-
-    $response = $this->http->get(
-        '/b/' . rawurlencode($parts['broadcastToken']) . '/items/' . rawurlencode($parts['itemToken']) . '/episode.' . $parts['ext'],
-        headers: ['Range' => 'bytes=abc-def'],
-    );
-
-    $response->assertStatus(Status::OK)
-        ->assertHeaderContains('Content-Length', (string) strlen($content));
-
-    expect(podcastEpisodeBody($response->body))->toBe($content);
-});
-
-test('a multi-range header is ignored and the full file is served', function (): void {
-    [$headers, $stashId, $mediaItemId] = podcastEpisodeReadyStash($this, 'episode-range-multi');
-    $config = $this->container->get(StashdConfig::class);
-    $content = podcastEpisodeRangeFixtureContent();
-    podcastEpisodeCreateAsset(
-        $config,
-        $this->container->get(AssetRepository::class),
-        $mediaItemId,
-        AssetKind::Audio,
-        'original.mp3',
-        'audio/mpeg',
-        $content,
-    );
-
-    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'podcast',
-        'name' => 'Range Multi',
-        'slug' => 'episode-range-multi-' . bin2hex(random_bytes(3)),
-    ], headers: $headers)->assertStatus(Status::CREATED);
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $feedXml = (string) file_get_contents(podcastEpisodeFeedPath($config, $broadcast->body['broadcast']['id']));
-    $parts = podcastEpisodeUrlParts(podcastEpisodeEnclosureUrlFromFeed($feedXml));
-
-    $response = $this->http->get(
-        '/b/' . rawurlencode($parts['broadcastToken']) . '/items/' . rawurlencode($parts['itemToken']) . '/episode.' . $parts['ext'],
-        headers: ['Range' => 'bytes=0-1,3-4'],
-    );
-
-    $response->assertStatus(Status::OK)
-        ->assertHeaderContains('Content-Length', (string) strlen($content));
-
-    expect(podcastEpisodeBody($response->body))->toBe($content);
-});
-
-test('a range header attached to an invalid token still returns a non-revealing 404', function (): void {
-    [$headers, $stashId, $mediaItemId] = podcastEpisodeReadyStash($this, 'episode-range-bad-token');
-    $config = $this->container->get(StashdConfig::class);
-    podcastEpisodeCreateAsset(
-        $config,
-        $this->container->get(AssetRepository::class),
-        $mediaItemId,
-        AssetKind::Audio,
-        'original.mp3',
-        'audio/mpeg',
-        podcastEpisodeRangeFixtureContent(),
-    );
-
-    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'podcast',
-        'name' => 'Range Bad Token',
-        'slug' => 'episode-range-bad-token-' . bin2hex(random_bytes(3)),
-    ], headers: $headers)->assertStatus(Status::CREATED);
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $feedXml = (string) file_get_contents(podcastEpisodeFeedPath($config, $broadcast->body['broadcast']['id']));
-    $parts = podcastEpisodeUrlParts(podcastEpisodeEnclosureUrlFromFeed($feedXml));
-
-    // Unknown broadcast token, Range header attached.
-    $this->http->get(
-        '/b/' . rawurlencode('unknown-broadcast-token-000000000000') . '/items/' . rawurlencode($parts['itemToken']) . '/episode.' . $parts['ext'],
-        headers: ['Range' => 'bytes=0-3'],
-    )->assertStatus(Status::NOT_FOUND);
-
-    // Valid broadcast token, unknown item token, Range header attached.
-    $this->http->get(
-        '/b/' . rawurlencode($parts['broadcastToken']) . '/items/' . rawurlencode('unknown-item-token') . '/episode.' . $parts['ext'],
-        headers: ['Range' => 'bytes=0-3'],
-    )->assertStatus(Status::NOT_FOUND);
-});
-
-function podcastEpisodeRangeFixtureContent(): string
-{
-    return '0123456789abcdefghijklmnopqrstuvwxyz';
-}
-
 /** @return array{0: array{Authorization: string}, 1: string, 2: string} */
 function podcastEpisodeReadyStash(\Tests\IntegrationTestCase $test, string $channel): array
 {
@@ -828,6 +473,21 @@ function podcastEpisodeCreateAsset(
         mimeType: $mimeType,
         sizeBytes: strlen($contents),
     );
+}
+
+/**
+ * Mirrors {@see \App\Broadcasts\PodcastEpisodeController}'s own path-relative-
+ * to-Vault-root + per-segment-rawurlencode logic, so this asserts the exact
+ * value Caddy's intercept block (`docker/Caddyfile`) expects to rewrite the
+ * request to.
+ */
+function podcastEpisodeExpectedAccelPath(string $mediaItemId, string $filename): string
+{
+    $media = MediaItemRecord::findById(new PrimaryKey($mediaItemId));
+    $relative = 'podcast-episode-tests/' . $media->providerItemId . '/' . $filename;
+    $segments = array_map(rawurlencode(...), explode('/', $relative));
+
+    return '/' . implode('/', $segments);
 }
 
 function podcastEpisodeFeedPath(StashdConfig $config, string $broadcastId): string

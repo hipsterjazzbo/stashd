@@ -154,16 +154,20 @@ for dir in vault broadcasts temp cache; do
     fi
 done
 
-echo "Checking Phase 2 schema tables exist..."
+echo "Checking schema: activity_events present, dropped SSE-transport tables gone..."
 if ! $CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite "SELECT name FROM sqlite_master WHERE type='table' AND name='activity_events';" | grep -q activity_events; then
     echo "smoke failed: activity_events table missing (migrations did not run cleanly)" >&2
     exit 1
 fi
 
-if ! $CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite "SELECT name FROM sqlite_master WHERE type='table' AND name='event_notifications';" | grep -q event_notifications; then
-    echo "smoke failed: event_notifications table missing (migrations did not run cleanly)" >&2
-    exit 1
-fi
+# event_notifications/sse_connections were pure SSE-poll transport, dropped by
+# DropSseAndEventNotificationTables once Mercure replaced the poll loop.
+for dropped_table in event_notifications sse_connections; do
+    if $CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite "SELECT name FROM sqlite_master WHERE type='table' AND name='${dropped_table}';" | grep -q "$dropped_table"; then
+        echo "smoke failed: ${dropped_table} table still exists (drop migration did not run cleanly)" >&2
+        exit 1
+    fi
+done
 
 echo "Checking supervisord worker lanes + scheduler + frankenphp programs..."
 assert_supervisor_program frankenphp
