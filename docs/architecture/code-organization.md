@@ -90,7 +90,7 @@ Feature controllers moved into their feature folders:
 - `Stashes\StashPreflightController`
 - `Vault\MediaItemController`
 - `System\Health\HealthController`
-- `System\Event\EventsController`
+- `System\Event\EventSubscriptionController`
 
 ## Wiring / bootstrap
 

@@ -211,12 +211,6 @@ parameters:
 			path: app/Broadcasts/BroadcastPluginRegistry.php
 
 		-
-			message: '#^Parameter \#1 \$callback of function array_map expects \(callable\(mixed\)\: mixed\)\|null, Closure\(App\\Broadcasts\\BroadcastRecord\)\: string given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Broadcasts/BroadcastRepository.php
-
-		-
 			message: '#^Method App\\Broadcasts\\BroadcastRepository\:\:findByStashAndSlug\(\) should return App\\Broadcasts\\BroadcastRecord\|null but returns mixed\.$#'
 			identifier: return.type
 			count: 1
@@ -231,6 +225,12 @@ parameters:
 		-
 			message: '#^Method App\\Broadcasts\\BroadcastRepository\:\:listPodcastBroadcastsWithFeedToken\(\) should return list\<App\\Broadcasts\\BroadcastRecord\> but returns array\<mixed\>\.$#'
 			identifier: return.type
+			count: 1
+			path: app/Broadcasts/BroadcastRepository.php
+
+		-
+			message: '#^Parameter \#1 \$callback of function array_map expects \(callable\(mixed\)\: mixed\)\|null, Closure\(App\\Broadcasts\\BroadcastRecord\)\: string given\.$#'
+			identifier: argument.type
 			count: 1
 			path: app/Broadcasts/BroadcastRepository.php
 
@@ -721,18 +721,6 @@ parameters:
 			path: app/Jobs/Handlers/TranscodePodcastAudioJobHandler.php
 
 		-
-			message: '#^Cannot access property \$attempts on mixed\.$#'
-			identifier: property.nonObject
-			count: 2
-			path: app/Jobs/JobRepository.php
-
-		-
-			message: '#^Cannot access property \$heartbeatAt on mixed\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: app/Jobs/JobRepository.php
-
-		-
 			message: '#^Cannot access property \$entityId on mixed\.$#'
 			identifier: property.nonObject
 			count: 1
@@ -741,7 +729,13 @@ parameters:
 		-
 			message: '#^Cannot access property \$id on mixed\.$#'
 			identifier: property.nonObject
-			count: 1
+			count: 3
+			path: app/Jobs/JobRepository.php
+
+		-
+			message: '#^Cannot access property \$lastError on mixed\.$#'
+			identifier: property.nonObject
+			count: 2
 			path: app/Jobs/JobRepository.php
 
 		-
@@ -753,24 +747,12 @@ parameters:
 		-
 			message: '#^Cannot cast mixed to string\.$#'
 			identifier: cast.string
-			count: 2
-			path: app/Jobs/JobRepository.php
-
-		-
-			message: '#^Cannot access property \$lastError on mixed\.$#'
-			identifier: property.nonObject
 			count: 3
 			path: app/Jobs/JobRepository.php
 
 		-
-			message: '#^Cannot access property \$startedAt on mixed\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: app/Jobs/JobRepository.php
-
-		-
-			message: '#^Cannot use \+\+ on mixed\.$#'
-			identifier: postInc.type
+			message: '#^Method App\\Jobs\\JobRepository\:\:latestDownloadFailureByMediaItem\(\) should return array\<string, string\> but returns array\<string, mixed\>\.$#'
+			identifier: return.type
 			count: 1
 			path: app/Jobs/JobRepository.php
 
@@ -787,25 +769,13 @@ parameters:
 			path: app/Jobs/JobRepository.php
 
 		-
-			message: '#^Method App\\Jobs\\JobRepository\:\:latestDownloadFailureByMediaItem\(\) should return array\<string, string\> but returns array\<string, mixed\>\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Jobs/JobRepository.php
-
-		-
 			message: '#^Method App\\Jobs\\JobRepository\:\:listRecent\(\) should return list\<App\\Jobs\\JobRecord\> but returns list\<mixed\>\.$#'
 			identifier: return.type
 			count: 1
 			path: app/Jobs/JobRepository.php
 
 		-
-			message: '#^Parameter \#1 \$record of method App\\Jobs\\JobRepository\:\:save\(\) expects App\\Jobs\\JobRecord, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Jobs/JobRepository.php
-
-		-
-			message: '#^Parameter \#1 \$record of method App\\System\\State\\StateTransitionService\:\:transitionJob\(\) expects App\\Jobs\\JobRecord, mixed given\.$#'
+			message: '#^Parameter \#1 \$id of static method App\\Jobs\\JobRecord\:\:findById\(\) expects int\|string\|Tempest\\Database\\PrimaryKey, mixed given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Jobs/JobRepository.php
@@ -1217,42 +1187,6 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: app/System/Boot/SqliteConfigurator.php
-
-		-
-			message: '#^Cannot call method delete\(\) on mixed\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: app/System/Event/SseConnectionRepository.php
-
-		-
-			message: '#^Cannot cast iterable\|JsonSerializable\|string\|Stringable to string\.$#'
-			identifier: cast.string
-			count: 1
-			path: app/System/RoadRunner/GeneratorEventStream.php
-
-		-
-			message: '#^Parameter \#2 \$string of function explode expects string, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/System/RoadRunner/GeneratorEventStream.php
-
-		-
-			message: '#^Parameter \$data of class Tempest\\Http\\ServerSentMessage constructor expects iterable\|JsonSerializable\|string\|Stringable, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/System/RoadRunner/GeneratorEventStream.php
-
-		-
-			message: '#^Cannot cast mixed to string\.$#'
-			identifier: cast.string
-			count: 2
-			path: app/System/RoadRunner/GeneratorFileStream.php
-
-		-
-			message: '#^Parameter \#2 \$value of method Psr\\Http\\Message\\MessageInterface\:\:withAddedHeader\(\) expects array\<string\>\|string, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/System/RoadRunner/TempestPsr7Bridge.php
 
 		-
 			message: '#^Method App\\System\\Secret\\SecretRepository\:\:findByKey\(\) should return App\\System\\Secret\\SecretRecord\|null but returns mixed\.$#'

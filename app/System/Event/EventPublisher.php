@@ -12,14 +12,14 @@ use App\System\Secret\SecretsService;
 final readonly class EventPublisher
 {
     public function __construct(
-        private EventNotificationRepository $notifications,
+        private MercurePublisher $mercure,
         private SecretsService $secrets,
     ) {
     }
 
     public function jobCreated(JobRecord $job): void
     {
-        $this->notifications->publish('job.created', [
+        $this->mercure->publish('job.created', [
             'job_id' => (string) $job->id,
             'command_id' => $job->commandId,
             'intent' => $job->intent->value,
@@ -29,7 +29,7 @@ final readonly class EventPublisher
 
     public function jobProgress(JobRecord $job): void
     {
-        $this->notifications->publish('job.progress', [
+        $this->mercure->publish('job.progress', [
             'job_id' => (string) $job->id,
             'command_id' => $job->commandId,
             'intent' => $job->intent->value,
@@ -44,7 +44,7 @@ final readonly class EventPublisher
 
     public function jobCompleted(JobRecord $job): void
     {
-        $this->notifications->publish('job.completed', [
+        $this->mercure->publish('job.completed', [
             'job_id' => (string) $job->id,
             'command_id' => $job->commandId,
             'intent' => $job->intent->value,
@@ -54,7 +54,7 @@ final readonly class EventPublisher
 
     public function jobFailed(JobRecord $job): void
     {
-        $this->notifications->publish('job.failed', [
+        $this->mercure->publish('job.failed', [
             'job_id' => (string) $job->id,
             'command_id' => $job->commandId,
             'intent' => $job->intent->value,
@@ -65,7 +65,7 @@ final readonly class EventPublisher
 
     public function activityCreated(ActivityEventRecord $event): void
     {
-        $this->notifications->publish('activity.created', [
+        $this->mercure->publish('activity.created', [
             'activity_id' => (string) $event->id,
             'level' => $event->level->value,
             'type' => $event->type,

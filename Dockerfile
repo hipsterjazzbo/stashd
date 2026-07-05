@@ -15,7 +15,7 @@ COPY src ./src
 COPY app ./app
 RUN npm run build
 
-FROM php:8.5-cli-bookworm AS base
+FROM docker.io/dunglas/frankenphp:1-php8.5-bookworm AS base
 
 ARG PUID=1000
 ARG PGID=1000
@@ -34,7 +34,10 @@ RUN apt-get update \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN docker-php-ext-install pdo_sqlite sockets intl \
+# install-php-extensions (bundled in the FrankenPHP image) compiles for ZTS
+# automatically -- FrankenPHP's threaded worker model requires it, unlike the
+# non-ZTS php:8.5-cli-bookworm build this replaces.
+RUN install-php-extensions pdo_sqlite sockets intl \
     && php -m | grep -i '^uri$' >/dev/null \
     && php -r 'exit(extension_loaded("uri") ? 0 : 1);'
 
@@ -74,20 +77,16 @@ CMD ["all"]
 
 FROM base AS dev
 
-# This target intentionally does not COPY application source, install
-# composer/npm dependencies, or bake the rr binary: lerd's custom-container
-# dev setup bind-mounts the live host checkout over --workdir at runtime
-# instead (see docker/entrypoint.sh), so source edits take effect on a plain
-# container restart rather than a full image rebuild. That bind-mounted
-# checkout is expected to already have vendor/, public/build/, and ./rr in
-# place (via `composer install`, `npm run build`, and `vendor/bin/rr get` run
-# against the host checkout, e.g. through lerd's exec tooling) -- the same
-# prerequisites any non-Dockerized local PHP setup would need.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends $PHPIZE_DEPS \
-    && pecl install xdebug pcov \
-    && docker-php-ext-enable xdebug pcov \
-    && rm -rf /var/lib/apt/lists/*
+# This target intentionally does not COPY application source or install
+# composer/npm dependencies: lerd's custom-container dev setup bind-mounts
+# the live host checkout over --workdir at runtime instead (see
+# docker/entrypoint.sh), so source edits take effect on a plain container
+# restart rather than a full image rebuild. That bind-mounted checkout is
+# expected to already have vendor/ and public/build/ in place (via
+# `composer install` and `npm run build` run against the host checkout, e.g.
+# through lerd's exec tooling) -- the same prerequisites any non-Dockerized
+# local PHP setup would need.
+RUN install-php-extensions xdebug pcov
 
 COPY docker/php-dev.ini /usr/local/etc/php/conf.d/zz-stashd-dev.ini
 
@@ -100,15 +99,9 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --no-script
 
 COPY . .
 COPY --from=assets /app/public/build ./public/build
-# `rr get` hits the GitHub API to resolve/download the release; anonymous
-# requests are capped at 60/hr and get rate-limited under CI/shared-IP load
-# (this has broken at least one image publish). The secret is mounted (not
-# an ARG/ENV) so it never lands in image layers or history.
-RUN --mount=type=secret,id=github_token \
-    git config --global --add safe.directory /var/www/html \
+RUN git config --global --add safe.directory /var/www/html \
     && composer dump-autoload --optimize \
     && php vendor/bin/tempest discovery:generate --no-interaction \
-    && GITHUB_TOKEN=$(cat /run/secrets/github_token 2>/dev/null || true) vendor/bin/rr get --no-config \
     && rm -rf .tempest
 
 RUN chown -R stashd:stashd /var/www/html

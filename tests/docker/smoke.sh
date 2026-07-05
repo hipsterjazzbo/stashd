@@ -106,11 +106,21 @@ wait_for_health() {
 
 assert_supervisor_program() {
     program="$1"
-    if ! $CONTAINER exec "$NAME" supervisorctl status "$program" 2>/dev/null | grep -q RUNNING; then
-        echo "smoke failed: supervisord program not running: ${program}" >&2
-        $CONTAINER exec "$NAME" supervisorctl status 2>&1 || true
-        exit 1
-    fi
+    # /health goes green as soon as Caddy binds the port, which can be well
+    # before supervisord's startsecs grace period has elapsed for that
+    # program (STARTING -> RUNNING is time-gated, not instant) -- poll
+    # instead of checking once to avoid racing that transition.
+    deadline=$(( $(date +%s) + 15 ))
+    while [ "$(date +%s)" -lt "$deadline" ]; do
+        if $CONTAINER exec "$NAME" supervisorctl status "$program" 2>/dev/null | grep -q RUNNING; then
+            return 0
+        fi
+        sleep 1
+    done
+
+    echo "smoke failed: supervisord program not running: ${program}" >&2
+    $CONTAINER exec "$NAME" supervisorctl status 2>&1 || true
+    exit 1
 }
 
 wait_for_health
@@ -155,12 +165,19 @@ if ! $CONTAINER exec "$NAME" sqlite3 /data/stashd.sqlite "SELECT name FROM sqlit
     exit 1
 fi
 
-echo "Checking supervisord worker lanes + scheduler + roadrunner programs..."
-assert_supervisor_program roadrunner
+echo "Checking supervisord worker lanes + scheduler + frankenphp programs..."
+assert_supervisor_program frankenphp
 assert_supervisor_program worker-interactive
 assert_supervisor_program worker-discovery
 assert_supervisor_program worker-bulk
 assert_supervisor_program scheduler
+
+echo "Checking Mercure hub is configured and rejects anonymous subscribers..."
+mercure_status="$(http_status "http://127.0.0.1:18474/.well-known/mercure")"
+if [ "$mercure_status" != "401" ]; then
+    echo "smoke failed: /.well-known/mercure returned ${mercure_status}, expected 401 (anonymous subscribers must be rejected)" >&2
+    exit 1
+fi
 
 echo "Creating owner account for authenticated API checks..."
 setup_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/auth/setup" \
@@ -170,7 +187,7 @@ setup_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/auth/setup" \
     -d '{"username":"smoke","password":"smoke-password"}')"
 echo "$setup_body"
 
-echo "Logging in to establish session (setup cookie alone is not persisted across RR requests)..."
+echo "Logging in to establish session (setup does not itself establish one)..."
 login_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/auth/login" \
     -H 'Content-Type: application/json' \
     -c /tmp/stashd-smoke-cookies-$$ \
@@ -724,16 +741,18 @@ if [ "$wrong_token_status" != "404" ]; then
     exit 1
 fi
 
-echo "Verifying operator-supplied SIGNING_KEY is honored and auto-generation is skipped..."
+echo "Verifying operator-supplied SIGNING_KEY/MERCURE_JWT_SECRET are honored and auto-generation is skipped..."
 override_tmp="$(mktemp -d)"
 mkdir -p "$override_tmp/data" "$override_tmp/media"
 override_name="stashd-smoke-override-$$"
 operator_key="$(head -c32 /dev/urandom | base64)"
+operator_mercure_secret="$(head -c32 /dev/urandom | base64)"
 
 $CONTAINER run -d --name "$override_name" \
     -e STASHD_DATA_PATH=/data \
     -e STASHD_MEDIA_PATH=/media \
     -e SIGNING_KEY="$operator_key" \
+    -e MERCURE_JWT_SECRET="$operator_mercure_secret" \
     -v "$override_tmp/data:/data" \
     -v "$override_tmp/media:/media" \
     -p 18475:8474 \
@@ -746,7 +765,7 @@ while [ "$(date +%s)" -lt "$override_deadline" ]; do
 done
 
 if ! curl -fsS "http://127.0.0.1:18475/health" >/dev/null 2>&1; then
-    echo "smoke failed: health endpoint not ready with operator-supplied SIGNING_KEY" >&2
+    echo "smoke failed: health endpoint not ready with operator-supplied SIGNING_KEY/MERCURE_JWT_SECRET" >&2
     $CONTAINER logs "$override_name" 2>&1 || true
     $CONTAINER rm -f "$override_name" >/dev/null 2>&1 || true
     rm -rf "$override_tmp"
@@ -754,7 +773,7 @@ if ! curl -fsS "http://127.0.0.1:18475/health" >/dev/null 2>&1; then
 fi
 
 if [ -f "$override_tmp/data/.env" ]; then
-    echo "smoke failed: auto-generated .env was created even though an operator SIGNING_KEY was supplied" >&2
+    echo "smoke failed: auto-generated .env was created even though operator secrets were supplied" >&2
     $CONTAINER rm -f "$override_name" >/dev/null 2>&1 || true
     rm -rf "$override_tmp"
     exit 1

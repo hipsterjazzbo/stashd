@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Auth;
 
+use App\System\Event\MercurePublisher;
+use App\System\Event\MercureSecret;
 use RuntimeException;
 use SensitiveParameter;
+use Symfony\Component\Mercure\Jwt\LcobucciFactory;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 use Tempest\Http\Request;
@@ -22,6 +25,9 @@ final readonly class AuthService
     public const string SESSION_COOKIE = 'stashd_session';
 
     public const int WEB_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+
+    /** Mercure subscriber JWTs are short-lived; the frontend remints on page load and reconnect. */
+    public const int MERCURE_SUBSCRIBER_TOKEN_TTL_SECONDS = 60 * 60;
 
     public function __construct(
         private UserRepository $users,
@@ -142,6 +148,20 @@ final readonly class AuthService
                 $this->tokens->revoke(ApiTokenId::fromPrimaryKey($token->id));
             }
         }
+    }
+
+    /**
+     * Mints a short-TTL, subscribe-only Mercure JWT for the frontend's shared
+     * EventSource. This is a transport credential derived from the caller
+     * already being authenticated (enforced by RequireAuthMiddleware on the
+     * endpoint calling this), not a user-scoped grant -- every subscriber
+     * gets the same single-topic scope.
+     */
+    public function issueMercureSubscriberToken(): string
+    {
+        $factory = new LcobucciFactory(MercureSecret::resolve(), jwtLifetime: self::MERCURE_SUBSCRIBER_TOKEN_TTL_SECONDS);
+
+        return $factory->create(subscribe: [MercurePublisher::TOPIC]);
     }
 
     /** @return array{id: string, token: string, token_preview: string, name: string} */
