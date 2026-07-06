@@ -16,6 +16,7 @@ enum JobIntent: string
     case StorageCheck = 'storage_check';
     case Preflight = 'preflight';
     case AddInput = 'add_input';
+    case RetryFailedDownloads = 'retry_failed_downloads';
     case Boot = 'boot';
     case VerifyVault = 'verify_vault';
     case MediaServer = 'media_server';

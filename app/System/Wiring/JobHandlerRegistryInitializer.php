@@ -10,6 +10,7 @@ use App\Jobs\Handlers\BroadcastJobHandler;
 use App\Jobs\Handlers\DownloadJobHandler;
 use App\Jobs\Handlers\MediaServerJobHandler;
 use App\Jobs\Handlers\PreflightJobHandler;
+use App\Jobs\Handlers\RetryFailedDownloadsJobHandler;
 use App\Jobs\Handlers\StorageCheckJobHandler;
 use App\Jobs\Handlers\TranscodePodcastAudioJobHandler;
 use App\Jobs\Handlers\VerifyVaultJobHandler;
@@ -25,6 +26,7 @@ final class JobHandlerRegistryInitializer implements Initializer
             $container->get(BootJobHandler::class),
             $container->get(PreflightJobHandler::class),
             $container->get(AddInputJobHandler::class),
+            $container->get(RetryFailedDownloadsJobHandler::class),
             $container->get(DownloadJobHandler::class),
             $container->get(StorageCheckJobHandler::class),
             $container->get(VerifyVaultJobHandler::class),

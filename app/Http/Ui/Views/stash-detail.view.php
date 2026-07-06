@@ -94,6 +94,11 @@
 									<button type="button" class="transition-colors hover:text-cream" x-bind:class="itemStatusFilter === chip.filter ? 'text-cream' : ''" x-on:click="itemStatusFilter = chip.filter" x-text="chip.label"></button>
 								</span>
 							</template>
+							<button type="button" class="ml-1 rounded border border-line px-2 py-0.5 text-muted transition-colors hover:text-cream disabled:opacity-50"
+								x-bind:disabled="actionPending === 'retry-all'"
+								x-on:click="retryAllFailed()">
+								retry all failed
+							</button>
 						</div>
 						<p class="text-[12px] text-muted" x-show="items.length === 0">No items</p>
 					</div>

@@ -1356,6 +1356,30 @@ function stashDetailComponent(stashId: string) {
 			}
 		},
 
+		// Dispatches one server-side command that looks up every failed item
+		// in this stash itself (not this.items -- which, once paginated,
+		// would only ever reflect whatever page happens to be loaded) and
+		// retries all of them.
+		async retryAllFailed() {
+			this.actionPending = 'retry-all'
+			try {
+				await apiFetch('/api/v1/commands', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						type: 'stash.retry_failed',
+						options: { stash_id: stashId },
+					}),
+				})
+				await this.refresh()
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not retry failed downloads.'
+			} finally {
+				this.actionPending = null
+			}
+		},
+
 		async runBroadcastAction(broadcastId: string, action: 'rebuild' | 'verify' | 'prune' | 'rotate_token') {
 			this.actionPending = `${broadcastId}:${action}`
 			try {
