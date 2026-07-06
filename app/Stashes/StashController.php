@@ -15,6 +15,7 @@ use App\Jobs\JobRepository;
 use App\Stashes\Api\StashInputResource;
 use App\Stashes\Api\StashItemResource;
 use App\Stashes\Api\StashResource;
+use App\Support\Http\QueryPagination;
 use App\System\Activity\ActivityEventService;
 use App\Vault\AssetRepository;
 use App\Vault\MediaItemRepository;
@@ -120,7 +121,7 @@ final readonly class StashController
     }
 
     #[Get('/api/v1/stashes/{id}/items')]
-    public function items(string $id): Json
+    public function items(string $id, Request $request): Json
     {
         $stash = $this->findStash($id);
 
@@ -128,7 +129,10 @@ final readonly class StashController
             return $this->notFound('Stash not found.');
         }
 
-        $stashItems = $this->stashItems->listForStash(StashId::fromPrimaryKey($stash->id));
+        $stashId = StashId::fromPrimaryKey($stash->id);
+        [$limit, $offset] = QueryPagination::parse($request);
+
+        $stashItems = $this->stashItems->listForStash($stashId, $limit, $offset);
         $mediaItemIds = array_values(array_unique(array_map(
             static fn ($item): string => (string) $item->mediaItemId,
             $stashItems,
@@ -148,6 +152,9 @@ final readonly class StashController
                 )->toArray(),
                 $stashItems,
             ),
+            'total' => $this->stashItems->countForStash($stashId),
+            'limit' => $limit,
+            'offset' => $offset,
         ]);
     }
 

@@ -14,8 +14,10 @@ use App\Stashes\Api\StashResource;
 use App\Stashes\StashId;
 use App\Stashes\StashItemRepository;
 use App\Stashes\StashRepository;
+use App\Support\Http\QueryPagination;
 use App\Vault\Api\AssetResource;
 use App\Vault\Api\MediaItemResource;
+use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
 use Tempest\Router\Get;
@@ -36,13 +38,18 @@ final readonly class MediaItemController
     }
 
     #[Get('/api/v1/items')]
-    public function index(): Json
+    public function index(Request $request): Json
     {
+        [$limit, $offset] = QueryPagination::parse($request);
+
         return new Json([
             'items' => array_map(
                 static fn ($item): array => MediaItemResource::fromRecord($item)->toArray(),
-                $this->mediaItems->list(),
+                $this->mediaItems->list($limit, $offset),
             ),
+            'total' => $this->mediaItems->count(),
+            'limit' => $limit,
+            'offset' => $offset,
         ]);
     }
 

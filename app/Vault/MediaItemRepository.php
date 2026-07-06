@@ -79,11 +79,25 @@ final class MediaItemRepository
     }
 
     /** @return list<MediaItemRecord> */
-    public function list(): array
+    public function list(?int $limit = null, ?int $offset = null): array
     {
-        return MediaItemRecord::select()
-            ->orderBy('createdAt', Direction::DESC)
-            ->all();
+        $query = MediaItemRecord::select()
+            ->orderBy('createdAt', Direction::DESC);
+
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
+        if ($offset !== null) {
+            $query->offset($offset);
+        }
+
+        return $query->all();
+    }
+
+    public function count(): int
+    {
+        return query(MediaItemRecord::class)->count()->execute();
     }
 
     /**
