@@ -65,6 +65,18 @@ final class StashInputRepository
         return $record;
     }
 
+    /**
+     * Only affects future discovery/sync passes for this input -- items
+     * already committed (and their ignoredReason) are not retroactively
+     * re-filtered.
+     */
+    public function updateOptions(StashInputRecord $record, ?StashInputOptions $options): StashInputRecord
+    {
+        $record->options = $options;
+
+        return $this->save($record);
+    }
+
     /** @return list<StashInputRecord> */
     public function listDueForAutomaticSync(DateTime $now): array
     {

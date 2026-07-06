@@ -58,6 +58,7 @@
 								<th class="px-4 py-2 font-normal">Source</th>
 								<th class="px-4 py-2 font-normal">State</th>
 								<th class="px-4 py-2 font-normal">Sync</th>
+								<th class="px-4 py-2 font-normal">Filters</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -72,6 +73,35 @@
 										</span>
 									</td>
 									<td class="px-4 py-2 text-muted" x-text="input.sync_mode ?? '—'"></td>
+									<td class="px-4 py-2">
+										<template x-if="editingInputFiltersId !== input.id">
+											<button type="button" class="text-muted transition-colors hover:text-cream"
+												x-on:click="startEditInputFilters(input)">
+												<span x-show="input.options?.title_regex_include || input.options?.title_regex_exclude">edit filters</span>
+												<span x-show="!(input.options?.title_regex_include || input.options?.title_regex_exclude)">+ add filter</span>
+											</button>
+										</template>
+										<template x-if="editingInputFiltersId === input.id">
+											<div class="w-56 space-y-1.5 rounded border border-line bg-espresso p-2">
+												<input type="text" x-model="editInputTitleRegexInclude" placeholder="Include title regex"
+													class="w-full rounded border border-line bg-panel px-2 py-1 text-[12px] text-cream outline-none focus:border-amber"/>
+												<input type="text" x-model="editInputTitleRegexExclude" placeholder="Exclude title regex"
+													class="w-full rounded border border-line bg-panel px-2 py-1 text-[12px] text-cream outline-none focus:border-amber"/>
+												<p class="text-[11px] text-muted">Applies to future syncs only — already-discovered items are unaffected.</p>
+												<div class="flex items-center gap-2">
+													<button type="button" x-on:click="saveInputFilters(input.id)"
+														x-bind:disabled="savingInputFilters === input.id"
+														class="rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-60">
+														Save
+													</button>
+													<button type="button" x-on:click="cancelEditInputFilters()"
+														class="text-[12px] text-muted transition-colors hover:text-cream">
+														Cancel
+													</button>
+												</div>
+											</div>
+										</template>
+									</td>
 								</tr>
 							</template>
 						</tbody>

@@ -199,6 +199,45 @@ final readonly class StashController
         return new Json(ApiJson::encode($result->toArray()), Status::CREATED);
     }
 
+    /**
+     * Only affects future discovery/sync passes for this input -- items
+     * already committed keep whatever ignoredReason they were given at
+     * discovery time; this never retroactively re-filters them.
+     */
+    #[Patch('/api/v1/stashes/{id}/inputs/{inputId}')]
+    public function updateInput(string $id, string $inputId, Request $request): Json
+    {
+        $stash = $this->findStash($id);
+
+        if ($stash === null) {
+            return $this->notFound('Stash not found.');
+        }
+
+        $input = $this->findStashInput($stash, $inputId);
+
+        if ($input === null) {
+            return $this->notFound('Stash input not found.');
+        }
+
+        // Sourced from the raw, un-normalized body: provider-option keys are
+        // opaque identifiers, not DTO field names (see addInput() above).
+        $rawOptionsBody = $request->body['options'] ?? null;
+        $rawOptions = is_array($rawOptionsBody) ? array_filter($rawOptionsBody, is_string(...), ARRAY_FILTER_USE_KEY) : [];
+        $inputOptions = StashInputOptions::fromArray($rawOptions);
+
+        foreach ([$inputOptions?->titleRegexInclude, $inputOptions?->titleRegexExclude] as $pattern) {
+            if ($pattern !== null && ! StashInputOptions::isValidTitleRegex($pattern)) {
+                return $this->validationError("Invalid title filter pattern: {$pattern}");
+            }
+        }
+
+        $input = $this->stashInputs->updateOptions($input, $inputOptions);
+
+        return new Json([
+            'input' => StashInputResource::fromRecord($input)->toArray(),
+        ]);
+    }
+
     #[Patch('/api/v1/stashes/{id}')]
     public function update(string $id, Request $request): Json
     {
@@ -295,6 +334,21 @@ final readonly class StashController
     private function findStash(string $id): ?StashRecord
     {
         return StashId::isValid($id) ? $this->stashes->find(StashId::parse($id)) : null;
+    }
+
+    private function findStashInput(StashRecord $stash, string $inputId): ?StashInputRecord
+    {
+        if (! StashInputId::isValid($inputId)) {
+            return null;
+        }
+
+        $input = $this->stashInputs->find(StashInputId::parse($inputId));
+
+        if ($input === null || $input->stashId->toString() !== StashId::fromPrimaryKey($stash->id)->toString()) {
+            return null;
+        }
+
+        return $input;
     }
 
     private function notFound(string $message): Json

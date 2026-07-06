@@ -464,6 +464,46 @@ paths:
         "400": { $ref: "#/components/responses/ValidationError" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/v1/stashes/{id}/inputs/{inputId}:
+    patch:
+      operationId: updateStashInput
+      tags: [StashInputs]
+      summary: >
+        Update an existing input's stored filters (title_regex_include/exclude,
+        provider options). Only affects future discovery/sync passes --
+        items already committed keep whatever ignoredReason they were given
+        at discovery time; this never retroactively re-filters them.
+      parameters:
+        - $ref: "#/components/parameters/StashId"
+        - name: inputId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                options:
+                  type: object
+                  description: >
+                    Same shape as POST .../inputs's options. Omitting a key
+                    (or sending an empty object) clears that filter.
+                  additionalProperties: true
+      responses:
+        "200":
+          description: Updated input
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  input: { $ref: "#/components/schemas/StashInput" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/v1/stashes/preflight:
     post:
       operationId: createPreflight

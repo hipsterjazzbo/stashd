@@ -678,6 +678,11 @@ interface StashInputSummary {
 	consecutive_failures: number
 	title: string | null
 	sync_mode: string | null
+	options: {
+		title_regex_include: string | null
+		title_regex_exclude: string | null
+		provider: Record<string, boolean | string>
+	} | null
 	last_checked_at: string | null
 	next_check_at: string | null
 	last_success_at: string | null
@@ -1123,6 +1128,10 @@ function stashDetailComponent(stashId: string) {
 		itemSearch: '',
 		jobs: [] as JobSummary[],
 		inputs: [] as StashInputSummary[],
+		editingInputFiltersId: null as string | null,
+		editInputTitleRegexInclude: '',
+		editInputTitleRegexExclude: '',
+		savingInputFilters: null as string | null,
 		broadcasts: [] as BroadcastSummary[],
 		broadcastPlugins: [] as BroadcastPluginSummary[],
 		actionPending: null as string | null,
@@ -1412,6 +1421,45 @@ function stashDetailComponent(stashId: string) {
 				this.error = 'Could not retry failed downloads.'
 			} finally {
 				this.actionPending = null
+			}
+		},
+
+		startEditInputFilters(input: StashInputSummary) {
+			this.editingInputFiltersId = input.id
+			this.editInputTitleRegexInclude = input.options?.title_regex_include ?? ''
+			this.editInputTitleRegexExclude = input.options?.title_regex_exclude ?? ''
+		},
+
+		cancelEditInputFilters() {
+			this.editingInputFiltersId = null
+		},
+
+		async saveInputFilters(inputId: string) {
+			this.savingInputFilters = inputId
+			try {
+				const response = await apiFetch(`/api/v1/stashes/${stashId}/inputs/${inputId}`, {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						options: {
+							title_regex_include: this.editInputTitleRegexInclude.trim() || undefined,
+							title_regex_exclude: this.editInputTitleRegexExclude.trim() || undefined,
+						},
+					}),
+				})
+				if (!response.ok) {
+					const body = (await response.json()) as { error?: { message?: string } }
+					this.error = body.error?.message ?? 'Could not update that input’s filters.'
+					return
+				}
+				this.editingInputFiltersId = null
+				this.error = null
+				await this.refresh()
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not reach the server.'
+			} finally {
+				this.savingInputFilters = null
 			}
 		},
 

@@ -171,3 +171,154 @@ test('add input excludes shorts and live items from a youtube channel when toggl
         ->and($reasonsByMediaItemId['StashdVid17'])->toBe(['ignored', 'filter_video_type'])
         ->and($reasonsByMediaItemId['StashdVid18'])->toBe(['ignored', 'filter_video_type']);
 });
+
+test('PATCH stash input updates its stored title-regex filters', function (): void {
+    $headers = $this->authHeaders();
+
+    $stash = $this->http->post('/api/v1/stashes', ['name' => 'Editable Filters'], headers: $headers)->assertStatus(Status::CREATED);
+    $stashId = $stash->body['stash']['id'];
+
+    $preflight = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.preflight',
+        'options' => ['source_uri' => 'fake://channel/editable-filters'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $inputId = $this->http->get('/api/v1/stashes/' . $stashId . '/inputs', headers: $headers)
+        ->assertOk()->body['inputs'][0]['id'];
+
+    $response = $this->http->patch('/api/v1/stashes/' . $stashId . '/inputs/' . $inputId, [
+        'options' => ['title_regex_include' => 'Episode 2'],
+    ], headers: $headers)->assertOk();
+
+    expect($response->body['input']['options']['title_regex_include'])->toBe('Episode 2')
+        ->and($response->body['input']['options']['title_regex_exclude'])->toBeNull();
+
+    $refetched = $this->http->get('/api/v1/stashes/' . $stashId . '/inputs', headers: $headers)->assertOk();
+    expect($refetched->body['inputs'][0]['options']['title_regex_include'])->toBe('Episode 2');
+});
+
+test('PATCH stash input with an empty options body clears stored filters', function (): void {
+    $headers = $this->authHeaders();
+
+    $stash = $this->http->post('/api/v1/stashes', ['name' => 'Clear Filters'], headers: $headers)->assertStatus(Status::CREATED);
+    $stashId = $stash->body['stash']['id'];
+
+    $preflight = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.preflight',
+        'options' => ['source_uri' => 'fake://channel/clear-filters'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
+        'options' => ['title_regex_include' => 'Episode 2'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $inputId = $this->http->get('/api/v1/stashes/' . $stashId . '/inputs', headers: $headers)
+        ->assertOk()->body['inputs'][0]['id'];
+
+    $response = $this->http->patch('/api/v1/stashes/' . $stashId . '/inputs/' . $inputId, [
+        'options' => [],
+    ], headers: $headers)->assertOk();
+
+    expect($response->body['input']['options'])->toBeNull();
+});
+
+test('PATCH stash input rejects a malformed title-regex pattern', function (): void {
+    $headers = $this->authHeaders();
+
+    $stash = $this->http->post('/api/v1/stashes', ['name' => 'Bad Edit Regex'], headers: $headers)->assertStatus(Status::CREATED);
+    $stashId = $stash->body['stash']['id'];
+
+    $preflight = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.preflight',
+        'options' => ['source_uri' => 'fake://channel/bad-edit-regex'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $inputId = $this->http->get('/api/v1/stashes/' . $stashId . '/inputs', headers: $headers)
+        ->assertOk()->body['inputs'][0]['id'];
+
+    $response = $this->http->patch('/api/v1/stashes/' . $stashId . '/inputs/' . $inputId, [
+        'options' => ['title_regex_include' => '(unterminated'],
+    ], headers: $headers);
+
+    $response->assertStatus(Status::BAD_REQUEST);
+    expect($response->body['error']['code'])->toBe('validation_error');
+});
+
+test('PATCH stash input does not retroactively re-filter already-committed items', function (): void {
+    $headers = $this->authHeaders();
+
+    $stash = $this->http->post('/api/v1/stashes', ['name' => 'No Retroactive Filter'], headers: $headers)->assertStatus(Status::CREATED);
+    $stashId = $stash->body['stash']['id'];
+
+    $preflight = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.preflight',
+        'options' => ['source_uri' => 'fake://channel/no-retroactive-filter'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $inputId = $this->http->get('/api/v1/stashes/' . $stashId . '/inputs', headers: $headers)
+        ->assertOk()->body['inputs'][0]['id'];
+
+    // All 3 items committed active (no filter was set at add-input time).
+    $beforeStates = array_map(
+        static fn (StashItemRecord $item): string => $item->state->value,
+        StashItemRecord::select()->where('stashId = ?', $stashId)->all(),
+    );
+    expect($beforeStates)->toBe(['active', 'active', 'active']);
+
+    $this->http->patch('/api/v1/stashes/' . $stashId . '/inputs/' . $inputId, [
+        'options' => ['title_regex_include' => 'Episode 2'],
+    ], headers: $headers)->assertOk();
+
+    // Editing the filter is stored, but the 3 already-committed items are untouched.
+    $afterStates = array_map(
+        static fn (StashItemRecord $item): string => $item->state->value,
+        StashItemRecord::select()->where('stashId = ?', $stashId)->all(),
+    );
+    expect($afterStates)->toBe(['active', 'active', 'active']);
+});
+
+test('PATCH stash input returns 404 for an input belonging to a different stash', function (): void {
+    $headers = $this->authHeaders();
+
+    $stashA = $this->http->post('/api/v1/stashes', ['name' => 'Cross Stash A'], headers: $headers)->assertStatus(Status::CREATED);
+    $stashB = $this->http->post('/api/v1/stashes', ['name' => 'Cross Stash B'], headers: $headers)->assertStatus(Status::CREATED);
+
+    $preflight = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.preflight',
+        'options' => ['source_uri' => 'fake://channel/cross-stash-input'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $this->http->post('/api/v1/stashes/' . $stashA->body['stash']['id'] . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $inputId = $this->http->get('/api/v1/stashes/' . $stashA->body['stash']['id'] . '/inputs', headers: $headers)
+        ->assertOk()->body['inputs'][0]['id'];
+
+    $this->http->patch('/api/v1/stashes/' . $stashB->body['stash']['id'] . '/inputs/' . $inputId, [
+        'options' => ['title_regex_include' => 'Episode 2'],
+    ], headers: $headers)->assertStatus(Status::NOT_FOUND);
+});
