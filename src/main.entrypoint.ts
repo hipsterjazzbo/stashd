@@ -115,6 +115,28 @@ function formatDuration(seconds: number | null | undefined): string {
 	return `${hours}h ${minutes % 60}m`
 }
 
+// navigator.clipboard requires a secure context (HTTPS/localhost) -- same
+// constraint as crypto.randomUUID elsewhere in this file, and just as
+// reachable over a plain-HTTP LAN IP. Falls back to the classic
+// execCommand technique, which works anywhere as long as it runs
+// synchronously from a real user gesture (true for both call sites, both
+// directly inside a click handler).
+async function copyToClipboard(text: string): Promise<void> {
+	if (navigator.clipboard) {
+		await navigator.clipboard.writeText(text)
+		return
+	}
+
+	const textarea = document.createElement('textarea')
+	textarea.value = text
+	textarea.style.position = 'fixed'
+	textarea.style.opacity = '0'
+	document.body.appendChild(textarea)
+	textarea.select()
+	document.execCommand('copy')
+	textarea.remove()
+}
+
 const ALL_DOWNLOAD_POLICIES = ['video', 'audio_only', 'metadata_only', 'manual_download']
 
 /**
@@ -344,6 +366,19 @@ const EVENT_TYPES = ['job.created', 'job.progress', 'job.completed', 'job.failed
 type MercureListener = (event: ActivityEvent) => void
 type ConnectionListener = (connected: boolean) => void
 
+// crypto.randomUUID() only exists in secure contexts (HTTPS or localhost) --
+// unavailable over a plain-HTTP LAN IP, a real access pattern for this app.
+// This id is a synthetic, client-only key for Alpine's event list (never
+// sent to the server), so a cheap fallback is fine; prefer the real thing
+// when it's there.
+function randomEventId(): string {
+	if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+		return crypto.randomUUID()
+	}
+
+	return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+}
+
 // One EventSource shared by every page component, opened against FrankenPHP's
 // embedded Mercure hub instead of each component (and the old
 // awaitSseTerminal one-shot helper) dialing its own /api/v1/events poll-loop
@@ -378,7 +413,7 @@ function ensureMercureConnection(): void {
 
 	mercureSource.onmessage = (raw: MessageEvent<string>) => {
 		const { event, ...payload } = JSON.parse(raw.data) as { event: string } & Record<string, unknown>
-		const wrapped: ActivityEvent = { id: crypto.randomUUID(), event, payload, created_at: new Date().toISOString() }
+		const wrapped: ActivityEvent = { id: randomEventId(), event, payload, created_at: new Date().toISOString() }
 
 		for (const listener of mercureListeners.get(event) ?? []) listener(wrapped)
 	}
@@ -1401,7 +1436,7 @@ function stashDetailComponent(stashId: string) {
 		},
 
 		async copyFeedUrl(feedUrl: string) {
-			await navigator.clipboard.writeText(feedUrl)
+			await copyToClipboard(feedUrl)
 		},
 
 		startEdit() {
@@ -1982,7 +2017,7 @@ function settingsComponent() {
 		},
 
 		async copyToken(token: string) {
-			await navigator.clipboard.writeText(token)
+			await copyToClipboard(token)
 		},
 
 		async createMediaServer() {
