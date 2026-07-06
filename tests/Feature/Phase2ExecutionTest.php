@@ -225,6 +225,28 @@ test('events subscription endpoint requires authentication and sets a scoped coo
         ->and($mercureCookie->httpOnly)->toBeTrue();
 });
 
+test('mercure cookie carries the raw subscriber JWT, not Tempest\'s encrypted cookie envelope', function (): void {
+    // Caddy's Mercure hub decodes this cookie itself, using MercureSecret --
+    // it has no knowledge of Tempest's own per-cookie AES-256-GCM encryption
+    // (SetCookieHeadersMiddleware), which wraps every cookie value in a
+    // {"payload":...,"iv":...,"tag":...,"signature":...} envelope unless the
+    // cookie key is explicitly whitelisted as plaintext. A JWT has exactly
+    // two dots (header.payload.signature); the encrypted envelope, being a
+    // single base64 blob, has none.
+    $headers = $this->authHeaders();
+
+    $response = $this->http->get('/api/v1/events/subscription', headers: $headers)->assertOk();
+    $jwt = mercureAuthorizationCookieFrom($response)->value;
+
+    expect(substr_count($jwt, '.'))->toBe(2);
+
+    [$header, $payload] = explode('.', $jwt);
+    $decodedPayload = json_decode(base64_decode(strtr($payload, '-_', '+/')), associative: true);
+
+    expect(json_decode(base64_decode(strtr($header, '-_', '+/')), associative: true)['alg'] ?? null)->not->toBeNull()
+        ->and($decodedPayload['mercure']['subscribe'] ?? null)->not->toBeNull();
+});
+
 test('mercure cookie is not Secure when reached with no reverse proxy, matching the http test baseUri', function (): void {
     $headers = $this->authHeaders();
 
