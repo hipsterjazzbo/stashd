@@ -42,6 +42,7 @@ final readonly class BroadcastLifecycleService
 {
     public function __construct(
         private BroadcastRepository $broadcasts,
+        private BroadcastItemRepository $broadcastItems,
         private BroadcastContextFactory $contextFactory,
         private BroadcastPluginRegistry $plugins,
         private BroadcastTriggerService $triggers,
@@ -257,10 +258,33 @@ final readonly class BroadcastLifecycleService
             return;
         }
 
-        $broadcast->lastError = 'broadcast_verification_failed';
+        $broadcast->lastError = $this->staleReason(BroadcastId::fromPrimaryKey($broadcast->id));
 
         if ($broadcast->state !== BroadcastState::Stale) {
             $this->transitions->transitionBroadcast($broadcast, BroadcastState::Stale);
         }
+    }
+
+    /**
+     * Prefers the specific reason already recorded on the stale/failed items
+     * (e.g. a pending transcode) over the generic fallback, so a benign
+     * in-progress state doesn't read as a hard failure. Falls back to the
+     * generic code when items disagree or none carry a reason.
+     */
+    private function staleReason(BroadcastId $broadcastId): string
+    {
+        $reasons = [];
+
+        foreach ($this->broadcastItems->listForBroadcast($broadcastId) as $item) {
+            if ($item->lastError === null) {
+                continue;
+            }
+
+            if (in_array($item->state, [BroadcastItemState::Stale, BroadcastItemState::Failed], true)) {
+                $reasons[$item->lastError] = true;
+            }
+        }
+
+        return count($reasons) === 1 ? array_key_first($reasons) : 'broadcast_verification_failed';
     }
 }

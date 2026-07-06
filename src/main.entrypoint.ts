@@ -1199,6 +1199,11 @@ function stashDetailComponent(stashId: string) {
 			if ('EventSource' in window) {
 				subscribeToEvents(EVENT_TYPES, () => void this.refresh())
 			}
+
+			// ponytail: SSE delivery isn't guaranteed (dropped connection, missed
+			// event) -- without this, a broadcast rebuild's progress bar can
+			// freeze on-screen forever even though the job finished server-side.
+			setInterval(() => void this.refresh(), 5000)
 		},
 
 		async refresh() {
