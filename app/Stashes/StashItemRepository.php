@@ -63,12 +63,29 @@ final class StashItemRepository
     }
 
     /** @return list<StashItemRecord> */
-    public function listForStash(StashId $stashId): array
+    public function listForStash(StashId $stashId, ?int $limit = null, ?int $offset = null): array
     {
-        return StashItemRecord::select()
+        $query = StashItemRecord::select()
             ->where('stashId = ?', $stashId->toString())
-            ->orderBy('position', Direction::ASC)
-            ->all();
+            ->orderBy('position', Direction::ASC);
+
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
+        if ($offset !== null) {
+            $query->offset($offset);
+        }
+
+        return $query->all();
+    }
+
+    public function countForStash(StashId $stashId): int
+    {
+        return query(StashItemRecord::class)
+            ->count()
+            ->where('stashId = ?', $stashId->toString())
+            ->execute();
     }
 
     /** @return list<StashItemRecord> */

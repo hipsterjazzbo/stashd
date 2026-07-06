@@ -1122,6 +1122,9 @@ function stashDetailComponent(stashId: string) {
 		error: null as string | null,
 		stash: null as StashSummary | null,
 		items: [] as StashItemSummary[],
+		itemsTotal: 0,
+		itemsLimit: 50,
+		itemsOffset: 0,
 		itemSortKey: 'published' as ItemSortKey,
 		itemSortDir: 'desc' as 'asc' | 'desc',
 		itemStatusFilter: 'all',
@@ -1202,7 +1205,7 @@ function stashDetailComponent(stashId: string) {
 			try {
 				const [stashResponse, itemsResponse, inputsResponse, broadcastsResponse, jobsResponse] = await Promise.all([
 					apiFetch(`/api/v1/stashes/${stashId}`),
-					apiFetch(`/api/v1/stashes/${stashId}/items`),
+					apiFetch(`/api/v1/stashes/${stashId}/items?limit=${this.itemsLimit}&offset=${this.itemsOffset}`),
 					apiFetch(`/api/v1/stashes/${stashId}/inputs`),
 					apiFetch(`/api/v1/stashes/${stashId}/broadcasts`),
 					apiFetch('/api/v1/jobs'),
@@ -1221,6 +1224,7 @@ function stashDetailComponent(stashId: string) {
 				// successful refresh.
 				this.stash = stashBody.stash ?? this.stash
 				this.items = itemsBody.items ?? this.items
+				this.itemsTotal = itemsBody.total ?? this.itemsTotal
 				this.inputs = inputsBody.inputs ?? this.inputs
 				this.broadcasts = broadcastsBody.broadcasts ?? this.broadcasts
 				this.jobs = jobsBody.jobs ?? this.jobs
@@ -1375,6 +1379,33 @@ function stashDetailComponent(stashId: string) {
 				}
 			}
 			return rows
+		},
+
+		hasPrevItemsPage(): boolean {
+			return this.itemsOffset > 0
+		},
+
+		hasNextItemsPage(): boolean {
+			return this.itemsOffset + this.itemsLimit < this.itemsTotal
+		},
+
+		async prevItemsPage() {
+			if (!this.hasPrevItemsPage()) return
+			this.itemsOffset = Math.max(0, this.itemsOffset - this.itemsLimit)
+			await this.refresh()
+		},
+
+		async nextItemsPage() {
+			if (!this.hasNextItemsPage()) return
+			this.itemsOffset += this.itemsLimit
+			await this.refresh()
+		},
+
+		itemsRangeLabel(): string {
+			if (this.itemsTotal === 0) return ''
+			const start = this.itemsOffset + 1
+			const end = Math.min(this.itemsOffset + this.itemsLimit, this.itemsTotal)
+			return `${start}–${end} of ${this.itemsTotal}`
 		},
 
 		// Re-dispatches item.download for a failed item -- MediaItemState
@@ -1905,6 +1936,9 @@ function vaultComponent() {
 		loading: true,
 		error: null as string | null,
 		items: [] as MediaItemSummary[],
+		total: 0,
+		limit: 50,
+		offset: 0,
 		statusBadge,
 		formatDuration,
 		formatRelativeTime,
@@ -1916,13 +1950,42 @@ function vaultComponent() {
 
 		async refresh() {
 			try {
-				const response = await apiFetch('/api/v1/items')
-				this.items = (await response.json()).items
+				const response = await apiFetch(`/api/v1/items?limit=${this.limit}&offset=${this.offset}`)
+				const body = await response.json()
+				this.items = body.items ?? this.items
+				this.total = body.total ?? this.total
 				this.error = null
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
 				this.error = 'Could not reach the server.'
 			}
+		},
+
+		hasPrevPage(): boolean {
+			return this.offset > 0
+		},
+
+		hasNextPage(): boolean {
+			return this.offset + this.limit < this.total
+		},
+
+		async prevPage() {
+			if (!this.hasPrevPage()) return
+			this.offset = Math.max(0, this.offset - this.limit)
+			await this.refresh()
+		},
+
+		async nextPage() {
+			if (!this.hasNextPage()) return
+			this.offset += this.limit
+			await this.refresh()
+		},
+
+		rangeLabel(): string {
+			if (this.total === 0) return ''
+			const start = this.offset + 1
+			const end = Math.min(this.offset + this.limit, this.total)
+			return `${start}–${end} of ${this.total}`
 		},
 	}
 }

@@ -115,9 +115,9 @@
 				<section class="rounded-lg border border-line bg-panel/60">
 					<div class="flex items-center justify-between border-b border-line px-4 py-3">
 						<h2 class="text-[13px] font-semibold text-cream">Items</h2>
-						<div class="flex flex-wrap items-center gap-x-1 text-[12px] text-muted" x-show="items.length > 0">
+						<div class="flex flex-wrap items-center gap-x-1 text-[12px] text-muted" x-show="itemsTotal > 0">
 							<button type="button" class="transition-colors hover:text-cream" x-bind:class="itemStatusFilter === 'all' ? 'text-cream' : ''" x-on:click="itemStatusFilter = 'all'">
-								<span x-text="items.length"></span> item<span x-show="items.length !== 1">s</span>
+								<span x-text="itemsTotal"></span> item<span x-show="itemsTotal !== 1">s</span>
 							</button>
 							<template x-for="chip in itemStatusSummary()" x-bind:key="chip.filter">
 								<span>·
@@ -130,10 +130,10 @@
 								retry all failed
 							</button>
 						</div>
-						<p class="text-[12px] text-muted" x-show="items.length === 0">No items</p>
+						<p class="text-[12px] text-muted" x-show="itemsTotal === 0">No items</p>
 					</div>
 
-					<div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2" x-show="items.length > 0">
+					<div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2" x-show="itemsTotal > 0">
 						<input type="text" x-model="itemSearch" placeholder="Search title…"
 							class="w-40 rounded border border-line bg-espresso px-2 py-1 text-[12px] text-cream outline-none focus:border-amber"/>
 						<select x-model="itemStatusFilter"
@@ -143,9 +143,10 @@
 								<option x-bind:value="status" x-text="status.replace(/_/g, ' ')"></option>
 							</template>
 						</select>
+						<p class="ml-auto text-[12px] text-muted" x-show="itemsTotal > itemsLimit">Filters and sort apply to the current page only.</p>
 					</div>
 
-					<table class="w-full text-left text-[13px]" x-show="items.length > 0">
+					<table class="w-full text-left text-[13px]" x-show="itemsTotal > 0">
 						<thead>
 							<tr class="text-[11px] uppercase tracking-wide text-muted">
 								<th class="px-4 py-2 font-normal">
@@ -217,8 +218,21 @@
 							</template>
 						</tbody>
 					</table>
-					<p class="px-4 py-3 text-[13px] text-muted" x-show="items.length === 0">No items yet.</p>
-					<p class="px-4 py-3 text-[13px] text-muted" x-show="items.length > 0 && itemRows().length === 0">No items match the current filters.</p>
+					<p class="px-4 py-3 text-[13px] text-muted" x-show="itemsTotal === 0">No items yet.</p>
+					<p class="px-4 py-3 text-[13px] text-muted" x-show="itemsTotal > 0 && itemRows().length === 0">No items match the current filters.</p>
+					<div class="flex items-center justify-between border-t border-line px-4 py-2 text-[12px] text-muted" x-show="itemsTotal > itemsLimit">
+						<span x-text="itemsRangeLabel()"></span>
+						<div class="flex items-center gap-2">
+							<button type="button" class="rounded border border-line px-2 py-1 text-muted transition-colors hover:text-cream disabled:opacity-40"
+								x-bind:disabled="!hasPrevItemsPage()" x-on:click="prevItemsPage()">
+								Prev
+							</button>
+							<button type="button" class="rounded border border-line px-2 py-1 text-muted transition-colors hover:text-cream disabled:opacity-40"
+								x-bind:disabled="!hasNextItemsPage()" x-on:click="nextItemsPage()">
+								Next
+							</button>
+						</div>
+					</div>
 				</section>
 
 				<section class="rounded-lg border border-line bg-panel/60">

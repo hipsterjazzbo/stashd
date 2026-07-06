@@ -48,6 +48,19 @@
 					</tbody>
 				</table>
 				<p class="px-4 py-3 text-[13px] text-muted" x-show="items.length === 0">No vault items yet.</p>
+				<div class="flex items-center justify-between border-t border-line px-4 py-2 text-[12px] text-muted" x-show="total > limit">
+					<span x-text="rangeLabel()"></span>
+					<div class="flex items-center gap-2">
+						<button type="button" class="rounded border border-line px-2 py-1 text-muted transition-colors hover:text-cream disabled:opacity-40"
+							x-bind:disabled="!hasPrevPage()" x-on:click="prevPage()">
+							Prev
+						</button>
+						<button type="button" class="rounded border border-line px-2 py-1 text-muted transition-colors hover:text-cream disabled:opacity-40"
+							x-bind:disabled="!hasNextPage()" x-on:click="nextPage()">
+							Next
+						</button>
+					</div>
+				</div>
 			</section>
 		</template>
 	</div>
