@@ -146,7 +146,11 @@ function formatRelativeTime(iso: string | null | undefined): string {
 	if (abs < 60) return `${abs}s ${suffix}`
 	if (abs < 3600) return `${Math.round(abs / 60)}m ${suffix}`
 	if (abs < 86400) return `${Math.round(abs / 3600)}h ${suffix}`
-	return `${Math.round(abs / 86400)}d ${suffix}`
+	if (abs < 86400 * 30) return `${Math.round(abs / 86400)}d ${suffix}`
+
+	// Past a month, a relative count (e.g. "2856d ago") stops being useful --
+	// an absolute date is.
+	return new Date(then).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 interface Badge {
@@ -303,6 +307,34 @@ function summarizeRecentActivity(events: ActivityLogEntry[], limit = 8): Activit
 	}
 
 	return groups.slice(0, limit)
+}
+
+/**
+ * The Activity page's live feed renders `ActivityEvent`s straight off Mercure
+ * (event name + raw payload); its initial backfill instead comes from the
+ * persisted `ActivityLogEntry` log, a differently-shaped resource. A
+ * persisted entry is exactly what happens at rest when an `activity.created`
+ * event fires, so it's adapted to that same shape here rather than teaching
+ * every render helper (eventBadge, summarizeEvent) a second event shape.
+ */
+function activityLogEntryToEvent(entry: ActivityLogEntry): ActivityEvent {
+	return {
+		id: entry.id,
+		event: 'activity.created',
+		payload: {
+			level: entry.level,
+			message: entry.message,
+			type: entry.type,
+			entity_type: entry.entity_type,
+			entity_id: entry.entity_id,
+			stash_id: entry.stash_id,
+			media_item_id: entry.media_item_id,
+			broadcast_id: entry.broadcast_id,
+			job_id: entry.job_id,
+			command_id: entry.command_id,
+		},
+		created_at: entry.created_at,
+	}
 }
 
 // The full, fixed set of event names MercurePublisher ever emits
@@ -738,6 +770,19 @@ interface LibrarySummary {
 	type: string | null
 }
 
+async function describeFailedResponse(response: Response): Promise<string> {
+	try {
+		const body = (await response.json()) as { error?: { message?: string } }
+		return body.error?.message ?? `HTTP ${response.status}`
+	} catch {
+		return `HTTP ${response.status}`
+	}
+}
+
+function describeFailureReason(cause: unknown): string {
+	return cause instanceof Error ? cause.message : String(cause)
+}
+
 function dashboardComponent() {
 	return {
 		loading: true,
@@ -772,28 +817,62 @@ function dashboardComponent() {
 		},
 
 		async refresh() {
-			try {
-				const [healthResponse, stashesResponse, itemsResponse, activityResponse] = await Promise.all([
-					apiFetch('/api/v1/system/health'),
-					apiFetch('/api/v1/stashes'),
-					apiFetch('/api/v1/items'),
-					apiFetch('/api/v1/activity'),
-				])
-				this.health = await healthResponse.json()
-				this.stashCount = ((await stashesResponse.json()).stashes as unknown[]).length
-				this.vaultCount = ((await itemsResponse.json()).items as unknown[]).length
-				this.activitySummary = summarizeRecentActivity((await activityResponse.json()).events as ActivityLogEntry[])
-				this.error = null
-			} catch (cause) {
-				if (cause instanceof UnauthenticatedError) return
-				this.error = 'Could not reach the server.'
+			// Each endpoint runs independently (Promise.allSettled, not
+			// Promise.all) so one bad endpoint doesn't hide which one it was
+			// behind a single generic "could not reach the server" message.
+			const endpoints: Array<{ label: string; run: () => Promise<void> }> = [
+				{
+					label: 'system health',
+					run: async () => {
+						const response = await apiFetch('/api/v1/system/health')
+						if (!response.ok) throw new Error(await describeFailedResponse(response))
+						this.health = await response.json()
+					},
+				},
+				{
+					label: 'stashes',
+					run: async () => {
+						const response = await apiFetch('/api/v1/stashes')
+						if (!response.ok) throw new Error(await describeFailedResponse(response))
+						this.stashCount = ((await response.json()).stashes as unknown[]).length
+					},
+				},
+				{
+					label: 'vault items',
+					run: async () => {
+						const response = await apiFetch('/api/v1/items')
+						if (!response.ok) throw new Error(await describeFailedResponse(response))
+						this.vaultCount = ((await response.json()).items as unknown[]).length
+					},
+				},
+				{
+					label: 'activity',
+					run: async () => {
+						const response = await apiFetch('/api/v1/activity')
+						if (!response.ok) throw new Error(await describeFailedResponse(response))
+						this.activitySummary = summarizeRecentActivity((await response.json()).events as ActivityLogEntry[])
+					},
+				},
+			]
+
+			const results = await Promise.allSettled(endpoints.map((endpoint) => endpoint.run()))
+
+			if (results.some((result) => result.status === 'rejected' && result.reason instanceof UnauthenticatedError)) {
+				return
 			}
+
+			const failures = results
+				.map((result, index) => (result.status === 'rejected' ? `${endpoints[index].label} (${describeFailureReason(result.reason)})` : null))
+				.filter((message): message is string => message !== null)
+
+			this.error = failures.length > 0 ? `Could not reach: ${failures.join(', ')}.` : null
 		},
 	}
 }
 
 function activityComponent() {
 	return {
+		loading: true,
 		events: [] as ActivityEvent[],
 		connected: false,
 		// SSE replaces `events` wholesale on every notification; tracking
@@ -813,7 +892,20 @@ function activityComponent() {
 			}
 		},
 
-		init() {
+		async init() {
+			try {
+				const response = await apiFetch('/api/v1/activity')
+				const entries = ((await response.json()).events as ActivityLogEntry[]) ?? []
+				this.events = entries.map(activityLogEntryToEvent)
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				// Backfill failing shouldn't block the live feed below -- an
+				// empty list here just means "No activity yet" until the
+				// first live event arrives, same as before this existed.
+			} finally {
+				this.loading = false
+			}
+
 			if (!('EventSource' in window)) return
 
 			subscribeToConnectionState((connected) => {
@@ -1259,6 +1351,30 @@ function stashDetailComponent(stashId: string) {
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
 				this.error = 'Could not retry that download.'
+			} finally {
+				this.actionPending = null
+			}
+		},
+
+		// Dispatches one server-side command that looks up every failed item
+		// in this stash itself (not this.items -- which, once paginated,
+		// would only ever reflect whatever page happens to be loaded) and
+		// retries all of them.
+		async retryAllFailed() {
+			this.actionPending = 'retry-all'
+			try {
+				await apiFetch('/api/v1/commands', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						type: 'stash.retry_failed',
+						options: { stash_id: stashId },
+					}),
+				})
+				await this.refresh()
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not retry failed downloads.'
 			} finally {
 				this.actionPending = null
 			}

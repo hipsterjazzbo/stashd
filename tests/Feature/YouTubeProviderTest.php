@@ -165,11 +165,12 @@ test('youtube add input populates stash icon_uri from the resolved channel avata
     expect($show->body['stash']['icon_uri'])->toBe('https://yt3.googleusercontent.com/stashd-demo-avatar.jpg');
 });
 
-test('youtube add input defaults the stash name to the resolved channel title when no name was given', function (): void {
+test('youtube add input defaults the stash name and slug to the resolved channel title when no name was given', function (): void {
     $headers = $this->authHeaders();
 
     $stash = $this->http->post('/api/v1/stashes', [], headers: $headers)->assertStatus(Status::CREATED);
-    expect($stash->body['stash']['name'])->toBe('New Stash');
+    expect($stash->body['stash']['name'])->toBe('New Stash')
+        ->and($stash->body['stash']['slug'])->toStartWith('new-stash');
 
     $preflight = $this->http->post('/api/v1/commands', [
         'type' => 'stash.preflight',
@@ -186,10 +187,11 @@ test('youtube add input defaults the stash name to the resolved channel title wh
 
     $updatedStash = StashRecord::findById(new \Tempest\Database\PrimaryKey($stash->body['stash']['id']));
     expect($updatedStash)->not->toBeNull()
-        ->and($updatedStash->name)->toBe('Stashd Demo');
+        ->and($updatedStash->name)->toBe('Stashd Demo')
+        ->and($updatedStash->slug)->toBe('stashd-demo');
 });
 
-test('a second input never overwrites a stash name already defaulted from the first', function (): void {
+test('a second input never overwrites a stash name or slug already defaulted from the first', function (): void {
     $headers = $this->authHeaders();
 
     $stash = $this->http->post('/api/v1/stashes', [], headers: $headers)->assertStatus(Status::CREATED);
@@ -207,7 +209,9 @@ test('a second input never overwrites a stash name already defaulted from the fi
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    expect(StashRecord::findById(new \Tempest\Database\PrimaryKey($stashId))->name)->toBe('Stashd Demo');
+    $afterFirst = StashRecord::findById(new \Tempest\Database\PrimaryKey($stashId));
+    expect($afterFirst->name)->toBe('Stashd Demo')
+        ->and($afterFirst->slug)->toBe('stashd-demo');
 
     $secondPreflight = $this->http->post('/api/v1/commands', [
         'type' => 'stash.preflight',
@@ -222,7 +226,9 @@ test('a second input never overwrites a stash name already defaulted from the fi
     ], headers: $headers)->assertStatus(Status::CREATED);
     $this->processAllJobs();
 
-    expect(StashRecord::findById(new \Tempest\Database\PrimaryKey($stashId))->name)->toBe('Stashd Demo');
+    $afterSecond = StashRecord::findById(new \Tempest\Database\PrimaryKey($stashId));
+    expect($afterSecond->name)->toBe('Stashd Demo')
+        ->and($afterSecond->slug)->toBe('stashd-demo');
 });
 
 test('unsupported youtube url fails preflight job with stable error', function (): void {

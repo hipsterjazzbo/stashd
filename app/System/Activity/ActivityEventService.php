@@ -151,6 +151,25 @@ final readonly class ActivityEventService
         );
     }
 
+    public function retriedFailedDownloads(
+        CommandRecord $command,
+        JobRecord $job,
+        string $stashId,
+        int $retriedCount,
+    ): ActivityEventRecord {
+        return $this->emit(
+            level: ActivityLevel::Info,
+            type: 'stash.retried_failed',
+            message: sprintf('Retried %d failed download(s).', $retriedCount),
+            entityType: 'stash',
+            entityId: $stashId,
+            stashId: $stashId,
+            jobId: (string) $job->id,
+            commandId: (string) $command->id,
+            groupKey: 'command:' . (string) $command->id,
+        );
+    }
+
     public function downloadCompleted(
         CommandRecord $command,
         JobRecord $job,

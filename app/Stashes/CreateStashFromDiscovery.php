@@ -102,8 +102,15 @@ final readonly class CreateStashFromDiscovery
         // before any input is resolved); this backfills it once that's known,
         // the same way iconUri already does above. Later inputs on an
         // already-named (possibly multi-source) stash must never overwrite it.
+        // The slug gets the same treatment -- otherwise it's stuck as
+        // new-stash-N forever even once the name backfills, since slugs are
+        // never regenerated from a name change elsewhere.
         if ($isFirstInput && $stash->name === 'New Stash' && $resolved->sourceTitle !== null) {
-            $this->stashes->update($stash, name: $resolved->sourceTitle);
+            $this->stashes->update(
+                $stash,
+                name: $resolved->sourceTitle,
+                slug: $this->stashes->nextAvailableSlug($this->stashes->slugify($resolved->sourceTitle)),
+            );
         }
 
         $stashInputId = StashInputId::fromPrimaryKey($stashInput->id);

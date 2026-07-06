@@ -94,6 +94,11 @@
 									<button type="button" class="transition-colors hover:text-cream" x-bind:class="itemStatusFilter === chip.filter ? 'text-cream' : ''" x-on:click="itemStatusFilter = chip.filter" x-text="chip.label"></button>
 								</span>
 							</template>
+							<button type="button" class="ml-1 rounded border border-line px-2 py-0.5 text-muted transition-colors hover:text-cream disabled:opacity-50"
+								x-bind:disabled="actionPending === 'retry-all'"
+								x-on:click="retryAllFailed()">
+								retry all failed
+							</button>
 						</div>
 						<p class="text-[12px] text-muted" x-show="items.length === 0">No items</p>
 					</div>
@@ -301,12 +306,16 @@
 							<input type="text" x-model="newBroadcastName" placeholder="Name (optional)"
 								class="flex-1 rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
 							<button type="button" x-show="!broadcastPreview" x-on:click="previewBroadcastCreation()"
-								x-bind:disabled="loadingBroadcastPreview || newBroadcastName.trim() === ''"
+								x-bind:disabled="loadingBroadcastPreview"
 								class="shrink-0 rounded bg-amber px-3 py-2 text-[13px] font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-60">
 								<span x-show="loadingBroadcastPreview">Loading…</span>
 								<span x-show="!loadingBroadcastPreview">Preview</span>
 							</button>
 						</div>
+
+						<p class="mt-2 text-[12px] text-muted" x-show="isSeriesBroadcastType(newBroadcastType) && inputs.length > 1">
+							Multiple inputs go into Season 01 by default — you can map each one to its own season from this broadcast's card once it's created.
+						</p>
 
 						<div class="mt-3 rounded border border-line bg-espresso p-3" x-show="broadcastPreview">
 							<p class="text-[11px] uppercase tracking-wide text-muted">What this will do</p>

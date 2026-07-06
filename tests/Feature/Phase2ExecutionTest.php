@@ -218,20 +218,56 @@ test('events subscription endpoint requires authentication and sets a scoped coo
     $headers = $this->authHeaders();
     $response = $this->http->get('/api/v1/events/subscription', headers: $headers)->assertOk();
 
-    $setCookie = $response->response->getHeader('set-cookie')?->values ?? [];
-    $mercureCookie = null;
-
-    foreach ($setCookie as $value) {
-        $cookie = \Tempest\Http\Cookie\Cookie::createFromString($value);
-        if ($cookie->key === 'mercureAuthorization') {
-            $mercureCookie = $cookie;
-        }
-    }
+    $mercureCookie = mercureAuthorizationCookieFrom($response);
 
     expect($mercureCookie)->not->toBeNull()
         ->and($mercureCookie->path)->toBe('/.well-known/mercure')
         ->and($mercureCookie->httpOnly)->toBeTrue();
 });
+
+test('mercure cookie is not Secure when reached with no reverse proxy, matching the http test baseUri', function (): void {
+    $headers = $this->authHeaders();
+
+    $response = $this->http->get('/api/v1/events/subscription', headers: $headers)->assertOk();
+
+    expect(mercureAuthorizationCookieFrom($response)->secure)->toBeFalse();
+});
+
+test('mercure cookie is Secure when a reverse proxy reports X-Forwarded-Proto: https, regardless of baseUri', function (): void {
+    $headers = $this->authHeaders();
+
+    $response = $this->http->get('/api/v1/events/subscription', headers: [
+        ...$headers,
+        'X-Forwarded-Proto' => 'https',
+    ])->assertOk();
+
+    expect(mercureAuthorizationCookieFrom($response)->secure)->toBeTrue();
+});
+
+test('mercure cookie is not Secure when X-Forwarded-Proto reports http, even behind a proxy', function (): void {
+    $headers = $this->authHeaders();
+
+    $response = $this->http->get('/api/v1/events/subscription', headers: [
+        ...$headers,
+        'X-Forwarded-Proto' => 'http',
+    ])->assertOk();
+
+    expect(mercureAuthorizationCookieFrom($response)->secure)->toBeFalse();
+});
+
+function mercureAuthorizationCookieFrom(\Tempest\Framework\Testing\Http\TestResponseHelper $response): ?\Tempest\Http\Cookie\Cookie
+{
+    $setCookie = $response->response->getHeader('set-cookie')?->values ?? [];
+
+    foreach ($setCookie as $value) {
+        $cookie = \Tempest\Http\Cookie\Cookie::createFromString($value);
+        if ($cookie->key === 'mercureAuthorization') {
+            return $cookie;
+        }
+    }
+
+    return null;
+}
 
 test('request auth context does not leak between http requests', function (): void {
     $headers = $this->authHeaders();
