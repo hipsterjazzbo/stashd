@@ -195,6 +195,49 @@ test('audio podcast triggers a transcode fallback instead of failing for video o
         ->and($audioAsset->derivedFromAssetId)->not->toBeNull();
 });
 
+test('a failed transcode surfaces on the broadcast item without a manual rebuild', function (): void {
+    [$headers, $stashId, $mediaItemId] = podcastFeedReadyStash($this, 'podcast-audio-transcode-failure');
+    podcastFeedCreateAsset(
+        $this->container->get(StashdConfig::class),
+        $this->container->get(AssetRepository::class),
+        $mediaItemId,
+        AssetKind::Video,
+        'original.mp4',
+        'video/mp4',
+        'video-bytes',
+    );
+
+    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'podcast',
+        'name' => 'Audio Transcode Failure',
+        'slug' => 'audio-transcode-failure-' . bin2hex(random_bytes(3)),
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    $gateway = $this->container->get(\App\Transcoding\Ffmpeg\FfmpegGateway::class);
+    assert($gateway instanceof \App\Transcoding\Ffmpeg\StubFfmpegGateway);
+    $gateway->failNextTranscode = true;
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild',
+        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    // One drain of the whole queue: rebuild queues the transcode, the
+    // transcode fails, and the handler's failure-path retrigger (the fix
+    // under test) queues a second rebuild that picks up the now-Failed
+    // audio asset -- no manual rebuild needed to surface the real state.
+    $this->processAllJobs();
+
+    $item = BroadcastItemRecord::select()
+        ->where('broadcastId = ?', $broadcast->body['broadcast']['id'])
+        ->first();
+    $audioAsset = $this->container->get(AssetRepository::class)
+        ->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::PodcastAudio);
+
+    expect($audioAsset?->state)->toBe(AssetState::Failed)
+        ->and($item->lastError)->toBe('podcast_audio_transcode_failed');
+});
+
 test('rebuild job handler counts items pending a transcode fallback for the honest progress label', function (): void {
     [$headers, $stashId, $mediaItemId] = podcastFeedReadyStash($this, 'podcast-audio-progress-label');
     podcastFeedCreateAsset(
