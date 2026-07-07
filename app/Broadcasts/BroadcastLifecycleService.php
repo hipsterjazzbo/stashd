@@ -88,10 +88,29 @@ final readonly class BroadcastLifecycleService
             settings: $mediaKind === null ? null : ['media_kind' => $mediaKind],
         );
 
-        $context = $this->contextFactory->build($draftBroadcast);
+        return $this->computeImpact($draftBroadcast);
+    }
+
+    /**
+     * Same storage-impact numbers as {@see preview()}, recomputed live for a
+     * broadcast that already exists -- lets the broadcast card show current
+     * impact ("N items, X already in the Vault, M pending transcode")
+     * instead of only ever showing that snapshot at creation time.
+     */
+    public function impact(BroadcastId $broadcastId): BroadcastCreationPreview
+    {
+        $broadcast = $this->broadcasts->find($broadcastId)
+            ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
+
+        return $this->computeImpact($broadcast);
+    }
+
+    private function computeImpact(BroadcastRecord $broadcast): BroadcastCreationPreview
+    {
+        $context = $this->contextFactory->build($broadcast);
         $eligible = $this->contextFactory->publishableStashItems($context);
 
-        $needsAudioTranscode = $type === 'podcast' && PodcastMediaKind::forBroadcast($draftBroadcast) === PodcastMediaKind::Audio;
+        $needsAudioTranscode = $broadcast->type === 'podcast' && PodcastMediaKind::forBroadcast($broadcast) === PodcastMediaKind::Audio;
 
         $vaultSizeBytes = 0;
         $transcodeItemCount = 0;
