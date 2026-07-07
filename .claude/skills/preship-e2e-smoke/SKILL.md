@@ -44,8 +44,6 @@ not noise to eliminate.
 
 - Playwright session flakiness: intermittent 401s against stashd.test, in-browser
   only, not reproducible via curl. Unresolved — retry before digging in.
-- Transcode-failure UI bug: a failed transcode job never retriggers broadcast
-  re-verify, so the card can freeze on "pending" indefinitely. Known, unfixed.
 
 ## Constraints
 
