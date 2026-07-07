@@ -41,4 +41,5 @@ Use skills when relevant:
 /docker-smoke-triage
 /codebase-rescue-audit
 /stashd-compact-checkpoint
+/preship-e2e-smoke
 ```
