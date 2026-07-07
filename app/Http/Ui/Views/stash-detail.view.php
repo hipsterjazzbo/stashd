@@ -265,6 +265,41 @@
 									</div>
 								</template>
 
+								<div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1" x-show="broadcast.items.length > 0">
+									<template x-for="row in broadcastItemStateCounts(broadcast)" x-bind:key="row.state">
+										<span class="inline-flex items-center gap-1 text-[11px]" x-bind:class="statusBadge(row.state).text">
+											<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(row.state).dot, statusBadge(row.state).pulse ? 'pulse-dot' : '']"></span>
+											<span x-text="row.count + ' ' + row.state"></span>
+										</span>
+									</template>
+								</div>
+
+								<ul class="mt-2 space-y-1" x-show="broadcastProblemItems(broadcast).length > 0">
+									<template x-for="item in broadcastProblemItems(broadcast)" x-bind:key="item.id">
+										<li class="flex items-center gap-2 rounded border border-line bg-espresso px-2 py-1 text-[11px]">
+											<span class="h-1.5 w-1.5 shrink-0 rounded-full" x-bind:class="[statusBadge(item.state).dot, statusBadge(item.state).pulse ? 'pulse-dot' : '']"></span>
+											<span class="shrink-0" x-bind:class="statusBadge(item.state).text" x-text="item.state"></span>
+											<span class="truncate text-muted" x-text="item.last_error ?? '—'"></span>
+										</li>
+									</template>
+								</ul>
+
+								<div class="mt-2 rounded border border-line bg-espresso p-2" x-show="broadcast.impact">
+									<p class="text-[12px] text-muted">
+										<span x-text="broadcast.impact?.eligible_item_count"></span> item<span x-show="broadcast.impact?.eligible_item_count !== 1">s</span> published
+										(<span x-text="formatBytes(broadcast.impact?.vault_size_bytes)"></span> already in the Vault).
+									</p>
+									<p class="mt-1 text-[12px] text-muted" x-show="(broadcast.impact?.skipped_item_count ?? 0) > 0">
+										<span x-text="broadcast.impact?.skipped_item_count"></span> item<span x-show="broadcast.impact?.skipped_item_count !== 1">s</span> skipped — not yet downloaded, removed, or missing from the Vault.
+									</p>
+									<p class="mt-1 text-[12px] text-muted" x-show="(broadcast.impact?.hardlinked_item_count ?? 0) > 0">
+										<span x-text="broadcast.impact?.hardlinked_item_count"></span> published via hardlink — ~0 extra space.
+									</p>
+									<p class="mt-1 text-[12px] text-warn" x-show="(broadcast.impact?.transcode_item_count ?? 0) > 0">
+										<span x-text="broadcast.impact?.transcode_item_count"></span> transcoded — extra space beyond the Vault original.
+									</p>
+								</div>
+
 								<div class="mt-2 flex flex-wrap gap-2">
 									<button type="button"
 										class="inline-flex items-center gap-1.5 rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-50"

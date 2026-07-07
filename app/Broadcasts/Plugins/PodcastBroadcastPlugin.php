@@ -125,7 +125,20 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
 
             if ($selection === null) {
                 $fallbackCode = $this->transcodeFallback->triggerIfNeeded($stashItem->mediaItemId, $kind);
-                $this->markItemFailed($item, $fallbackCode ?? $this->unavailableErrorCode($kind));
+
+                // A pending transcode is background work in progress, not a
+                // failure -- landing it in Processing (rather than Failed)
+                // matters beyond cosmetics: Failed can only transition back
+                // to Processing, so if this landed in Failed, the very next
+                // verify() call's attempt to move it to Stale would be
+                // blocked by BroadcastItemState's transition rules and the
+                // item would stay stuck showing Failed indefinitely.
+                if ($fallbackCode === 'podcast_audio_transcode_pending') {
+                    $this->markItemProcessing($item, $fallbackCode);
+                } else {
+                    $this->markItemFailed($item, $fallbackCode ?? $this->unavailableErrorCode($kind));
+                }
+
                 $failed[] = (string) $stashItem->id;
 
                 continue;
@@ -255,6 +268,16 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         $item->lastError = null;
         $this->broadcastItems->save($item);
         $this->transitions->transitionBroadcastItem($item, BroadcastItemState::Ready);
+    }
+
+    private function markItemProcessing(BroadcastItemRecord $item, string $reason): void
+    {
+        if ($item->state !== BroadcastItemState::Processing && $item->state->canTransitionTo(BroadcastItemState::Processing)) {
+            $this->transitions->transitionBroadcastItem($item, BroadcastItemState::Processing);
+        }
+
+        $item->lastError = $reason;
+        $this->broadcastItems->save($item);
     }
 
     private function markItemFailed(BroadcastItemRecord $item, string $reason): void

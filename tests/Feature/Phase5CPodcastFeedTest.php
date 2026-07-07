@@ -171,7 +171,12 @@ test('audio podcast triggers a transcode fallback instead of failing for video o
     // of the old immediate-failure behaviour (still exercised by the
     // video-podcast "unsuitable asset" test below, which has no fallback
     // pathway).
-    expect($item->lastError)->toBe('podcast_audio_transcode_pending');
+    expect($item->lastError)->toBe('podcast_audio_transcode_pending')
+        // publish() lands a pending transcode in Processing (not Failed), so
+        // verify() running right after in the same rebuild can still move it
+        // to Stale -- Failed's only allowed transition is back to
+        // Processing, so landing here first would leave it stuck as Failed.
+        ->and($item->state)->toBe(\App\Broadcasts\BroadcastItemState::Stale);
 
     // Draining the rest of the queue runs the transcode job and the
     // automatically re-triggered rebuild it queues on success, which picks

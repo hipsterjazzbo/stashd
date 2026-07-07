@@ -707,6 +707,17 @@ interface BroadcastSummary {
 	updated_at: string
 	feed_url?: string
 	token_preview?: string
+	items: BroadcastItemSummary[]
+	impact: BroadcastCreationPreviewSummary | null
+}
+
+interface BroadcastItemSummary {
+	id: string
+	broadcast_id: string
+	stash_item_id: string
+	media_item_id: string
+	state: string
+	last_error: string | null
 }
 
 interface BroadcastCreationPreviewSummary {
@@ -1199,6 +1210,11 @@ function stashDetailComponent(stashId: string) {
 			if ('EventSource' in window) {
 				subscribeToEvents(EVENT_TYPES, () => void this.refresh())
 			}
+
+			// ponytail: SSE delivery isn't guaranteed (dropped connection, missed
+			// event) -- without this, a broadcast rebuild's progress bar can
+			// freeze on-screen forever even though the job finished server-side.
+			setInterval(() => void this.refresh(), 5000)
 		},
 
 		async refresh() {
@@ -1272,6 +1288,24 @@ function stashDetailComponent(stashId: string) {
 		// "processing" with no sense of what's happening or how far along.
 		activeBroadcastJobFor(broadcastId: string): JobSummary | null {
 			return this.jobs.find((job) => job.entity_type === 'broadcast' && job.entity_id === broadcastId && job.state === 'processing') ?? null
+		},
+
+		// Compact "N ready · N processing · N stale" summary of a broadcast's
+		// items, in a stable order so the row doesn't reshuffle as counts change.
+		broadcastItemStateCounts(broadcast: BroadcastSummary): Array<{ state: string; count: number }> {
+			const counts = new Map<string, number>()
+			for (const item of broadcast.items) {
+				counts.set(item.state, (counts.get(item.state) ?? 0) + 1)
+			}
+			const order = ['processing', 'stale', 'failed', 'pending', 'ready', 'disabled']
+			return order.filter((state) => counts.has(state)).map((state) => ({ state, count: counts.get(state)! }))
+		},
+
+		// Items that aren't settled as ready, with the reason attached -- e.g.
+		// a pending transcode reads as "stale — podcast_audio_transcode_pending"
+		// rather than the whole broadcast reading as one opaque failure.
+		broadcastProblemItems(broadcast: BroadcastSummary): BroadcastItemSummary[] {
+			return broadcast.items.filter((item) => item.state !== 'ready')
 		},
 
 		// Static -- always shown in the status filter regardless of which

@@ -359,13 +359,23 @@ final readonly class BroadcastController
     /** @return array<string, mixed> */
     private function mapBroadcast(BroadcastRecord $broadcast): array
     {
+        $broadcastId = BroadcastId::fromPrimaryKey($broadcast->id);
+
+        $extra = [
+            'items' => array_map(
+                static fn ($item): array => BroadcastItemResource::fromRecord($item)->toArray(),
+                $this->broadcastItems->listForBroadcast($broadcastId),
+            ),
+            'impact' => ApiJson::encode($this->lifecycle->impact($broadcastId)->toArray()),
+        ];
+
         if ($broadcast->type !== 'podcast') {
-            return BroadcastResource::fromRecord($broadcast)->toArray();
+            return [...BroadcastResource::fromRecord($broadcast)->toArray(), ...$extra];
         }
 
         $token = $this->podcastTokens->ensureBroadcastToken($broadcast);
 
-        return BroadcastResource::fromRecord($broadcast, $this->podcastUrls->feedUrl($token))->toArray();
+        return [...BroadcastResource::fromRecord($broadcast, $this->podcastUrls->feedUrl($token))->toArray(), ...$extra];
     }
 
     private function mapPlugin(string $key, DiscoveredPlugin $discovered): array

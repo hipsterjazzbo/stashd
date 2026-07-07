@@ -237,6 +237,34 @@ test('broadcast.rebuild publishes hardlinks from vault originals', function (): 
     }
 });
 
+test('a broadcast\'s show/index response embeds live items and impact, not just the create-time preview', function (): void {
+    [$headers, $stashId, $mediaItemId, $broadcastId] = $this->bootstrapFakeDownloadBroadcast('broadcast-impact');
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'item.download',
+        'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild',
+        'options' => ['broadcast_id' => $broadcastId],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $broadcast = $this->http->get('/api/v1/broadcasts/' . $broadcastId, headers: $headers)->assertOk()->body['broadcast'];
+
+    expect($broadcast['items'])->toHaveCount(1)
+        ->and($broadcast['items'][0]['state'])->toBe('ready')
+        ->and($broadcast['impact']['eligible_item_count'])->toBe(1)
+        ->and($broadcast['impact']['vault_size_bytes'])->toBeGreaterThan(0)
+        ->and($broadcast['impact']['hardlinked_item_count'])->toBe(1)
+        ->and($broadcast['impact']['transcode_item_count'])->toBe(0);
+
+    $index = $this->http->get('/api/v1/stashes/' . $stashId . '/broadcasts', headers: $headers)->assertOk()->body['broadcasts'];
+    expect($index[0]['impact'])->toBe($broadcast['impact']);
+});
+
 test('broadcast.verify marks missing generated files stale', function (): void {
     [$headers, $stashId, $mediaItemId, $broadcastId] = $this->bootstrapFakeDownloadBroadcast('broadcast-verify-missing');
 
