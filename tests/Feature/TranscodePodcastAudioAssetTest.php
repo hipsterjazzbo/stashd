@@ -16,6 +16,7 @@ use App\Vault\AssetRole;
 use App\Vault\AssetState;
 use App\Vault\MediaItemId;
 use App\Vault\MediaItemRepository;
+use App\Vault\VaultPathBuilder;
 
 test('a successful transcode produces a ready derived audio asset', function (): void {
     [$mediaItemId, $videoAssetId, $audioAssetId] = transcodeExecutorTestFixture($this->container->get(MediaItemRepository::class), $this->container->get(AssetRepository::class), 'success');
@@ -98,6 +99,31 @@ test('a failed transcode leaves the asset Failed and marks temp staging failed',
     // cleans it on the next attempt for the same job id.
     expect($audioAsset->state)->toBe(AssetState::Failed)
         ->and(is_file($tempDirectory . '/.failed'))->toBeTrue();
+});
+
+test('a retry overwrites a stale Vault file left by an earlier attempt that crashed after writing but before marking the asset ready', function (): void {
+    [$mediaItemId, $videoAssetId, $audioAssetId] = transcodeExecutorTestFixture($this->container->get(MediaItemRepository::class), $this->container->get(AssetRepository::class), 'stale-leftover');
+
+    $paths = $this->container->get(VaultPathBuilder::class);
+    $destination = $paths->vaultFile('fake', 'transcode-executor-stale-leftover', 'podcast-audio.mp3');
+    mkdir(dirname($destination), 0775, true);
+    file_put_contents($destination, 'leftover-from-a-crashed-attempt');
+
+    $gateway = $this->container->get(FfmpegGateway::class);
+    assert($gateway instanceof StubFfmpegGateway);
+
+    $executor = $this->container->get(TranscodePodcastAudioAsset::class);
+    $executor->execute(
+        mediaItemId: MediaItemId::parse($mediaItemId),
+        sourceAssetId: AssetId::parse($videoAssetId),
+        audioAssetId: AssetId::parse($audioAssetId),
+        jobId: PrefixedUlid::parse('job_01J00000000000000000000095'),
+    );
+
+    $audioAsset = $this->container->get(AssetRepository::class)->find(AssetId::parse($audioAssetId));
+
+    expect($audioAsset->state)->toBe(AssetState::Ready)
+        ->and(file_get_contents($destination))->not->toBe('leftover-from-a-crashed-attempt');
 });
 
 /**

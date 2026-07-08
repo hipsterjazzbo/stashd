@@ -100,6 +100,17 @@ final readonly class TranscodePodcastAudioAsset
             $sizeBytes = filesize($tempPath);
             $destination = $this->vaultPaths->vaultFile($mediaItem->providerKey, $mediaItem->providerItemId, self::OUTPUT_FILENAME);
 
+            // Reaching here means $audioAsset isn't Ready (checked above), so
+            // any file already at this deterministic path is debris from an
+            // earlier attempt that wrote it but crashed before marking the
+            // asset Ready -- unlike a Vault original, this derived artifact is
+            // disposable/regenerable, so it's safe to clear before a retry.
+            // Without this, MoveFileIntoVault's (correct, for originals)
+            // never-overwrite guard would permanently block every retry.
+            if (file_exists($destination)) {
+                unlink($destination);
+            }
+
             $this->fileMover->moveIntoPlace($tempPath, $destination);
 
             $audioAsset->path = $destination;
