@@ -8,6 +8,7 @@ use App\Support\PrefixedUlidGenerator;
 use App\Vault\MediaItemId;
 use App\Vault\MediaItemRepository;
 use App\Vault\MediaItemSourceRepository;
+use Tempest\Database\Database;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
@@ -26,6 +27,7 @@ final class StashRepository
         private StashInputRepository $stashInputs,
         private MediaItemSourceRepository $mediaItemSources,
         private MediaItemRepository $mediaItems,
+        private Database $database,
     ) {
     }
 
@@ -160,23 +162,32 @@ final class StashRepository
     }
 
     /**
-     * Deletes the stash and its inputs/items (and their media item sources).
-     * Deduped `media_items` and Vault originals are left intact.
+     * Deletes the stash. `stash_items`, `stash_inputs`, and `broadcasts` cascade
+     * at the database level (see CreateDomainSchema); media item sources do not
+     * (their FK is ON DELETE SET NULL, not CASCADE, since they're meant to be
+     * orphan-tracked rather than dropped by default), so they're deleted here
+     * explicitly. Deduped `media_items` and Vault originals are left intact.
+     *
+     * Runs in a transaction: without it, a failure between the sources cleanup
+     * and the stash row's own delete (e.g. a write-lock conflict with a
+     * background job) would leave the stash orphaned from its sources with no
+     * clean way to retry.
      */
     public function delete(StashRecord $stash): void
     {
         $stashId = StashId::fromPrimaryKey($stash->id);
 
-        foreach ($this->stashItems->listForStash($stashId) as $item) {
-            $item->delete();
-        }
+        $committed = $this->database->withinTransaction(function () use ($stash, $stashId): void {
+            foreach ($this->stashInputs->listForStash($stashId) as $input) {
+                $this->mediaItemSources->deleteForStashInput(StashInputId::fromPrimaryKey($input->id));
+            }
 
-        foreach ($this->stashInputs->listForStash($stashId) as $input) {
-            $this->mediaItemSources->deleteForStashInput(StashInputId::fromPrimaryKey($input->id));
-            $input->delete();
-        }
+            $stash->delete();
+        });
 
-        $stash->delete();
+        if (! $committed) {
+            throw new StashDeleteFailed($stash);
+        }
     }
 
     /**

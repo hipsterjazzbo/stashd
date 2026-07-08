@@ -319,7 +319,16 @@ final readonly class StashController
             return $this->notFound('Stash not found.');
         }
 
-        $this->stashes->delete($stash);
+        try {
+            $this->stashes->delete($stash);
+        } catch (StashDeleteFailed) {
+            return new Json([
+                'error' => [
+                    'code' => 'delete_failed',
+                    'message' => 'Could not delete this stash right now. Please try again.',
+                ],
+            ], Status::CONFLICT);
+        }
 
         return new Json(['deleted' => true]);
     }

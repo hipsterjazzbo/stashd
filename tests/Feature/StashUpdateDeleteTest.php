@@ -8,8 +8,15 @@ use App\Stashes\StashInputRecord;
 use App\Stashes\StashItemRecord;
 use App\Stashes\StashRecord;
 use App\Vault\MediaItemSourceRecord;
+use RuntimeException;
+use Tempest\Database\Builder\QueryBuilders\BuildsQuery;
+use Tempest\Database\Config\DatabaseDialect;
+use Tempest\Database\Database;
 use Tempest\Database\PrimaryKey;
+use Tempest\Database\Query;
 use Tempest\Http\Status;
+use Tempest\Support\Str\ImmutableString;
+use UnitEnum;
 
 test('PATCH stash updates provided fields and leaves others unchanged', function (): void {
     [$headers, $stashId] = $this->bootstrapFakeDownloadStash('patch-stash');
@@ -92,6 +99,66 @@ test('DELETE stash cascades to stash items, inputs, and media item sources but l
         ->and(MediaItemSourceRecord::select()->where('stashInputId = ?', (string) $input->id)->all())->toBeEmpty();
 
     expect(\App\Vault\MediaItemRecord::findById(new PrimaryKey($mediaItemId)))->not->toBeNull();
+});
+
+test('DELETE stash rolls back cleanly instead of partially deleting when the transaction fails', function (): void {
+    [$headers, $stashId] = $this->bootstrapFakeDownloadStash('delete-rollback');
+
+    $itemCountBefore = count(StashItemRecord::select()->where('stashId = ?', $stashId)->all());
+    expect($itemCountBefore)->toBeGreaterThan(0);
+
+    $realDatabase = $this->container->get(Database::class);
+    $this->container->singleton(Database::class, new class ($realDatabase) implements Database {
+        public function __construct(private Database $inner)
+        {
+        }
+
+        public DatabaseDialect $dialect { get => $this->inner->dialect; }
+
+        public null|string|UnitEnum $tag { get => $this->inner->tag; }
+
+        public function execute(BuildsQuery|Query $query): void
+        {
+            $this->inner->execute($query);
+        }
+
+        public function getLastInsertId(): ?PrimaryKey
+        {
+            return $this->inner->getLastInsertId();
+        }
+
+        public function fetch(BuildsQuery|Query $query): array
+        {
+            return $this->inner->fetch($query);
+        }
+
+        public function fetchFirst(BuildsQuery|Query $query): ?array
+        {
+            return $this->inner->fetchFirst($query);
+        }
+
+        public function withinTransaction(callable $callback): bool
+        {
+            return $this->inner->withinTransaction(function () use ($callback): void {
+                $callback();
+
+                throw new RuntimeException('forced rollback for test');
+            });
+        }
+
+        public function getRawSql(Query $query): ImmutableString
+        {
+            return $this->inner->getRawSql($query);
+        }
+    });
+
+    $response = $this->http->delete('/api/v1/stashes/' . $stashId, headers: $headers);
+
+    $response->assertStatus(Status::CONFLICT);
+    expect($response->body['error']['code'])->toBe('delete_failed');
+
+    expect(StashRecord::findById(new PrimaryKey($stashId)))->not->toBeNull()
+        ->and(count(StashItemRecord::select()->where('stashId = ?', $stashId)->all()))->toBe($itemCountBefore);
 });
 
 test('delete-impact reports media items shared with other stashes', function (): void {
