@@ -113,129 +113,6 @@
 				</section>
 
 				<section class="rounded-lg border border-line bg-panel/60">
-					<div class="flex items-center justify-between border-b border-line px-4 py-3">
-						<h2 class="text-[13px] font-semibold text-cream">Items</h2>
-						<div class="flex flex-wrap items-center gap-x-1 text-[12px] text-muted" x-show="itemsTotal > 0">
-							<button type="button" class="transition-colors hover:text-cream" x-bind:class="itemStatusFilter === 'all' ? 'text-cream' : ''" x-on:click="itemStatusFilter = 'all'">
-								<span x-text="itemsTotal"></span> item<span x-show="itemsTotal !== 1">s</span>
-							</button>
-							<template x-for="chip in itemStatusSummary()" x-bind:key="chip.filter">
-								<span>·
-									<button type="button" class="transition-colors hover:text-cream" x-bind:class="itemStatusFilter === chip.filter ? 'text-cream' : ''" x-on:click="itemStatusFilter = chip.filter" x-text="chip.label"></button>
-								</span>
-							</template>
-							<button type="button" class="ml-1 rounded border border-line px-2 py-0.5 text-muted transition-colors hover:text-cream disabled:opacity-50"
-								x-bind:disabled="actionPending === 'retry-all'"
-								x-on:click="retryAllFailed()">
-								retry all failed
-							</button>
-						</div>
-						<p class="text-[12px] text-muted" x-show="itemsTotal === 0">No items</p>
-					</div>
-
-					<div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2" x-show="itemsTotal > 0">
-						<input type="text" x-model="itemSearch" placeholder="Search title…"
-							class="w-40 rounded border border-line bg-espresso px-2 py-1 text-[12px] text-cream outline-none focus:border-amber"/>
-						<select x-model="itemStatusFilter"
-							class="rounded border border-line bg-espresso px-2 py-1 text-[12px] text-cream outline-none focus:border-amber">
-							<option value="all">All statuses</option>
-							<template x-for="status in itemStatusOptions()" x-bind:key="status">
-								<option x-bind:value="status" x-text="status.replace(/_/g, ' ')"></option>
-							</template>
-						</select>
-						<p class="ml-auto text-[12px] text-muted" x-show="itemsTotal > itemsLimit">Filters and sort apply to the current page only.</p>
-					</div>
-
-					<table class="w-full text-left text-[13px]" x-show="itemsTotal > 0">
-						<thead>
-							<tr class="text-[11px] uppercase tracking-wide text-muted">
-								<th class="px-4 py-2 font-normal">
-									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('title')">Item <span x-text="itemSortIndicator('title')"></span></button>
-								</th>
-								<th class="px-4 py-2 font-normal">
-									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('published')">Published <span x-text="itemSortIndicator('published')"></span></button>
-								</th>
-								<th class="px-4 py-2 font-normal">
-									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('duration')">Duration <span x-text="itemSortIndicator('duration')"></span></button>
-								</th>
-								<th class="px-4 py-2 font-normal">
-									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('size')">Size <span x-text="itemSortIndicator('size')"></span></button>
-								</th>
-								<th class="px-4 py-2 font-normal">
-									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('status')">Status <span x-text="itemSortIndicator('status')"></span></button>
-								</th>
-							</tr>
-						</thead>
-						<tbody>
-							<template x-for="row in itemRows()" x-bind:key="row.key">
-								<tr class="border-t border-line/60" x-bind:class="row.item.state === 'ignored' ? 'opacity-50' : (isDownloading(row.item) ? 'bg-amber/5' : '')">
-									<template x-if="row.type === 'item'">
-										<td class="px-4 py-2">
-											<a class="flex items-center gap-2 text-cream transition-colors hover:text-amber" x-bind:href="'/vault/' + row.item.media_item_id">
-												<img x-show="row.item.media_item?.thumbnail_uri" x-bind:src="row.item.media_item?.thumbnail_uri" class="h-9 w-16 shrink-0 rounded object-cover" alt=""/>
-												<span x-text="row.item.display_title ?? row.item.media_item?.title ?? row.item.media_item_id"></span>
-											</a>
-										</td>
-									</template>
-									<template x-if="row.type === 'item'">
-										<td class="px-4 py-2 text-muted" x-text="formatRelativeTime(row.item.media_item?.published_at)"></td>
-									</template>
-									<template x-if="row.type === 'item'">
-										<td class="px-4 py-2 text-muted" x-text="formatDuration(row.item.media_item?.duration_seconds)"></td>
-									</template>
-									<template x-if="row.type === 'item'">
-										<td class="px-4 py-2 text-muted" x-text="formatBytes(row.item.total_asset_size_bytes)"></td>
-									</template>
-									<template x-if="row.type === 'item'">
-										<td class="px-4 py-2">
-											<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(row.item.media_item?.state).text"
-												x-bind:title="row.item.media_item?.state === 'failed' ? (row.item.media_item?.failure_reason ?? 'Unknown error') : null">
-												<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(row.item.media_item?.state).dot, statusBadge(row.item.media_item?.state).pulse ? 'pulse-dot' : '']"></span>
-												<span x-text="statusBadge(row.item.media_item?.state).label"></span>
-											</span>
-											<button type="button" x-show="row.item.media_item?.state === 'failed'"
-												class="ml-2 rounded border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:text-cream disabled:opacity-50"
-												x-bind:disabled="actionPending === row.item.id + ':retry'"
-												x-on:click="retryDownload(row.item)">
-												retry
-											</button>
-											<p class="mt-1 text-[12px] text-muted" x-show="row.item.state === 'ignored'" x-text="'ignored: ' + (row.item.ignored_reason ?? 'unknown reason').replace(/_/g, ' ')"></p>
-										</td>
-									</template>
-									<template x-if="row.type === 'progress'">
-										<td colspan="5" class="px-4 py-2">
-											<div class="flex items-center gap-2">
-												<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber pulse-dot"></span>
-												<span class="shrink-0 text-[11px] text-muted" x-text="row.job.progress_label ?? row.job.intent.replace(/_/g, ' ')"></span>
-												<div class="h-1.5 flex-1 rounded-full bg-espresso">
-													<div class="h-1.5 rounded-full bg-amber" x-bind:style="'width: ' + (row.job.progress_percent ?? 0) + '%'"></div>
-												</div>
-												<span class="shrink-0 text-[11px] text-muted" x-text="Math.round(row.job.progress_percent ?? 0) + '%'"></span>
-											</div>
-										</td>
-									</template>
-								</tr>
-							</template>
-						</tbody>
-					</table>
-					<p class="px-4 py-3 text-[13px] text-muted" x-show="itemsTotal === 0">No items yet.</p>
-					<p class="px-4 py-3 text-[13px] text-muted" x-show="itemsTotal > 0 && itemRows().length === 0">No items match the current filters.</p>
-					<div class="flex items-center justify-between border-t border-line px-4 py-2 text-[12px] text-muted" x-show="itemsTotal > itemsLimit">
-						<span x-text="itemsRangeLabel()"></span>
-						<div class="flex items-center gap-2">
-							<button type="button" class="rounded border border-line px-2 py-1 text-muted transition-colors hover:text-cream disabled:opacity-40"
-								x-bind:disabled="!hasPrevItemsPage()" x-on:click="prevItemsPage()">
-								Prev
-							</button>
-							<button type="button" class="rounded border border-line px-2 py-1 text-muted transition-colors hover:text-cream disabled:opacity-40"
-								x-bind:disabled="!hasNextItemsPage()" x-on:click="nextItemsPage()">
-								Next
-							</button>
-						</div>
-					</div>
-				</section>
-
-				<section class="rounded-lg border border-line bg-panel/60">
 					<h2 class="border-b border-line px-4 py-3 text-[13px] font-semibold text-cream">Broadcasts</h2>
 					<p class="px-4 py-3 text-[13px] text-muted" x-show="broadcasts.length === 0">No broadcasts yet.</p>
 					<ul class="divide-y divide-line/60" x-show="broadcasts.length > 0">
@@ -276,10 +153,15 @@
 
 								<ul class="mt-2 space-y-1" x-show="broadcastProblemItems(broadcast).length > 0">
 									<template x-for="item in broadcastProblemItems(broadcast)" x-bind:key="item.id">
-										<li class="flex items-center gap-2 rounded border border-line bg-espresso px-2 py-1 text-[11px]">
-											<span class="h-1.5 w-1.5 shrink-0 rounded-full" x-bind:class="[statusBadge(item.state).dot, statusBadge(item.state).pulse ? 'pulse-dot' : '']"></span>
-											<span class="shrink-0" x-bind:class="statusBadge(item.state).text" x-text="item.state"></span>
-											<span class="truncate text-muted" x-text="item.last_error ?? '—'"></span>
+										<li class="rounded border border-line bg-espresso px-2 py-1 text-[11px]">
+											<div class="flex items-center gap-2">
+												<span class="h-1.5 w-1.5 shrink-0 rounded-full" x-bind:class="[statusBadge(item.state).dot, statusBadge(item.state).pulse ? 'pulse-dot' : '']"></span>
+												<a class="truncate text-cream transition-colors hover:text-amber" x-bind:href="'/vault/' + item.media_item_id" x-text="item.media_item?.title ?? item.media_item_id"></a>
+												<span class="shrink-0" x-bind:class="statusBadge(item.state).text" x-text="item.state"></span>
+											</div>
+											<p class="mt-0.5 truncate text-muted">
+												<span x-text="item.last_error ?? '—'"></span> — <span x-text="broadcastProblemItemHint(item)"></span>
+											</p>
 										</li>
 									</template>
 								</ul>
@@ -440,6 +322,133 @@
 									Update download policy
 								</button>
 							</div>
+						</div>
+					</div>
+				</section>
+
+				<section class="rounded-lg border border-line bg-panel/60">
+					<div class="flex items-center justify-between border-b border-line px-4 py-3">
+						<h2 class="text-[13px] font-semibold text-cream">Items</h2>
+						<div class="flex flex-wrap items-center gap-x-1 text-[12px] text-muted" x-show="itemsTotal > 0">
+							<button type="button" class="transition-colors hover:text-cream" x-bind:class="itemStatusFilter === 'all' ? 'text-cream' : ''" x-on:click="itemStatusFilter = 'all'">
+								<span x-text="itemsTotal"></span> item<span x-show="itemsTotal !== 1">s</span>
+							</button>
+							<template x-for="chip in itemStatusSummary()" x-bind:key="chip.filter">
+								<span>·
+									<button type="button" class="transition-colors hover:text-cream" x-bind:class="itemStatusFilter === chip.filter ? 'text-cream' : ''" x-on:click="itemStatusFilter = chip.filter" x-text="chip.label"></button>
+								</span>
+							</template>
+							<button type="button" class="ml-1 rounded border border-line px-2 py-0.5 text-muted transition-colors hover:text-cream disabled:opacity-50"
+								x-bind:disabled="actionPending === 'retry-all'"
+								x-on:click="retryAllFailed()">
+								retry all failed
+							</button>
+							<button type="button" class="ml-1 rounded border border-line px-2 py-0.5 text-muted transition-colors hover:text-cream" x-show="ignoredItemCount() > 0"
+								x-on:click="showIgnored = !showIgnored">
+								<span x-show="!showIgnored"><span x-text="ignoredItemCount()"></span> ignored — show</span>
+								<span x-show="showIgnored">hide ignored</span>
+							</button>
+						</div>
+						<p class="text-[12px] text-muted" x-show="itemsTotal === 0">No items</p>
+					</div>
+
+					<div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2" x-show="itemsTotal > 0">
+						<input type="text" x-model="itemSearch" placeholder="Search title…"
+							class="w-40 rounded border border-line bg-espresso px-2 py-1 text-[12px] text-cream outline-none focus:border-amber"/>
+						<select x-model="itemStatusFilter"
+							class="rounded border border-line bg-espresso px-2 py-1 text-[12px] text-cream outline-none focus:border-amber">
+							<option value="all">All statuses</option>
+							<template x-for="status in itemStatusOptions()" x-bind:key="status">
+								<option x-bind:value="status" x-text="status.replace(/_/g, ' ')"></option>
+							</template>
+						</select>
+					</div>
+
+					<table class="w-full text-left text-[13px]" x-show="itemsTotal > 0">
+						<thead>
+							<tr class="text-[11px] uppercase tracking-wide text-muted">
+								<th class="px-4 py-2 font-normal">
+									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('title')">Item <span x-text="itemSortIndicator('title')"></span></button>
+								</th>
+								<th class="px-4 py-2 font-normal">
+									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('published')">Published <span x-text="itemSortIndicator('published')"></span></button>
+								</th>
+								<th class="px-4 py-2 font-normal">
+									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('duration')">Duration <span x-text="itemSortIndicator('duration')"></span></button>
+								</th>
+								<th class="px-4 py-2 font-normal">
+									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('size')">Size <span x-text="itemSortIndicator('size')"></span></button>
+								</th>
+								<th class="px-4 py-2 font-normal">
+									<button type="button" class="transition-colors hover:text-cream" x-on:click="setItemSort('status')">Status <span x-text="itemSortIndicator('status')"></span></button>
+								</th>
+							</tr>
+						</thead>
+						<tbody>
+							<template x-for="row in itemRows()" x-bind:key="row.key">
+								<tr class="border-t border-line/60" x-bind:class="row.item.state === 'ignored' ? 'opacity-50' : (isDownloading(row.item) ? 'bg-amber/5' : '')">
+									<template x-if="row.type === 'item'">
+										<td class="px-4 py-2">
+											<a class="flex items-center gap-2 text-cream transition-colors hover:text-amber" x-bind:href="'/vault/' + row.item.media_item_id">
+												<img x-show="row.item.media_item?.thumbnail_uri" x-bind:src="row.item.media_item?.thumbnail_uri" class="h-9 w-16 shrink-0 rounded object-cover" alt=""/>
+												<span x-text="row.item.display_title ?? row.item.media_item?.title ?? row.item.media_item_id"></span>
+											</a>
+										</td>
+									</template>
+									<template x-if="row.type === 'item'">
+										<td class="px-4 py-2 text-muted" x-text="formatRelativeTime(row.item.media_item?.published_at)"></td>
+									</template>
+									<template x-if="row.type === 'item'">
+										<td class="px-4 py-2 text-muted" x-text="formatDuration(row.item.media_item?.duration_seconds)"></td>
+									</template>
+									<template x-if="row.type === 'item'">
+										<td class="px-4 py-2 text-muted" x-text="formatBytes(row.item.total_asset_size_bytes)"></td>
+									</template>
+									<template x-if="row.type === 'item'">
+										<td class="px-4 py-2">
+											<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(row.item.media_item?.state).text"
+												x-bind:title="row.item.media_item?.state === 'failed' ? (row.item.media_item?.failure_reason ?? 'Unknown error') : null">
+												<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(row.item.media_item?.state).dot, statusBadge(row.item.media_item?.state).pulse ? 'pulse-dot' : '']"></span>
+												<span x-text="statusBadge(row.item.media_item?.state).label"></span>
+											</span>
+											<button type="button" x-show="row.item.media_item?.state === 'failed'"
+												class="ml-2 rounded border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:text-cream disabled:opacity-50"
+												x-bind:disabled="actionPending === row.item.id + ':retry'"
+												x-on:click="retryDownload(row.item)">
+												retry
+											</button>
+											<p class="mt-1 text-[12px] text-muted" x-show="row.item.state === 'ignored'" x-text="'ignored: ' + (row.item.ignored_reason ?? 'unknown reason').replace(/_/g, ' ')"></p>
+										</td>
+									</template>
+									<template x-if="row.type === 'progress'">
+										<td colspan="5" class="px-4 py-2">
+											<div class="flex items-center gap-2">
+												<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber pulse-dot"></span>
+												<span class="shrink-0 text-[11px] text-muted" x-text="row.job.progress_label ?? row.job.intent.replace(/_/g, ' ')"></span>
+												<div class="h-1.5 flex-1 rounded-full bg-espresso">
+													<div class="h-1.5 rounded-full bg-amber" x-bind:style="'width: ' + (row.job.progress_percent ?? 0) + '%'"></div>
+												</div>
+												<span class="shrink-0 text-[11px] text-muted" x-text="Math.round(row.job.progress_percent ?? 0) + '%'"></span>
+											</div>
+										</td>
+									</template>
+								</tr>
+							</template>
+						</tbody>
+					</table>
+					<p class="px-4 py-3 text-[13px] text-muted" x-show="itemsTotal === 0">No items yet.</p>
+					<p class="px-4 py-3 text-[13px] text-muted" x-show="itemsTotal > 0 && visibleItems().length === 0">No items match the current filters.</p>
+					<div class="flex items-center justify-between border-t border-line px-4 py-2 text-[12px] text-muted" x-show="visibleItems().length > itemsLimit">
+						<span x-text="itemsRangeLabel()"></span>
+						<div class="flex items-center gap-2">
+							<button type="button" class="rounded border border-line px-2 py-1 text-muted transition-colors hover:text-cream disabled:opacity-40"
+								x-bind:disabled="!hasPrevItemsPage()" x-on:click="prevItemsPage()">
+								Prev
+							</button>
+							<button type="button" class="rounded border border-line px-2 py-1 text-muted transition-colors hover:text-cream disabled:opacity-40"
+								x-bind:disabled="!hasNextItemsPage()" x-on:click="nextItemsPage()">
+								Next
+							</button>
 						</div>
 					</div>
 				</section>
@@ -623,10 +632,17 @@
 				</template>
 
 				<template x-if="addInputStep === 'committing'">
-					<p class="mt-3 flex items-center gap-2 text-[13px] text-muted">
-						<span class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
-						Adding input and discovering items…
-					</p>
+					<div class="mt-3">
+						<p class="flex items-center gap-2 text-[13px] text-muted">
+							<span class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
+							Adding input and discovering items…
+						</p>
+						<p class="mt-2 text-[12px] text-muted">This can take a while for a slow or rate-limited source. It'll keep running in the background even if you close this.</p>
+						<div class="mt-4 flex justify-end gap-2">
+							<button type="button" x-on:click="cancelAddInput()"
+								class="rounded border border-line px-3 py-2 text-[13px] text-muted transition-colors hover:text-cream">Close</button>
+						</div>
+					</div>
 				</template>
 
 				<template x-if="addInputStep === 'failed'">

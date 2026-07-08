@@ -72,6 +72,23 @@ async function apiFetch(path: string, init: RequestInit = {}): Promise<Response>
 }
 
 /**
+ * Retries once, after a short delay, when `fetch()` itself rejects (a
+ * network-level failure -- dropped connection, DNS blip -- as opposed to an
+ * HTTP error status, which callers already handle separately). Only safe for
+ * GETs: a lost response after a non-idempotent write may mean the request
+ * still landed server-side, so this must not be used for mutating calls.
+ */
+async function getWithRetry(path: string): Promise<Response> {
+	try {
+		return await apiFetch(path)
+	} catch (cause) {
+		if (cause instanceof UnauthenticatedError) throw cause
+		await new Promise((resolve) => setTimeout(resolve, 400))
+		return await apiFetch(path)
+	}
+}
+
+/**
  * Client auth gate for the dashboard shell. The HTML pages are public, so when
  * the session cookie is missing or invalid every /api/v1 call returns 401 — we
  * detect that up front and bounce to /login. Pages opt in via the layout's
@@ -718,6 +735,7 @@ interface BroadcastItemSummary {
 	media_item_id: string
 	state: string
 	last_error: string | null
+	media_item: { title: string } | null
 }
 
 interface BroadcastCreationPreviewSummary {
@@ -875,7 +893,7 @@ function dashboardComponent() {
 				{
 					label: 'system health',
 					run: async () => {
-						const response = await apiFetch('/api/v1/system/health')
+						const response = await getWithRetry('/api/v1/system/health')
 						if (!response.ok) throw new Error(await describeFailedResponse(response))
 						this.health = await response.json()
 					},
@@ -883,7 +901,7 @@ function dashboardComponent() {
 				{
 					label: 'stashes',
 					run: async () => {
-						const response = await apiFetch('/api/v1/stashes')
+						const response = await getWithRetry('/api/v1/stashes')
 						if (!response.ok) throw new Error(await describeFailedResponse(response))
 						this.stashCount = ((await response.json()).stashes as unknown[]).length
 					},
@@ -891,7 +909,7 @@ function dashboardComponent() {
 				{
 					label: 'vault items',
 					run: async () => {
-						const response = await apiFetch('/api/v1/items')
+						const response = await getWithRetry('/api/v1/items')
 						if (!response.ok) throw new Error(await describeFailedResponse(response))
 						this.vaultCount = ((await response.json()).items as unknown[]).length
 					},
@@ -899,7 +917,7 @@ function dashboardComponent() {
 				{
 					label: 'activity',
 					run: async () => {
-						const response = await apiFetch('/api/v1/activity')
+						const response = await getWithRetry('/api/v1/activity')
 						if (!response.ok) throw new Error(await describeFailedResponse(response))
 						this.activitySummary = summarizeRecentActivity((await response.json()).events as ActivityLogEntry[])
 					},
@@ -1076,13 +1094,18 @@ function stashesComponent() {
 			if (!this.deletingStash) return
 			this.deletingBusy = true
 			try {
-				await apiFetch(`/api/v1/stashes/${this.deletingStash.id}`, { method: 'DELETE' })
+				const response = await apiFetch(`/api/v1/stashes/${this.deletingStash.id}`, { method: 'DELETE' })
+				if (!response.ok) {
+					const body = (await response.json()) as { error?: { message?: string } }
+					this.error = body.error?.message ?? 'Could not delete that stash.'
+					return
+				}
 				this.deletingStash = null
 				this.deleteImpact = null
 				await this.refresh()
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
-				this.error = 'Could not delete that stash.'
+				this.error = 'Could not reach the server.'
 			} finally {
 				this.deletingBusy = false
 			}
@@ -1136,10 +1159,12 @@ function stashDetailComponent(stashId: string) {
 		itemsTotal: 0,
 		itemsLimit: 50,
 		itemsOffset: 0,
+		itemsRefreshing: false,
 		itemSortKey: 'published' as ItemSortKey,
 		itemSortDir: 'desc' as 'asc' | 'desc',
 		itemStatusFilter: 'all',
 		itemSearch: '',
+		showIgnored: false,
 		jobs: [] as JobSummary[],
 		inputs: [] as StashInputSummary[],
 		editingInputFiltersId: null as string | null,
@@ -1199,6 +1224,16 @@ function stashDetailComponent(stashId: string) {
 
 			this.onBroadcastTypeChanged()
 
+			// A filter/search change can leave itemsOffset pointing past the end
+			// of the now-smaller visible set -- reset to the first page rather
+			// than showing a false empty state.
+			this.$watch('itemStatusFilter', () => {
+				this.itemsOffset = 0
+			})
+			this.$watch('itemSearch', () => {
+				this.itemsOffset = 0
+			})
+
 			const link = new URLSearchParams(window.location.search).get('link')
 			if (link) {
 				window.history.replaceState({}, '', window.location.pathname)
@@ -1217,18 +1252,51 @@ function stashDetailComponent(stashId: string) {
 			setInterval(() => void this.refresh(), 5000)
 		},
 
+		// Assembles the stash's complete item list across as many capped
+		// requests as the existing paginated endpoint needs (QueryPagination
+		// hard-caps at 200/request) -- filters/sort/search/status-counts all
+		// need the whole set, not just one page. Returns null on failure so
+		// refresh() can fall back to the previous value like every other
+		// endpoint here.
+		async fetchAllStashItems(): Promise<{ items: StashItemSummary[]; total: number } | null> {
+			const chunkSize = 200
+			const items: StashItemSummary[] = []
+			let offset = 0
+			let total = 0
+
+			for (;;) {
+				const response = await apiFetch(`/api/v1/stashes/${stashId}/items?limit=${chunkSize}&offset=${offset}`)
+				const body = (await response.json()) as { items?: StashItemSummary[]; total?: number }
+				if (!Array.isArray(body.items)) return null
+
+				items.push(...body.items)
+				total = body.total ?? items.length
+				offset += chunkSize
+
+				if (offset >= total) break
+			}
+
+			return { items, total }
+		},
+
 		async refresh() {
+			// A stash with many items means several sequential requests to
+			// assemble the full list (fetchAllStashItems) -- SSE events fire on
+			// every job update and can arrive faster than that completes, so
+			// without this guard overlapping refreshes would pile up.
+			if (this.itemsRefreshing) return
+			this.itemsRefreshing = true
+
 			try {
-				const [stashResponse, itemsResponse, inputsResponse, broadcastsResponse, jobsResponse] = await Promise.all([
+				const [stashResponse, itemsResult, inputsResponse, broadcastsResponse, jobsResponse] = await Promise.all([
 					apiFetch(`/api/v1/stashes/${stashId}`),
-					apiFetch(`/api/v1/stashes/${stashId}/items?limit=${this.itemsLimit}&offset=${this.itemsOffset}`),
+					this.fetchAllStashItems(),
 					apiFetch(`/api/v1/stashes/${stashId}/inputs`),
 					apiFetch(`/api/v1/stashes/${stashId}/broadcasts`),
 					apiFetch('/api/v1/jobs'),
 				])
-				const [stashBody, itemsBody, inputsBody, broadcastsBody, jobsBody] = await Promise.all([
+				const [stashBody, inputsBody, broadcastsBody, jobsBody] = await Promise.all([
 					stashResponse.json(),
-					itemsResponse.json(),
 					inputsResponse.json(),
 					broadcastsResponse.json(),
 					jobsResponse.json(),
@@ -1239,8 +1307,10 @@ function stashDetailComponent(stashId: string) {
 				// every template expression that reads it until the next
 				// successful refresh.
 				this.stash = stashBody.stash ?? this.stash
-				this.items = itemsBody.items ?? this.items
-				this.itemsTotal = itemsBody.total ?? this.itemsTotal
+				if (itemsResult) {
+					this.items = itemsResult.items
+					this.itemsTotal = itemsResult.total
+				}
 				this.inputs = inputsBody.inputs ?? this.inputs
 				this.broadcasts = broadcastsBody.broadcasts ?? this.broadcasts
 				this.jobs = jobsBody.jobs ?? this.jobs
@@ -1248,6 +1318,8 @@ function stashDetailComponent(stashId: string) {
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
 				this.error = 'Could not reach the server.'
+			} finally {
+				this.itemsRefreshing = false
 			}
 		},
 
@@ -1308,6 +1380,17 @@ function stashDetailComponent(stashId: string) {
 			return broadcast.items.filter((item) => item.state !== 'ready')
 		},
 
+		// "rebuild" already reprocesses every non-ready item regardless of
+		// cause, so it's the default action for any error code. The one
+		// exception: an unavailable asset means there's nothing for rebuild to
+		// publish yet -- the source needs to come back first.
+		broadcastProblemItemHint(item: BroadcastItemSummary): string {
+			if (item.last_error?.endsWith('_asset_unavailable')) {
+				return 'redownload the source item in the Vault first, then rebuild.'
+			}
+			return 'rebuild retries this.'
+		},
+
 		// Static -- always shown in the status filter regardless of which
 		// states are present, so the dropdown's option list never shifts out
 		// from under the current selection (a <select> whose selected
@@ -1360,6 +1443,7 @@ function stashDetailComponent(stashId: string) {
 			const search = this.itemSearch.trim().toLowerCase()
 
 			const filtered = this.items.filter((item) => {
+				if (!this.showIgnored && item.state === 'ignored') return false
 				if (this.itemStatusFilter !== 'all' && item.media_item?.state !== this.itemStatusFilter) return false
 				if (search === '') return true
 				const title = (item.display_title ?? item.media_item?.title ?? '').toLowerCase()
@@ -1378,6 +1462,14 @@ function stashDetailComponent(stashId: string) {
 				if (av > bv) return dir
 				return 0
 			})
+		},
+
+		// Count of stash-item-level ignored items (StashItemState::Ignored) --
+		// distinct from the media-item-level "ignored" status chip below,
+		// which counts a different enum (MediaItemState) and is unaffected by
+		// the showIgnored toggle.
+		ignoredItemCount(): number {
+			return this.items.filter((item) => item.state === 'ignored').length
 		},
 
 		// Header summary chips, e.g. "218 items" · "12 downloading" · "3
@@ -1402,10 +1494,13 @@ function stashDetailComponent(stashId: string) {
 		// own item, in order. Alpine's x-for template can only have a single
 		// root element, so two parallel x-for loops over `items` can't be
 		// interleaved per-item -- this single loop with a type discriminator
-		// is what makes that possible.
+		// is what makes that possible. Sliced to the current display window --
+		// visibleItems() itself holds every matching item in the stash, not
+		// just one page, so this is what keeps the rendered table small.
 		itemRows(): Array<{ type: 'item' | 'progress'; key: string; item: StashItemSummary; job: JobSummary | null }> {
 			const rows: Array<{ type: 'item' | 'progress'; key: string; item: StashItemSummary; job: JobSummary | null }> = []
-			for (const item of this.visibleItems()) {
+			const windowed = this.visibleItems().slice(this.itemsOffset, this.itemsOffset + this.itemsLimit)
+			for (const item of windowed) {
 				rows.push({ type: 'item', key: item.id, item, job: null })
 				const job = this.activeJobFor(item.media_item_id)
 				if (job) {
@@ -1420,26 +1515,27 @@ function stashDetailComponent(stashId: string) {
 		},
 
 		hasNextItemsPage(): boolean {
-			return this.itemsOffset + this.itemsLimit < this.itemsTotal
+			return this.itemsOffset + this.itemsLimit < this.visibleItems().length
 		},
 
-		async prevItemsPage() {
+		// Pure display-window changes -- visibleItems() already holds every
+		// matching item, so there's nothing to re-fetch.
+		prevItemsPage() {
 			if (!this.hasPrevItemsPage()) return
 			this.itemsOffset = Math.max(0, this.itemsOffset - this.itemsLimit)
-			await this.refresh()
 		},
 
-		async nextItemsPage() {
+		nextItemsPage() {
 			if (!this.hasNextItemsPage()) return
 			this.itemsOffset += this.itemsLimit
-			await this.refresh()
 		},
 
 		itemsRangeLabel(): string {
-			if (this.itemsTotal === 0) return ''
+			const total = this.visibleItems().length
+			if (total === 0) return ''
 			const start = this.itemsOffset + 1
-			const end = Math.min(this.itemsOffset + this.itemsLimit, this.itemsTotal)
-			return `${start}–${end} of ${this.itemsTotal}`
+			const end = Math.min(this.itemsOffset + this.itemsLimit, total)
+			return `${start}–${end} of ${total}`
 		},
 
 		// Re-dispatches item.download for a failed item -- MediaItemState
@@ -1622,11 +1718,17 @@ function stashDetailComponent(stashId: string) {
 		async confirmDelete() {
 			this.deletingBusy = true
 			try {
-				await apiFetch(`/api/v1/stashes/${stashId}`, { method: 'DELETE' })
+				const response = await apiFetch(`/api/v1/stashes/${stashId}`, { method: 'DELETE' })
+				if (!response.ok) {
+					const body = (await response.json()) as { error?: { message?: string } }
+					this.error = body.error?.message ?? 'Could not delete that stash.'
+					this.deletingBusy = false
+					return
+				}
 				window.location.assign('/stashes')
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
-				this.error = 'Could not delete that stash.'
+				this.error = 'Could not reach the server.'
 				this.deletingBusy = false
 			}
 		},

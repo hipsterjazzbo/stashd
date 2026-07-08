@@ -18,6 +18,7 @@ use App\Stashes\StashInputRepository;
 use App\Stashes\StashRecord;
 use App\Stashes\StashRepository;
 use App\System\Storage\PathSanitizer;
+use App\Vault\MediaItemRepository;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
@@ -40,6 +41,7 @@ final readonly class BroadcastController
         private PodcastTokenService $podcastTokens,
         private PodcastEpisodeUrlBuilder $podcastUrls,
         private BroadcastLifecycleService $lifecycle,
+        private MediaItemRepository $mediaItems,
     ) {
     }
 
@@ -214,10 +216,7 @@ final readonly class BroadcastController
         }
 
         return new Json([
-            'items' => array_map(
-                static fn ($item): array => BroadcastItemResource::fromRecord($item)->toArray(),
-                $this->broadcastItems->listForBroadcast(BroadcastId::parse($id)),
-            ),
+            'items' => $this->mapBroadcastItems($this->broadcastItems->listForBroadcast(BroadcastId::parse($id))),
         ]);
     }
 
@@ -362,10 +361,7 @@ final readonly class BroadcastController
         $broadcastId = BroadcastId::fromPrimaryKey($broadcast->id);
 
         $extra = [
-            'items' => array_map(
-                static fn ($item): array => BroadcastItemResource::fromRecord($item)->toArray(),
-                $this->broadcastItems->listForBroadcast($broadcastId),
-            ),
+            'items' => $this->mapBroadcastItems($this->broadcastItems->listForBroadcast($broadcastId)),
             'impact' => ApiJson::encode($this->lifecycle->impact($broadcastId)->toArray()),
         ];
 
@@ -376,6 +372,26 @@ final readonly class BroadcastController
         $token = $this->podcastTokens->ensureBroadcastToken($broadcast);
 
         return [...BroadcastResource::fromRecord($broadcast, $this->podcastUrls->feedUrl($token))->toArray(), ...$extra];
+    }
+
+    /**
+     * @param list<BroadcastItemRecord> $items
+     * @return list<array<string, mixed>>
+     */
+    private function mapBroadcastItems(array $items): array
+    {
+        $mediaItemsById = $this->mediaItems->listByIds(array_values(array_unique(array_map(
+            static fn (BroadcastItemRecord $item): string => (string) $item->mediaItemId,
+            $items,
+        ))));
+
+        return array_map(
+            static fn (BroadcastItemRecord $item): array => BroadcastItemResource::fromRecord(
+                $item,
+                $mediaItemsById[(string) $item->mediaItemId] ?? null,
+            )->toArray(),
+            $items,
+        );
     }
 
     private function mapPlugin(string $key, DiscoveredPlugin $discovered): array
