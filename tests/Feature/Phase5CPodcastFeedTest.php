@@ -19,6 +19,8 @@ use App\Vault\AssetState;
 use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
 use Tempest\Database\PrimaryKey;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 use Tempest\Http\Status;
 
 test('the podcast broadcast format is registered', function (): void {
@@ -236,6 +238,76 @@ test('a failed transcode surfaces on the broadcast item without a manual rebuild
 
     expect($audioAsset?->state)->toBe(AssetState::Failed)
         ->and($item->lastError)->toBe('podcast_audio_transcode_failed');
+});
+
+test('a failed transcode is not retried immediately, but is retried once the cooldown elapses', function (): void {
+    [$headers, $stashId, $mediaItemId] = podcastFeedReadyStash($this, 'podcast-audio-transcode-retry');
+    podcastFeedCreateAsset(
+        $this->container->get(StashdConfig::class),
+        $this->container->get(AssetRepository::class),
+        $mediaItemId,
+        AssetKind::Video,
+        'original.mp4',
+        'video/mp4',
+        'video-bytes',
+    );
+
+    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'podcast',
+        'name' => 'Audio Transcode Retry',
+        'slug' => 'audio-transcode-retry-' . bin2hex(random_bytes(3)),
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    $gateway = $this->container->get(\App\Transcoding\Ffmpeg\FfmpegGateway::class);
+    assert($gateway instanceof \App\Transcoding\Ffmpeg\StubFfmpegGateway);
+    $gateway->failNextTranscode = true;
+    // transcodeCalls is a shared counter across every test in this file
+    // (the stub isn't reset per test) -- assert on the delta, not the
+    // absolute count.
+    $callsBefore = $gateway->transcodeCalls;
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild',
+        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $assets = $this->container->get(AssetRepository::class);
+    $audioAsset = $assets->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::PodcastAudio);
+    expect($audioAsset?->state)->toBe(AssetState::Failed)
+        ->and($gateway->transcodeCalls - $callsBefore)->toBe(1);
+
+    // Rebuilding again right away must not retry -- without the cooldown,
+    // this would spin a broken transcode in a tight loop.
+    $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild',
+        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $stillFailed = $assets->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::PodcastAudio);
+    expect($stillFailed?->state)->toBe(AssetState::Failed)
+        ->and($gateway->transcodeCalls - $callsBefore)->toBe(1);
+
+    // Backdate the failure past the cooldown (as if the user is retrying a
+    // while later, e.g. after fixing whatever caused it) and rebuild again.
+    $stillFailed->updatedAt = DateTime::now(Timezone::UTC)->minusSeconds(301);
+    $stillFailed->save();
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild',
+        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $retried = $assets->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::PodcastAudio);
+    $item = BroadcastItemRecord::select()
+        ->where('broadcastId = ?', $broadcast->body['broadcast']['id'])
+        ->first();
+
+    expect($gateway->transcodeCalls - $callsBefore)->toBe(2)
+        ->and($retried?->state)->toBe(AssetState::Ready)
+        ->and($item->lastError)->toBeNull();
 });
 
 test('rebuild job handler counts items pending a transcode fallback for the honest progress label', function (): void {

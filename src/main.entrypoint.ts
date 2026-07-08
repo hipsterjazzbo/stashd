@@ -1388,6 +1388,9 @@ function stashDetailComponent(stashId: string) {
 			if (item.last_error?.endsWith('_asset_unavailable')) {
 				return 'redownload the source item in the Vault first, then rebuild.'
 			}
+			if (item.last_error?.endsWith('_transcode_failed')) {
+				return 'rebuild retries this, but not more than once every few minutes.'
+			}
 			return 'rebuild retries this.'
 		},
 
