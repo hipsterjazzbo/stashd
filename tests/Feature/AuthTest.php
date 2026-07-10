@@ -92,6 +92,37 @@ test('the session cookie issued at login authenticates protected routes', functi
     expect($me->body['user']['username'])->toBe('owner');
 });
 
+test('logging in again does not revoke a prior session for the same user', function (): void {
+    $this->http->post('/api/v1/auth/setup', [
+        'username' => 'owner',
+        'password' => 'secret-password',
+    ])->assertStatus(Status::CREATED);
+
+    $firstLogin = $this->http->post('/api/v1/auth/login', [
+        'username' => 'owner',
+        'password' => 'secret-password',
+    ])->assertOk();
+    useSessionCookieFrom($firstLogin);
+    $firstCookie = $_COOKIE[AuthService::SESSION_COOKIE];
+
+    $secondLogin = $this->http->post('/api/v1/auth/login', [
+        'username' => 'owner',
+        'password' => 'secret-password',
+    ])->assertOk();
+    useSessionCookieFrom($secondLogin);
+    $secondCookie = $_COOKIE[AuthService::SESSION_COOKIE];
+
+    expect($secondCookie)->not->toBe($firstCookie);
+
+    // Second login must not have kicked out the first session.
+    $_COOKIE[AuthService::SESSION_COOKIE] = $firstCookie;
+    $this->http->get('/api/v1/auth/me')->assertOk();
+
+    // Both sessions genuinely coexist -- the second one still works too.
+    $_COOKIE[AuthService::SESSION_COOKIE] = $secondCookie;
+    $this->http->get('/api/v1/auth/me')->assertOk();
+});
+
 test('logout revokes the session token and clears the cookie', function (): void {
     $this->http->post('/api/v1/auth/setup', [
         'username' => 'owner',

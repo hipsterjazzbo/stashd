@@ -129,13 +129,15 @@ final readonly class AuthService
     }
 
     /**
-     * Mints the single rotating web-session token, replacing any prior one, and
-     * returns the raw value for the caller to place in the session cookie.
+     * Mints a new web-session token and returns the raw value for the caller
+     * to place in the session cookie. Deliberately does not revoke the
+     * user's other web sessions -- concurrent sessions (multiple tabs,
+     * devices, or scripts logged in as the same user) are allowed to coexist.
+     * Explicit logout (see revokeWebSessionTokens) is the only thing that
+     * ends a session.
      */
     public function issueWebSessionToken(UserRecord $user): string
     {
-        $this->revokeWebSessionTokens($user);
-
         $expiresAt = DateTime::now(Timezone::UTC)->plusSeconds(self::WEB_SESSION_TTL_SECONDS);
 
         return $this->createApiToken($user, self::WEB_SESSION_TOKEN_NAME, expiresAt: $expiresAt)['token'];
