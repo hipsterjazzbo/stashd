@@ -225,6 +225,22 @@
 									<p class="mt-1 text-[12px] text-warn">Anyone with this link can listen — treat it like a password.</p>
 								</div>
 
+								<div class="mt-3 rounded border border-line bg-espresso p-2"
+									x-init="ensureDestinationPathDraft(broadcast)">
+									<p class="text-[11px] uppercase tracking-wide text-muted">Destination path</p>
+									<p class="mt-1 text-[12px] text-muted">Where this broadcast's files are written. Stashd creates and exclusively manages one folder named after the broadcast directly under this path — it never touches anything else already there. Leave blank for the default location inside the Stashd media volume.</p>
+									<div class="mt-2 flex items-center gap-2">
+										<input type="text" placeholder="/mnt/nas/media/TV"
+											x-model="destinationPathDrafts[broadcast.id]"
+											class="flex-1 rounded border border-line bg-panel px-2 py-1 text-[12px] text-cream outline-none focus:border-amber"/>
+										<button type="button" x-on:click="saveDestinationPath(broadcast.id)"
+											x-bind:disabled="savingDestinationPath === broadcast.id"
+											class="shrink-0 rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-60">
+											Save
+										</button>
+									</div>
+								</div>
+
 								<template x-if="isSeriesBroadcastType(broadcast.type) && inputs.length > 0">
 									<div class="mt-3 rounded border border-line bg-espresso p-2"
 										x-init="ensureSeasonMappingDraft(broadcast)">
@@ -273,6 +289,9 @@
 								<span x-show="!loadingBroadcastPreview">Preview</span>
 							</button>
 						</div>
+
+						<input type="text" x-model="newBroadcastDestinationPath" placeholder="Destination path (optional) — e.g. /mnt/nas/media/TV"
+							class="mt-2 w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
 
 						<p class="mt-2 text-[12px] text-muted" x-show="isSeriesBroadcastType(newBroadcastType) && inputs.length > 1">
 							Multiple inputs go into Season 01 by default — you can map each one to its own season from this broadcast's card once it's created.
@@ -436,9 +455,9 @@
 							</template>
 						</tbody>
 					</table>
-					<p class="px-4 py-3 text-[13px] text-muted" x-show="itemsTotal === 0">No items yet.</p>
-					<p class="px-4 py-3 text-[13px] text-muted" x-show="itemsTotal > 0 && visibleItems().length === 0">No items match the current filters.</p>
-					<div class="flex items-center justify-between border-t border-line px-4 py-2 text-[12px] text-muted" x-show="visibleItems().length > itemsLimit">
+					<p class="px-4 py-3 text-[13px] text-muted" x-show="stashItemCount === 0">No items yet.</p>
+					<p class="px-4 py-3 text-[13px] text-muted" x-show="stashItemCount > 0 && itemsTotal === 0">No items match the current filters.</p>
+					<div class="flex items-center justify-between border-t border-line px-4 py-2 text-[12px] text-muted" x-show="itemsTotal > itemsLimit">
 						<span x-text="itemsRangeLabel()"></span>
 						<div class="flex items-center gap-2">
 							<button type="button" class="rounded border border-line px-2 py-1 text-muted transition-colors hover:text-cream disabled:opacity-40"

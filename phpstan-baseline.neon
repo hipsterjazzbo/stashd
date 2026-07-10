@@ -289,12 +289,6 @@ parameters:
 			path: app/Broadcasts/HardlinkPublisher.php
 
 		-
-			message: '#^Property App\\Broadcasts\\HardlinkPublisher\:\:\$probe is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: app/Broadcasts/HardlinkPublisher.php
-
-		-
 			message: '#^Cannot access property \$derivedFromAssetId on mixed\.$#'
 			identifier: property.nonObject
 			count: 1
@@ -1093,12 +1087,6 @@ parameters:
 			path: app/Stashes/StashItemRepository.php
 
 		-
-			message: '#^Method App\\Stashes\\StashItemRepository\:\:listForStash\(\) should return list\<App\\Stashes\\StashItemRecord\> but returns array\<mixed\>\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Stashes/StashItemRepository.php
-
-		-
 			message: '#^Cannot cast mixed to string\.$#'
 			identifier: cast.string
 			count: 2
@@ -1586,6 +1574,12 @@ parameters:
 
 		-
 			message: '#^Method App\\Vault\\AssetRepository\:\:listForMediaItem\(\) should return list\<App\\Vault\\AssetRecord\> but returns array\<mixed\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Vault/AssetRepository.php
+
+		-
+			message: '#^Method App\\Vault\\AssetRepository\:\:listByBroadcastAndRole\(\) should return list\<App\\Vault\\AssetRecord\> but returns array\<mixed\>\.$#'
 			identifier: return.type
 			count: 1
 			path: app/Vault/AssetRepository.php

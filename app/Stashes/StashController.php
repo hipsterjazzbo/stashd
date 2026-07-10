@@ -18,7 +18,8 @@ use App\Stashes\Api\StashResource;
 use App\Support\Http\QueryPagination;
 use App\System\Activity\ActivityEventService;
 use App\Vault\AssetRepository;
-use App\Vault\MediaItemRepository;
+use App\Vault\MediaItemState;
+use Tempest\Database\Direction;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
@@ -39,7 +40,6 @@ final readonly class StashController
         private CommandDispatchService $dispatch,
         private AuthContext $context,
         private ActivityEventService $activity,
-        private MediaItemRepository $mediaItems,
         private AssetRepository $assets,
         private JobRepository $jobs,
     ) {
@@ -132,13 +132,43 @@ final readonly class StashController
         $stashId = StashId::fromPrimaryKey($stash->id);
         [$limit, $offset] = QueryPagination::parse($request);
 
-        $stashItems = $this->stashItems->listForStash($stashId, $limit, $offset);
+        $rawSearch = $request->get('search');
+        $search = is_string($rawSearch) ? trim($rawSearch) : '';
+
+        $rawStatus = $request->get('status');
+        $status = is_string($rawStatus) ? MediaItemState::tryFrom($rawStatus) : null;
+
+        $rawIncludeIgnored = $request->get('include_ignored');
+        $includeIgnored = ! (is_string($rawIncludeIgnored) && $rawIncludeIgnored === 'false');
+
+        $rawSort = $request->get('sort');
+        $sort = is_string($rawSort) ? $rawSort : 'position';
+
+        $rawDirection = $request->get('dir');
+        $direction = is_string($rawDirection) && strtolower($rawDirection) === 'desc' ? Direction::DESC : Direction::ASC;
+
+        $filters = [
+            'search' => $search === '' ? null : $search,
+            'status' => $status,
+            'includeIgnored' => $includeIgnored,
+        ];
+
+        $stashItems = $this->stashItems->listForStash(
+            $stashId,
+            $limit,
+            $offset,
+            search: $filters['search'],
+            status: $filters['status'],
+            includeIgnored: $filters['includeIgnored'],
+            sort: $sort,
+            direction: $direction,
+        );
+
         $mediaItemIds = array_values(array_unique(array_map(
             static fn ($item): string => (string) $item->mediaItemId,
             $stashItems,
         )));
 
-        $mediaItemsById = $this->mediaItems->listByIds($mediaItemIds);
         $totalSizeByMediaItem = $this->assets->totalSizeBytesByMediaItem($mediaItemIds);
         $downloadFailureByMediaItem = $this->jobs->latestDownloadFailureByMediaItem($mediaItemIds);
 
@@ -146,15 +176,27 @@ final readonly class StashController
             'items' => array_map(
                 static fn ($item): array => StashItemResource::fromRecord(
                     $item,
-                    $mediaItemsById[(string) $item->mediaItemId] ?? null,
+                    $item->mediaItem,
                     $totalSizeByMediaItem[(string) $item->mediaItemId] ?? null,
                     $downloadFailureByMediaItem[(string) $item->mediaItemId] ?? null,
                 )->toArray(),
                 $stashItems,
             ),
-            'total' => $this->stashItems->countForStash($stashId),
+            'total' => $this->stashItems->countForStash(
+                $stashId,
+                search: $filters['search'],
+                status: $filters['status'],
+                includeIgnored: $filters['includeIgnored'],
+            ),
             'limit' => $limit,
             'offset' => $offset,
+            'status_counts' => $this->stashItems->statusCountsForStash($stashId),
+            'ignored_count' => $this->stashItems->countIgnoredForStash($stashId),
+            // Unfiltered, whole-stash count -- distinct from `total` (which
+            // reflects the current search/status/includeIgnored filters) so
+            // the UI can tell "this stash has no items at all" apart from
+            // "the current filters match nothing".
+            'stash_item_count' => $this->stashItems->countForStash($stashId),
         ]);
     }
 

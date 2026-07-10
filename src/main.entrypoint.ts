@@ -1157,9 +1157,13 @@ function stashDetailComponent(stashId: string) {
 		stash: null as StashSummary | null,
 		items: [] as StashItemSummary[],
 		itemsTotal: 0,
+		stashItemCount: 0,
 		itemsLimit: 50,
 		itemsOffset: 0,
 		itemsRefreshing: false,
+		itemStatusCounts: {} as Record<string, number>,
+		itemIgnoredCount: 0,
+		itemSearchDebounce: null as ReturnType<typeof setTimeout> | null,
 		itemSortKey: 'published' as ItemSortKey,
 		itemSortDir: 'desc' as 'asc' | 'desc',
 		itemStatusFilter: 'all',
@@ -1177,6 +1181,7 @@ function stashDetailComponent(stashId: string) {
 		newBroadcastType: 'podcast',
 		newBroadcastMediaKind: 'audio',
 		newBroadcastName: '',
+		newBroadcastDestinationPath: '',
 		creatingBroadcast: false,
 		broadcastPreview: null as BroadcastCreationPreviewSummary | null,
 		loadingBroadcastPreview: false,
@@ -1184,6 +1189,8 @@ function stashDetailComponent(stashId: string) {
 		updatingDownloadPolicy: false,
 		seasonMappingDrafts: {} as Record<string, Record<string, string>>,
 		savingSeasonMapping: null as string | null,
+		destinationPathDrafts: {} as Record<string, string>,
+		savingDestinationPath: null as string | null,
 		statusBadge,
 		formatRelativeTime,
 		formatDuration,
@@ -1224,14 +1231,22 @@ function stashDetailComponent(stashId: string) {
 
 			this.onBroadcastTypeChanged()
 
-			// A filter/search change can leave itemsOffset pointing past the end
-			// of the now-smaller visible set -- reset to the first page rather
-			// than showing a false empty state.
+			// Filter/search/showIgnored changes are query params now (server
+			// -side filtering, see refreshItems()), not a client-side recompute
+			// -- each needs its own re-fetch, not just an offset reset. Search
+			// is debounced so typing doesn't fire a request per keystroke.
 			this.$watch('itemStatusFilter', () => {
 				this.itemsOffset = 0
+				void this.refreshItems()
+			})
+			this.$watch('showIgnored', () => {
+				this.itemsOffset = 0
+				void this.refreshItems()
 			})
 			this.$watch('itemSearch', () => {
 				this.itemsOffset = 0
+				if (this.itemSearchDebounce) clearTimeout(this.itemSearchDebounce)
+				this.itemSearchDebounce = setTimeout(() => void this.refreshItems(), 300)
 			})
 
 			const link = new URLSearchParams(window.location.search).get('link')
@@ -1252,45 +1267,55 @@ function stashDetailComponent(stashId: string) {
 			setInterval(() => void this.refresh(), 5000)
 		},
 
-		// Assembles the stash's complete item list across as many capped
-		// requests as the existing paginated endpoint needs (QueryPagination
-		// hard-caps at 200/request) -- filters/sort/search/status-counts all
-		// need the whole set, not just one page. Returns null on failure so
-		// refresh() can fall back to the previous value like every other
-		// endpoint here.
-		async fetchAllStashItems(): Promise<{ items: StashItemSummary[]; total: number } | null> {
-			const chunkSize = 200
-			const items: StashItemSummary[] = []
-			let offset = 0
-			let total = 0
+		// Fetches just the current page, filtered/sorted server-side --
+		// search/status/sort/showIgnored are query params now
+		// (StashController::items()), not a client-side recompute over a
+		// fully-materialized list. Catches its own errors (rather than
+		// throwing) so a failure here doesn't abort the Promise.all in
+		// refresh(), matching every other endpoint's fallback-on-failure
+		// behavior there.
+		async refreshItems() {
+			const params = new URLSearchParams({
+				limit: String(this.itemsLimit),
+				offset: String(this.itemsOffset),
+				sort: this.itemSortKey,
+				dir: this.itemSortDir,
+				include_ignored: this.showIgnored ? 'true' : 'false',
+			})
+			if (this.itemStatusFilter !== 'all') params.set('status', this.itemStatusFilter)
+			if (this.itemSearch.trim() !== '') params.set('search', this.itemSearch.trim())
 
-			for (;;) {
-				const response = await apiFetch(`/api/v1/stashes/${stashId}/items?limit=${chunkSize}&offset=${offset}`)
-				const body = (await response.json()) as { items?: StashItemSummary[]; total?: number }
-				if (!Array.isArray(body.items)) return null
-
-				items.push(...body.items)
-				total = body.total ?? items.length
-				offset += chunkSize
-
-				if (offset >= total) break
+			try {
+				const response = await apiFetch(`/api/v1/stashes/${stashId}/items?${params.toString()}`)
+				const body = (await response.json()) as {
+					items?: StashItemSummary[]
+					total?: number
+					status_counts?: Record<string, number>
+					ignored_count?: number
+					stash_item_count?: number
+				}
+				this.items = body.items ?? this.items
+				this.itemsTotal = body.total ?? this.itemsTotal
+				this.itemStatusCounts = body.status_counts ?? this.itemStatusCounts
+				this.itemIgnoredCount = body.ignored_count ?? this.itemIgnoredCount
+				this.stashItemCount = body.stash_item_count ?? this.stashItemCount
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not reach the server.'
 			}
-
-			return { items, total }
 		},
 
 		async refresh() {
-			// A stash with many items means several sequential requests to
-			// assemble the full list (fetchAllStashItems) -- SSE events fire on
-			// every job update and can arrive faster than that completes, so
-			// without this guard overlapping refreshes would pile up.
+			// SSE events fire on every job update and can arrive faster than a
+			// refresh cycle completes -- without this guard, overlapping
+			// refreshes would pile up.
 			if (this.itemsRefreshing) return
 			this.itemsRefreshing = true
 
 			try {
-				const [stashResponse, itemsResult, inputsResponse, broadcastsResponse, jobsResponse] = await Promise.all([
+				const [stashResponse, , inputsResponse, broadcastsResponse, jobsResponse] = await Promise.all([
 					apiFetch(`/api/v1/stashes/${stashId}`),
-					this.fetchAllStashItems(),
+					this.refreshItems(),
 					apiFetch(`/api/v1/stashes/${stashId}/inputs`),
 					apiFetch(`/api/v1/stashes/${stashId}/broadcasts`),
 					apiFetch('/api/v1/jobs'),
@@ -1307,10 +1332,6 @@ function stashDetailComponent(stashId: string) {
 				// every template expression that reads it until the next
 				// successful refresh.
 				this.stash = stashBody.stash ?? this.stash
-				if (itemsResult) {
-					this.items = itemsResult.items
-					this.itemsTotal = itemsResult.total
-				}
 				this.inputs = inputsBody.inputs ?? this.inputs
 				this.broadcasts = broadcastsBody.broadcasts ?? this.broadcasts
 				this.jobs = jobsBody.jobs ?? this.jobs
@@ -1409,6 +1430,8 @@ function stashDetailComponent(stashId: string) {
 				this.itemSortKey = key
 				this.itemSortDir = key === 'published' ? 'desc' : 'asc'
 			}
+			this.itemsOffset = 0
+			void this.refreshItems()
 		},
 
 		itemSortIndicator(key: ItemSortKey): string {
@@ -1416,94 +1439,54 @@ function stashDetailComponent(stashId: string) {
 			return this.itemSortDir === 'asc' ? '↑' : '↓'
 		},
 
-		itemSortValue(item: StashItemSummary, key: ItemSortKey): string | number {
-			switch (key) {
-				case 'title':
-					return (item.display_title ?? item.media_item?.title ?? '').toLowerCase()
-				case 'published':
-					return item.media_item?.published_at ? Date.parse(item.media_item.published_at) : 0
-				case 'duration':
-					return item.media_item?.duration_seconds ?? -1
-				case 'size':
-					return item.total_asset_size_bytes ?? -1
-				case 'status':
-					return item.media_item?.state ?? ''
-				case 'position':
-				default:
-					return item.position ?? 0
-			}
-		},
-
 		isDownloading(item: StashItemSummary): boolean {
 			return this.activeJobFor(item.media_item_id) !== null
 		},
 
-		// Filters, then sorts, the raw items list -- itemRows() flattens the
-		// result with each item's live download progress row. Items actively
-		// downloading are always pinned above the chosen sort, since they're
-		// otherwise easy to lose in a long list.
-		visibleItems(): StashItemSummary[] {
-			const search = this.itemSearch.trim().toLowerCase()
-
-			const filtered = this.items.filter((item) => {
-				if (!this.showIgnored && item.state === 'ignored') return false
-				if (this.itemStatusFilter !== 'all' && item.media_item?.state !== this.itemStatusFilter) return false
-				if (search === '') return true
-				const title = (item.display_title ?? item.media_item?.title ?? '').toLowerCase()
-				return title.includes(search)
-			})
-
-			const dir = this.itemSortDir === 'asc' ? 1 : -1
-			return [...filtered].sort((a, b) => {
+		// this.items is already the current page, filtered/sorted server-side --
+		// this just pins actively-downloading items above the page's sort order,
+		// which is cheap to do client-side since it only ever re-sorts the
+		// current page (<= itemsLimit items), not the whole stash.
+		displayItems(): StashItemSummary[] {
+			return [...this.items].sort((a, b) => {
 				const aDownloading = this.isDownloading(a)
 				const bDownloading = this.isDownloading(b)
 				if (aDownloading !== bDownloading) return aDownloading ? -1 : 1
-
-				const av = this.itemSortValue(a, this.itemSortKey)
-				const bv = this.itemSortValue(b, this.itemSortKey)
-				if (av < bv) return -dir
-				if (av > bv) return dir
 				return 0
 			})
 		},
 
 		// Count of stash-item-level ignored items (StashItemState::Ignored) --
-		// distinct from the media-item-level "ignored" status chip below,
-		// which counts a different enum (MediaItemState) and is unaffected by
-		// the showIgnored toggle.
+		// distinct from the media-item-level "ignored" status chip below, which
+		// counts a different enum (MediaItemState). Fetched server-side
+		// (StashController::items()'s ignored_count) since it must reflect the
+		// whole stash regardless of the current page/filter.
 		ignoredItemCount(): number {
-			return this.items.filter((item) => item.state === 'ignored').length
+			return this.itemIgnoredCount
 		},
 
 		// Header summary chips, e.g. "218 items" · "12 downloading" · "3
-		// failed" -- clicking a chip sets itemStatusFilter to it, so the
-		// summary doubles as a set of filter shortcuts.
+		// failed" -- clicking a chip sets itemStatusFilter to it, so the summary
+		// doubles as a set of filter shortcuts. Counts come from the server
+		// (status_counts, a real GROUP BY aggregate across the whole stash), not
+		// a client-side tally over the current page.
 		itemStatusSummary(): Array<{ label: string; filter: string }> {
-			const counts = new Map<string, number>()
-			for (const item of this.items) {
-				const status = item.media_item?.state
-				if (!status) continue
-				counts.set(status, (counts.get(status) ?? 0) + 1)
-			}
-
-			return ITEM_STATUS_OPTIONS.filter((status) => counts.has(status)).map((status) => ({
-				label: `${counts.get(status)} ${status.replace(/_/g, ' ')}`,
+			return ITEM_STATUS_OPTIONS.filter((status) => (this.itemStatusCounts[status] ?? 0) > 0).map((status) => ({
+				label: `${this.itemStatusCounts[status]} ${status.replace(/_/g, ' ')}`,
 				filter: status,
 			}))
 		},
 
 		// Flattens items + their active job (if any) into one list so the items
 		// table's x-for can render a full-width progress row directly under its
-		// own item, in order. Alpine's x-for template can only have a single
-		// root element, so two parallel x-for loops over `items` can't be
-		// interleaved per-item -- this single loop with a type discriminator
-		// is what makes that possible. Sliced to the current display window --
-		// visibleItems() itself holds every matching item in the stash, not
-		// just one page, so this is what keeps the rendered table small.
+		// own item, in order. Alpine's x-for template can only have a single root
+		// element, so two parallel x-for loops over `items` can't be interleaved
+		// per-item -- this single loop with a type discriminator is what makes
+		// that possible. No slicing needed -- displayItems() is already just the
+		// current page.
 		itemRows(): Array<{ type: 'item' | 'progress'; key: string; item: StashItemSummary; job: JobSummary | null }> {
 			const rows: Array<{ type: 'item' | 'progress'; key: string; item: StashItemSummary; job: JobSummary | null }> = []
-			const windowed = this.visibleItems().slice(this.itemsOffset, this.itemsOffset + this.itemsLimit)
-			for (const item of windowed) {
+			for (const item of this.displayItems()) {
 				rows.push({ type: 'item', key: item.id, item, job: null })
 				const job = this.activeJobFor(item.media_item_id)
 				if (job) {
@@ -1518,27 +1501,26 @@ function stashDetailComponent(stashId: string) {
 		},
 
 		hasNextItemsPage(): boolean {
-			return this.itemsOffset + this.itemsLimit < this.visibleItems().length
+			return this.itemsOffset + this.itemsLimit < this.itemsTotal
 		},
 
-		// Pure display-window changes -- visibleItems() already holds every
-		// matching item, so there's nothing to re-fetch.
 		prevItemsPage() {
 			if (!this.hasPrevItemsPage()) return
 			this.itemsOffset = Math.max(0, this.itemsOffset - this.itemsLimit)
+			void this.refreshItems()
 		},
 
 		nextItemsPage() {
 			if (!this.hasNextItemsPage()) return
 			this.itemsOffset += this.itemsLimit
+			void this.refreshItems()
 		},
 
 		itemsRangeLabel(): string {
-			const total = this.visibleItems().length
-			if (total === 0) return ''
+			if (this.itemsTotal === 0) return ''
 			const start = this.itemsOffset + 1
-			const end = Math.min(this.itemsOffset + this.itemsLimit, total)
-			return `${start}–${end} of ${total}`
+			const end = Math.min(this.itemsOffset + this.itemsLimit, this.itemsTotal)
+			return `${start}–${end} of ${this.itemsTotal}`
 		},
 
 		// Re-dispatches item.download for a failed item -- MediaItemState
@@ -1819,7 +1801,9 @@ function stashDetailComponent(stashId: string) {
 
 		async createBroadcast() {
 			this.creatingBroadcast = true
-			const settings = this.newBroadcastType === 'podcast' ? { media_kind: this.newBroadcastMediaKind } : {}
+			const settings: Record<string, unknown> = this.newBroadcastType === 'podcast' ? { media_kind: this.newBroadcastMediaKind } : {}
+			const destinationPath = this.newBroadcastDestinationPath.trim()
+			if (destinationPath !== '') settings.destination_path = destinationPath
 			const name = this.newBroadcastName.trim()
 			try {
 				const response = await apiFetch(`/api/v1/stashes/${stashId}/broadcasts`, {
@@ -1837,6 +1821,7 @@ function stashDetailComponent(stashId: string) {
 					return
 				}
 				this.newBroadcastName = ''
+				this.newBroadcastDestinationPath = ''
 				this.broadcastPreview = null
 				this.error = null
 				await this.refresh()
@@ -1898,6 +1883,38 @@ function stashDetailComponent(stashId: string) {
 				this.error = 'Could not reach the server.'
 			} finally {
 				this.savingSeasonMapping = null
+			}
+		},
+
+		// Same "only initialize once" rule as ensureSeasonMappingDraft — a
+		// background SSE-triggered refresh must not clobber an in-progress edit.
+		ensureDestinationPathDraft(broadcast: BroadcastSummary) {
+			if (broadcast.id in this.destinationPathDrafts) return
+
+			this.destinationPathDrafts[broadcast.id] = (broadcast.settings?.destination_path as string | undefined) ?? ''
+		},
+
+		async saveDestinationPath(broadcastId: string) {
+			this.savingDestinationPath = broadcastId
+			try {
+				const draft = (this.destinationPathDrafts[broadcastId] ?? '').trim()
+				const response = await apiFetch(`/api/v1/broadcasts/${broadcastId}/destination`, {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ destination_path: draft !== '' ? draft : null }),
+				})
+				if (!response.ok) {
+					const body = (await response.json()) as { error?: { message?: string } }
+					this.error = body.error?.message ?? 'Could not update the destination path.'
+					return
+				}
+				this.error = null
+				await this.refresh()
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not reach the server.'
+			} finally {
+				this.savingDestinationPath = null
 			}
 		},
 
@@ -1995,9 +2012,15 @@ function stashDetailComponent(stashId: string) {
 				return false
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return true
-				this.addInputFailureMessage = 'Could not reach the server.'
-				this.addInputStep = 'failed'
-				return true
+				// A network-level fetch failure (dropped connection, DNS hiccup,
+				// interface change) here is exactly what the 3s fallback poll
+				// (see awaitSseTerminal) exists to be resilient against -- treating
+				// it as terminal defeats that purpose. The command's own state is
+				// unknown, not failed, so keep polling instead of giving up on one
+				// bad tick; a genuine command failure is still reported via the
+				// state === 'failed'/'rejected' branch above once a request
+				// actually reaches the server.
+				return false
 			}
 		},
 
@@ -2062,9 +2085,15 @@ function stashDetailComponent(stashId: string) {
 				return false
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return true
-				this.addInputFailureMessage = 'Could not reach the server.'
-				this.addInputStep = 'failed'
-				return true
+				// A network-level fetch failure (dropped connection, DNS hiccup,
+				// interface change) here is exactly what the 3s fallback poll
+				// (see awaitSseTerminal) exists to be resilient against -- treating
+				// it as terminal defeats that purpose. The command's own state is
+				// unknown, not failed, so keep polling instead of giving up on one
+				// bad tick; a genuine command failure is still reported via the
+				// state === 'failed'/'rejected' branch above once a request
+				// actually reaches the server.
+				return false
 			}
 		},
 	}
