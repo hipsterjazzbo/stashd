@@ -89,7 +89,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
     {
         $profile = $this->profile();
         $broadcastId = (string) $context->broadcast->id;
-        $root = $this->paths->broadcastRoot($broadcastId);
+        $root = $this->paths->broadcastRoot($context->broadcast);
         $files = [];
         $sidecars = [];
         $skipped = [];
@@ -114,7 +114,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
                 ? $this->filenames->mediaServerEpisodeFilename($stashItem, $mediaItem, $vault->path, $position, $seasonOverride)
                 : $this->filenames->episodeFilename($stashItem, $mediaItem, $vault->path, $position);
             $relative = $this->paths->relativeFile($season, $filename);
-            $absolute = $this->paths->broadcastFile($broadcastId, $season, $filename);
+            $absolute = $this->paths->broadcastFile($context->broadcast, $season, $filename);
 
             $files[] = new BroadcastPlannedFile(
                 stashItemId: (string) $stashItem->id,
@@ -132,7 +132,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
                     $sidecars[] = new BroadcastPlannedSidecar(
                         kind: BroadcastSidecarType::TvShowNfo,
                         relativePath: $tvShowRelative,
-                        absolutePath: $this->paths->broadcastFile($broadcastId, 'tvshow.nfo'),
+                        absolutePath: $this->paths->broadcastFile($context->broadcast, 'tvshow.nfo'),
                         content: $this->nfos->tvShowNfo($context->broadcast->name),
                     );
                     $tvShowNfoAdded = true;
@@ -144,7 +144,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
                 $sidecars[] = new BroadcastPlannedSidecar(
                     kind: BroadcastSidecarType::EpisodeNfo,
                     relativePath: $this->paths->relativeFile($season, $episodeNfoName),
-                    absolutePath: $this->paths->broadcastFile($broadcastId, $season, $episodeNfoName),
+                    absolutePath: $this->paths->broadcastFile($context->broadcast, $season, $episodeNfoName),
                     content: $this->nfos->episodeNfo($stashItem, $mediaItem, $seasonNumber, $episodeNumber),
                     stashItemId: (string) $stashItem->id,
                     mediaItemId: (string) $stashItem->mediaItemId,
@@ -153,7 +153,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
         }
 
         if ($profile->attemptPosterHardlink) {
-            $posterSidecar = $this->planPosterSidecar($context, $broadcastId);
+            $posterSidecar = $this->planPosterSidecar($context);
 
             if ($posterSidecar !== null) {
                 $sidecars[] = $posterSidecar;
@@ -172,6 +172,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
     public function publish(BroadcastContext $context, BroadcastPlan $plan): BroadcastPublishResult
     {
         $broadcastId = $plan->broadcastId;
+        $root = $this->paths->claimRoot($context->broadcast);
         $publishedPaths = [];
         $failedStashItemIds = [];
         $publishedCount = 0;
@@ -195,7 +196,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
             }
 
             try {
-                $this->hardlinks->publishHardlink($planned->sourcePath, $planned->absolutePath);
+                $this->hardlinks->publishHardlink($planned->sourcePath, $planned->absolutePath, $root);
 
                 $item->publishedPath = $planned->absolutePath;
                 $item->publishedUri = null;
@@ -228,7 +229,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
 
         foreach ($plan->sidecars as $sidecar) {
             if ($sidecar->kind === BroadcastSidecarType::Poster) {
-                $this->publishPosterSidecar($sidecar);
+                $this->publishPosterSidecar($sidecar, $root);
 
                 continue;
             }
@@ -248,6 +249,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
     public function verify(BroadcastContext $context): BroadcastVerifyResult
     {
         $broadcastId = (string) $context->broadcast->id;
+        $this->paths->assertOwnsRoot($context->broadcast);
         $validItemIds = [];
         $staleItemIds = [];
         $missingItemIds = [];
@@ -327,7 +329,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
     public function prune(BroadcastContext $context): BroadcastPruneResult
     {
         $broadcastId = (string) $context->broadcast->id;
-        $root = $this->paths->broadcastRoot($broadcastId);
+        $root = $this->paths->assertOwnsRoot($context->broadcast);
         $plan = $this->plan($context);
         $keepPaths = array_map(static fn (BroadcastPlannedFile $file): string => $file->absolutePath, $plan->files);
 
@@ -370,7 +372,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
         );
     }
 
-    private function planPosterSidecar(BroadcastContext $context, string $broadcastId): ?BroadcastPlannedSidecar
+    private function planPosterSidecar(BroadcastContext $context): ?BroadcastPlannedSidecar
     {
         foreach ($context->stashItems as $stashItem) {
             $thumbnail = $this->assets->findByMediaItemAndRole(
@@ -393,7 +395,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
             return new BroadcastPlannedSidecar(
                 kind: BroadcastSidecarType::Poster,
                 relativePath: $this->paths->relativeFile($filename),
-                absolutePath: $this->paths->broadcastFile($broadcastId, $filename),
+                absolutePath: $this->paths->broadcastFile($context->broadcast, $filename),
                 content: '',
                 mediaItemId: (string) $stashItem->mediaItemId,
             );
@@ -402,7 +404,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
         return null;
     }
 
-    private function publishPosterSidecar(BroadcastPlannedSidecar $sidecar): void
+    private function publishPosterSidecar(BroadcastPlannedSidecar $sidecar, string $root): void
     {
         if ($sidecar->mediaItemId === null) {
             return;
@@ -418,7 +420,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
         }
 
         try {
-            $this->hardlinks->publishHardlink($thumbnail->path, $sidecar->absolutePath);
+            $this->hardlinks->publishHardlink($thumbnail->path, $sidecar->absolutePath, $root);
         } catch (\App\Broadcasts\BroadcastException) {
             // Poster is optional — skip when hardlink unavailable.
         }

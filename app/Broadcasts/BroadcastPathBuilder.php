@@ -10,33 +10,38 @@ use InvalidArgumentException;
 
 final readonly class BroadcastPathBuilder
 {
+    private const string OWNERSHIP_MARKER = '.stashd-broadcast';
+
     public function __construct(
         private StashdConfig $config,
     ) {
     }
 
-    public function broadcastRoot(string $broadcastId): string
+    public function broadcastRoot(BroadcastRecord $broadcast): string
     {
-        $safeId = PathSanitizer::sanitizeSegment($broadcastId);
-        $path = rtrim($this->config->broadcastsPath(), '/') . '/' . $safeId;
-        $this->assertWithinBroadcastsRoot($path);
+        $override = $this->validateDestinationOverride(
+            is_string($broadcast->settings['destination_path'] ?? null)
+                ? $broadcast->settings['destination_path']
+                : null,
+        );
 
-        return $path;
+        $parent = $override
+            ?? rtrim($this->config->broadcastsPath(), '/') . '/' . PathSanitizer::sanitizeSegment($broadcast->type);
+
+        $leaf = PathSanitizer::sanitizeBroadcastSegment($broadcast->name);
+
+        return rtrim($parent, '/') . '/' . $leaf;
     }
 
-    public function broadcastFile(string $broadcastId, string ...$segments): string
+    public function broadcastFile(BroadcastRecord $broadcast, string ...$segments): string
     {
-        $root = $this->broadcastRoot($broadcastId);
-        $parts = [$root];
+        $parts = [$this->broadcastRoot($broadcast)];
 
         foreach ($segments as $segment) {
             $parts[] = PathSanitizer::sanitizeBroadcastSegment($segment);
         }
 
-        $path = implode('/', $parts);
-        $this->assertWithinBroadcastsRoot($path);
-
-        return $path;
+        return implode('/', $parts);
     }
 
     public function relativeFile(string ...$segments): string
@@ -50,26 +55,137 @@ final readonly class BroadcastPathBuilder
         return implode('/', $parts);
     }
 
-    public function assertWithinBroadcastsRoot(string $path): void
+    /**
+     * Validates a user-supplied destination_path override. Returns the trimmed,
+     * validated path (unchanged, not canonicalized -- broadcastRoot() appends a
+     * broadcast-owned leaf below it regardless) or null when no override was given.
+     */
+    public function validateDestinationOverride(?string $path): ?string
     {
-        $root = rtrim(str_replace('\\', '/', $this->config->broadcastsPath()), '/');
-        $candidate = str_replace('\\', '/', $path);
-
-        if ($candidate === $root || str_starts_with($candidate, $root . '/')) {
-            return;
+        if ($path === null) {
+            return null;
         }
 
-        $resolvedRoot = realpath($root);
-        $resolvedParent = realpath(dirname($path));
+        $trimmed = trim($path);
 
-        if (
-            $resolvedRoot !== false
-            && $resolvedParent !== false
-            && str_starts_with($resolvedParent, $resolvedRoot)
-        ) {
-            return;
+        if ($trimmed === '') {
+            return null;
         }
 
-        throw new InvalidArgumentException('Broadcast path escapes storage root.');
+        if (! str_starts_with($trimmed, '/') || str_contains($trimmed, '..')) {
+            throw new InvalidArgumentException('destination_path must be an absolute path without ".." segments.');
+        }
+
+        $resolved = $this->canonicalize($trimmed);
+
+        foreach ($this->protectedRoots() as $protected) {
+            $resolvedProtected = $this->canonicalize($protected);
+
+            if (str_starts_with($resolved . '/', $resolvedProtected . '/')
+                || str_starts_with($resolvedProtected . '/', $resolved . '/')
+            ) {
+                throw new InvalidArgumentException('destination_path cannot overlap a Stashd-managed storage root.');
+            }
+        }
+
+        return $trimmed;
+    }
+
+    /**
+     * Claims the broadcast's root directory: creates and marks it on first use,
+     * or verifies an existing directory is already owned by this broadcast.
+     * Write-time only -- call exclusively from publish().
+     */
+    public function claimRoot(BroadcastRecord $broadcast): string
+    {
+        $root = $this->broadcastRoot($broadcast);
+
+        if (! is_dir($root)) {
+            if (! mkdir($root, 0775, true) && ! is_dir($root)) {
+                throw BroadcastException::withCode(
+                    'broadcast_publish_failed',
+                    'Could not create broadcast directory.',
+                );
+            }
+
+            file_put_contents(rtrim($root, '/') . '/' . self::OWNERSHIP_MARKER, (string) $broadcast->id);
+
+            return $root;
+        }
+
+        $this->assertMarkerMatches($root, $broadcast);
+
+        return $root;
+    }
+
+    /**
+     * Read-only ownership check -- never creates a directory. Call from prune()
+     * before deleting anything, and from verify() before trusting file state.
+     */
+    public function assertOwnsRoot(BroadcastRecord $broadcast): string
+    {
+        $root = $this->broadcastRoot($broadcast);
+
+        if (! is_dir($root)) {
+            return $root;
+        }
+
+        $this->assertMarkerMatches($root, $broadcast);
+
+        return $root;
+    }
+
+    private function assertMarkerMatches(string $root, BroadcastRecord $broadcast): void
+    {
+        $markerPath = rtrim($root, '/') . '/' . self::OWNERSHIP_MARKER;
+        $marker = is_file($markerPath) ? trim((string) file_get_contents($markerPath)) : null;
+
+        if ($marker !== (string) $broadcast->id) {
+            throw BroadcastException::withCode(
+                'broadcast_destination_conflict',
+                "Target directory is not managed by this broadcast: {$root}",
+            );
+        }
+    }
+
+    /** @return list<string> */
+    private function protectedRoots(): array
+    {
+        return [
+            $this->config->vaultPath(),
+            $this->config->dataPath,
+            $this->config->tempPath(),
+            $this->config->cachePath(),
+            $this->config->backupsPath(),
+            $this->config->broadcastsPath(),
+        ];
+    }
+
+    private function canonicalize(string $path): string
+    {
+        $normalized = rtrim(str_replace('\\', '/', $path), '/');
+        $resolved = realpath($normalized);
+
+        if ($resolved !== false) {
+            return str_replace('\\', '/', $resolved);
+        }
+
+        // Path doesn't exist yet -- walk up to the nearest existing ancestor so
+        // traversal via a not-yet-created descendant can't dodge the denylist.
+        $ancestor = dirname($normalized);
+
+        while ($ancestor !== '/' && $ancestor !== '.') {
+            $resolvedAncestor = realpath($ancestor);
+
+            if ($resolvedAncestor !== false) {
+                $suffix = substr($normalized, strlen($ancestor));
+
+                return str_replace('\\', '/', $resolvedAncestor) . $suffix;
+            }
+
+            $ancestor = dirname($ancestor);
+        }
+
+        return $normalized;
     }
 }

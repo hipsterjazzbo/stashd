@@ -7,6 +7,8 @@ namespace Tests\Feature;
 use App\Broadcasts\BroadcastFilenameBuilder;
 use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastLifecycleService;
+use App\Broadcasts\BroadcastPathBuilder;
+use App\Broadcasts\BroadcastRepository;
 use App\Broadcasts\HardlinkPublisher;
 use App\Config\StashdConfig;
 use App\Stashes\StashId;
@@ -330,7 +332,8 @@ test('broadcast.prune removes generated files only and never vault originals', f
     $publishedPath = $items->body['items'][0]['published_path'];
     expect(is_file($publishedPath))->toBeTrue();
 
-    $root = $config->broadcastsPath() . '/' . $broadcastId;
+    $broadcast = $this->container->get(BroadcastRepository::class)->find(BroadcastId::parse($broadcastId));
+    $root = $this->container->get(BroadcastPathBuilder::class)->broadcastRoot($broadcast);
     file_put_contents($root . '/stale-extra.txt', 'stale');
 
     $prune = $this->http->post('/api/v1/commands', [

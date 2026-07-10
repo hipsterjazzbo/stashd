@@ -744,6 +744,42 @@ paths:
         "400": { $ref: "#/components/responses/ValidationError" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/v1/broadcasts/{id}/destination:
+    patch:
+      operationId: updateBroadcastDestination
+      tags: [Broadcasts]
+      summary: >
+        Set or clear a broadcast's destination_path override. When set,
+        Stashd creates and exclusively owns one folder (named after the
+        broadcast) directly under this path; it refuses to touch a
+        pre-existing directory it did not create. Pass null (or omit the
+        field) to reset to the default {mediaPath}/broadcasts/{type}/{name}
+        location.
+      parameters:
+        - $ref: "#/components/parameters/BroadcastId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                destination_path:
+                  type: string
+                  nullable: true
+                  example: /mnt/nas/media/TV
+      responses:
+        "200":
+          description: Updated broadcast
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  broadcast: { $ref: "#/components/schemas/Broadcast" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/v1/items:
     get:
       operationId: listItems

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Broadcasts\BroadcastId;
+use App\Broadcasts\BroadcastPathBuilder;
+use App\Broadcasts\BroadcastRecord;
 use App\Config\StashdConfig;
 use App\Stashes\StashItemRecord;
 use App\Stashes\StashItemState;
@@ -492,7 +494,10 @@ function podcastEpisodeExpectedAccelPath(string $mediaItemId, string $filename):
 
 function podcastEpisodeFeedPath(StashdConfig $config, string $broadcastId): string
 {
-    return $config->broadcastsPath() . '/' . $broadcastId . '/feed.xml';
+    $broadcast = BroadcastRecord::select()->get(new PrimaryKey($broadcastId))
+        ?? throw new \RuntimeException('Broadcast not found: ' . $broadcastId);
+
+    return (new BroadcastPathBuilder($config))->broadcastFile($broadcast, 'feed.xml');
 }
 
 function podcastEpisodeEnclosureUrlFromFeed(string $feedXml): string

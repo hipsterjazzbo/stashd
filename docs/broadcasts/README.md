@@ -30,11 +30,8 @@ Not implemented:
 - Podcast broadcast/feed tokens and podcast item tokens are stored through `SecretsService`.
 - Authenticated API responses can show the full private feed URL for podcast broadcasts.
 - `broadcast.rotate_token` rotates the private feed token without rotating item tokens.
-- `broadcast.rebuild` for podcast formats writes a deterministic generated feed:
-
-```text
-/media/broadcasts/{broadcastId}/feed.xml
-```
+- `broadcast.rebuild` for podcast formats writes a deterministic generated feed at `feed.xml`
+  under the broadcast's resolved destination root — see "Destination path" below.
 
 Podcast feeds are tokenized HTTP distribution surfaces, not Plex/Jellyfin filesystem views. Podcast formats do **not** use `AbstractSeriesBroadcastType`.
 
@@ -129,35 +126,76 @@ Deferred (per the engineering spec's full funding-link section, not yet implemen
 
 Covered by `tests/Unit/Broadcasts/Podcasts/PodcastFundingLinkDetectorTest.php` and `tests/Feature/Phase5CPodcastFeedTest.php`.
 
-## Layout
+## Destination path
 
-### `filesystem_series`
+Every broadcast resolves to a filesystem root Stashd creates and owns exclusively:
 
 ```text
-/media/broadcasts/{broadcastId}/
-  Season 01/
-    001 - Episode-title.ext
-    002 - Another-title.ext
+root = destination_path (if set) | {mediaPath}/broadcasts/{type}     <- parent
+       + "/" + sanitized broadcast name                              <- owned leaf
 ```
 
-### `jellyfin_series` / `plex_series`
+- `type` is the broadcast's registered plugin key (`jellyfin`, `plex`, `podcast`).
+- The leaf folder name comes from the broadcast's `name` (space-preserving sanitization, the
+  same one already used for readable episode/season names), **not** the broadcast ID — media
+  servers expect a human-readable, stable-looking show folder, not a ULID.
+- `settings.destination_path`, set per broadcast (`PATCH /api/v1/broadcasts/{id}/destination`,
+  or at creation via `settings`), overrides the default parent with an **exact, literal**
+  directory — including a path outside the container's default media volume, as long as it's
+  bind-mounted into the container. Stashd creates exactly one named subfolder directly under it
+  and never touches anything else in that parent.
+- Root resolution is a **pure function, recomputed on every rebuild** — renaming a broadcast or
+  changing `destination_path` relocates its output on the next publish. The old folder is
+  orphaned (not auto-pruned; a broadcast only ever prunes its *current* root). Run
+  `stashd:relocate-broadcast-paths` (below) or clean up manually if that matters to you.
+
+### Ownership marker
+
+The first time a broadcast is published, Stashd creates its leaf folder and drops a
+`.stashd-broadcast` marker file inside containing the broadcast's ID. Every subsequent
+publish/verify/prune checks that marker before touching anything:
+
+- Marker missing or belonging to a different broadcast → the operation fails with
+  `broadcast_destination_conflict` and **nothing in that directory is touched** — no writes, no
+  deletes. This is what makes it safe to point `destination_path` at a directory you already
+  manage: Stashd will refuse to adopt pre-existing content, and will refuse to let two broadcasts
+  collide on the same folder name (broadcast `name` has no uniqueness enforcement, so two
+  same-type broadcasts with the same name — even in different stashes — will hit this on the
+  second one's publish; rename one to resolve it, the same way two shows can't share a folder in
+  a real media library either).
+- Marker present and matching → normal republish, exactly as before.
+
+### Layout
 
 ```text
-/media/broadcasts/{broadcastId}/
+{root}/                                    # jellyfin / plex
   tvshow.nfo
   poster.jpg                    # optional hardlink when available
   Season 01/
     S01E001 - Episode-title.ext
     S01E001 - Episode-title.nfo
     S01E002 - Another-title.ext
-```
 
-### `podcast`
-
-```text
-/media/broadcasts/{broadcastId}/
+{root}/                                    # podcast
   feed.xml
 ```
+
+### Relocating existing broadcasts
+
+Broadcast output moved from a flat, ID-keyed default (`{mediaPath}/broadcasts/{broadcastId}/`)
+to the type-aware, name-keyed scheme above. Run the one-time migration once after upgrading:
+
+```text
+stashd:relocate-broadcast-paths
+```
+
+It renames each broadcast's on-disk root in place (same filesystem, so it's an atomic move, not
+a re-copy) and rewrites any persisted hardlink asset paths to match. It's idempotent — safe to
+re-run. **Not run automatically at boot.** If you already have an external Jellyfin/Plex library
+scanning the old `/media/broadcasts/{broadcastId}/` path, update that library's path and re-run
+a scan afterward.
+
+### Podcast specifics
 
 - Podcast rebuilds do not hardlink/copy media files into the broadcast directory.
 - Enclosure URLs point at future tokenized media routes.
@@ -165,9 +203,11 @@ Covered by `tests/Unit/Broadcasts/Podcasts/PodcastFundingLinkDetectorTest.php` a
 - A podcast configured for audio (`settings.media_kind: audio`, the default) requires a ready audio Vault asset — see "Audio transcode fallback" below for what happens when only a video original exists.
 - A podcast configured for video (`settings.media_kind: video`) requires a ready video Vault asset with conservative podcast-friendly MIME/container support. No fallback exists for this direction; full video transcode/remux remains future work, a v1 non-goal.
 
-- Path identity uses broadcast ID + stash item ordering (season/episode/position fallbacks)
-- Filenames use readable titles with broadcast-safe sanitization (spaces preserved in folder/episode names)
-- Generated paths may change on rebuild; Vault paths never change
+### Series specifics
+
+- Episode/season identity uses stash item ordering (season/episode/position fallbacks), not the folder name.
+- Filenames use readable titles with broadcast-safe sanitization (spaces preserved in folder/episode names).
+- Generated paths may change on rebuild; Vault paths never change.
 
 ## Hardlink-first policy
 
@@ -177,7 +217,14 @@ Covered by `tests/Unit/Broadcasts/Podcasts/PodcastFundingLinkDetectorTest.php` a
 4. **No silent copy fallback**
 5. Symlink/copy require explicit future policy (not implemented)
 
-Cross-root hardlink support is probed at boot (`vault_broadcast_hardlink` in system health).
+Cross-root hardlink support is probed at boot (`vault_broadcast_hardlink` in system health) for
+the default broadcasts root, and probed live against the actual resolved root on every publish
+for a broadcast using `destination_path`. A `jellyfin`/`plex` broadcast relocated to a
+`destination_path` on a **different filesystem** than the Vault fails every rebuild with the
+existing `broadcast_hardlink_unavailable` — expected, not a new failure mode. No copy/symlink
+fallback exists for this case; `destination_path` for a hardlink-based broadcast type only works
+when it shares Vault's filesystem. `podcast` broadcasts are unaffected (they never hardlink
+media, only write `feed.xml`).
 
 ## Lifecycle
 
@@ -208,9 +255,10 @@ Not yet implemented: settings-change detection, artwork/subtitle drift beyond op
 
 ```text
 GET  /api/v1/stashes/{stashId}/broadcasts
-POST /api/v1/stashes/{stashId}/broadcasts   (type: filesystem_series | jellyfin_series | plex_series | podcast; podcast settings.media_kind: audio | video, defaults to audio)
+POST /api/v1/stashes/{stashId}/broadcasts   (type: jellyfin | plex | podcast; podcast settings.media_kind: audio | video, defaults to audio)
 GET  /api/v1/broadcasts/{broadcastId}
 GET  /api/v1/broadcasts/{broadcastId}/items
+PATCH /api/v1/broadcasts/{broadcastId}/destination  (destination_path: string | null)
 POST /api/v1/commands  (broadcast.plan|rebuild|verify|prune|trigger)
 ```
 

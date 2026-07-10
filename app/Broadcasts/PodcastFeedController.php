@@ -42,7 +42,7 @@ final readonly class PodcastFeedController
             return $this->notRevealed();
         }
 
-        $feedPath = $this->paths->broadcastFile((string) $broadcast->id, 'feed.xml');
+        $feedPath = $this->paths->broadcastFile($broadcast, 'feed.xml');
 
         if (! is_file($feedPath) || ! is_readable($feedPath)) {
             return $this->notRevealed();

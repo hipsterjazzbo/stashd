@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Broadcasts\BroadcastId;
+use App\Broadcasts\BroadcastPathBuilder;
+use App\Broadcasts\BroadcastRecord;
 use App\Broadcasts\BroadcastRepository;
 use App\Config\StashdConfig;
 use App\Stashes\StashItemRecord;
@@ -217,7 +219,10 @@ function podcastRouteCreateAudioAsset(StashdConfig $config, AssetRepository $ass
 
 function podcastRouteFeedPath(StashdConfig $config, string $broadcastId): string
 {
-    return $config->broadcastsPath() . '/' . $broadcastId . '/feed.xml';
+    $broadcast = BroadcastRecord::select()->get(new PrimaryKey($broadcastId))
+        ?? throw new \RuntimeException('Broadcast not found: ' . $broadcastId);
+
+    return (new BroadcastPathBuilder($config))->broadcastFile($broadcast, 'feed.xml');
 }
 
 function podcastRouteTokenFromUrl(string $feedUrl): string

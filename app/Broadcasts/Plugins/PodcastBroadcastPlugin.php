@@ -83,7 +83,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
 
         return new BroadcastPlan(
             broadcastId: $broadcastId,
-            broadcastRoot: $this->paths->broadcastRoot($broadcastId),
+            broadcastRoot: $this->paths->broadcastRoot($context->broadcast),
             files: [],
             sidecars: [
                 new BroadcastPlannedSidecar(
@@ -151,6 +151,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
             $included++;
         }
 
+        $this->paths->claimRoot($context->broadcast);
         $feedPath = $this->feedPath($context);
         $this->writeFeed($feedPath, $this->feedBuilder->build($this->metadata($context, $broadcastToken, $includedDescriptions), $episodes));
 
@@ -164,6 +165,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
 
     public function verify(BroadcastContext $context): BroadcastVerifyResult
     {
+        $this->paths->assertOwnsRoot($context->broadcast);
         $valid = [];
         $stale = [];
         $missing = [];
@@ -232,6 +234,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
 
     public function prune(BroadcastContext $context): BroadcastPruneResult
     {
+        $this->paths->assertOwnsRoot($context->broadcast);
         $feedPath = $this->feedPath($context);
 
         if (is_file($feedPath) && @unlink($feedPath)) {
@@ -381,7 +384,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
 
     private function feedPath(BroadcastContext $context): string
     {
-        return $this->paths->broadcastFile((string) $context->broadcast->id, 'feed.xml');
+        return $this->paths->broadcastFile($context->broadcast, 'feed.xml');
     }
 
     private function writeFeed(string $path, string $xml): void

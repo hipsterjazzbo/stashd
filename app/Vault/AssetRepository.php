@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Vault;
 
+use App\Broadcasts\BroadcastId;
 use App\Support\DurationSeconds;
 use App\Support\PrefixedUlidGenerator;
 use Tempest\Database\PrimaryKey;
@@ -82,6 +83,14 @@ final class AssetRepository
     {
         return AssetRecord::select()
             ->where('mediaItemId = ?', $mediaItemId->toString())
+            ->all();
+    }
+
+    /** @return list<AssetRecord> */
+    public function listByBroadcastAndRole(BroadcastId $broadcastId, AssetRole $role): array
+    {
+        return AssetRecord::select()
+            ->where('broadcastId = ? AND role = ?', $broadcastId->toString(), $role)
             ->all();
     }
 

@@ -42,6 +42,7 @@ final readonly class BroadcastController
         private PodcastEpisodeUrlBuilder $podcastUrls,
         private BroadcastLifecycleService $lifecycle,
         private MediaItemRepository $mediaItems,
+        private BroadcastPathBuilder $paths,
     ) {
     }
 
@@ -178,6 +179,16 @@ final readonly class BroadcastController
 
         $settings = is_array($body['settings'] ?? null) ? ApiJson::encode($body['settings']) : null;
 
+        $destinationPath = $settings['destination_path'] ?? null;
+
+        if (is_string($destinationPath)) {
+            try {
+                $this->paths->validateDestinationOverride($destinationPath);
+            } catch (\InvalidArgumentException $exception) {
+                return $this->validationError($exception->getMessage());
+            }
+        }
+
         $broadcast = $this->broadcasts->create(
             stashId: $typedStashId,
             type: $typeRaw,
@@ -267,6 +278,43 @@ final readonly class BroadcastController
             unset($settings['season_mapping']);
         } else {
             $settings['season_mapping'] = $mapping;
+        }
+
+        $broadcast->settings = $settings === [] ? null : $settings;
+        $this->broadcasts->save($broadcast);
+
+        return new Json([
+            'broadcast' => $this->mapBroadcast($broadcast),
+        ]);
+    }
+
+    #[Patch('/api/v1/broadcasts/{id}/destination')]
+    public function updateDestination(string $id, Request $request): Json
+    {
+        $broadcast = $this->findBroadcast($id);
+
+        if ($broadcast === null) {
+            return $this->notFound('Broadcast not found.');
+        }
+
+        // Read 'destination_path' from the raw body, not ApiJson::normalizeRequest()'s
+        // output -- it's a single already-snake_case field, and there's no need to
+        // risk the snake/camel transform on a filesystem path value.
+        $rawDestination = $request->body['destination_path'] ?? null;
+        $destinationPath = is_string($rawDestination) ? trim($rawDestination) : null;
+
+        try {
+            $validated = $this->paths->validateDestinationOverride($destinationPath);
+        } catch (\InvalidArgumentException $exception) {
+            return $this->validationError($exception->getMessage());
+        }
+
+        $settings = $this->decodeSettings($broadcast);
+
+        if ($validated === null) {
+            unset($settings['destination_path']);
+        } else {
+            $settings['destination_path'] = $validated;
         }
 
         $broadcast->settings = $settings === [] ? null : $settings;

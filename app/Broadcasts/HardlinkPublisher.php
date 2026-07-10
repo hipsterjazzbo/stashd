@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
+use App\Config\StashdConfig;
 use App\System\Storage\FilesystemProbe;
-use App\System\Storage\StorageCapabilityChecker;
 
 /** Hardlink-first publisher — never silently copies. */
 final readonly class HardlinkPublisher
 {
     public function __construct(
-        private StorageCapabilityChecker $storageChecker,
+        private StashdConfig $config,
         private FilesystemProbe $probe,
     ) {
     }
@@ -51,7 +51,7 @@ final readonly class HardlinkPublisher
         return true;
     }
 
-    public function assertHardlinksAvailable(): void
+    public function assertHardlinksAvailable(string $targetRoot): void
     {
         if (getenv('STASHD_BROADCAST_HARDLINK_FORCE_FAIL') === '1') {
             throw BroadcastException::withCode(
@@ -60,7 +60,7 @@ final readonly class HardlinkPublisher
             );
         }
 
-        $result = $this->storageChecker->checkVaultBroadcastHardlink();
+        $result = $this->probe->probeHardlinkCrossRoot($this->config->vaultPath(), $targetRoot);
 
         if (! $result->ok) {
             throw BroadcastException::withCode(
@@ -70,9 +70,9 @@ final readonly class HardlinkPublisher
         }
     }
 
-    public function publishHardlink(string $sourcePath, string $targetPath): void
+    public function publishHardlink(string $sourcePath, string $targetPath, string $targetRoot): void
     {
-        $this->assertHardlinksAvailable();
+        $this->assertHardlinksAvailable($targetRoot);
 
         if (! is_file($sourcePath)) {
             throw BroadcastException::withCode(
