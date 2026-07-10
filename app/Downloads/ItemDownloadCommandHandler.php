@@ -14,6 +14,7 @@ use App\Jobs\JobIntent;
 use App\Jobs\JobRepository;
 use App\Stashes\StashId;
 use App\Stashes\StashItemRepository;
+use App\Stashes\StashItemState;
 use App\Stashes\StashRepository;
 use App\Support\PrefixedUlid;
 use App\Vault\MediaItemId;
@@ -52,8 +53,23 @@ final readonly class ItemDownloadCommandHandler implements CommandHandler
             throw InvalidCommandPayload::withErrors(['Stash not found.']);
         }
 
-        if ($this->stashItems->findByStashAndMediaItem(StashId::parse($stashId), MediaItemId::parse($mediaItemId)) === null) {
+        $stashItem = $this->stashItems->findByStashAndMediaItem(StashId::parse($stashId), MediaItemId::parse($mediaItemId));
+
+        if ($stashItem === null) {
             throw InvalidCommandPayload::withErrors(['Media item is not part of the requested stash.']);
+        }
+
+        // The item was already excluded at commit time (title-regex filter,
+        // include_shorts/include_live content-type filter, etc. -- see
+        // CreateStashFromDiscovery::ignoredReason()) -- an ignored item is
+        // never downloadable through any path, dispatched explicitly or not,
+        // regardless of why it was ignored. Without this, item.download can
+        // be dispatched directly against an ignored item and creates a job
+        // that's doomed to fail (e.g. yt-dlp refusing an unaired premiere)
+        // instead of failing fast with the reason the app already knows.
+        if ($stashItem->state === StashItemState::Ignored) {
+            $reason = $stashItem->ignoredReason ?? 'unknown reason';
+            throw InvalidCommandPayload::withErrors(["This item is ignored ({$reason}) and cannot be downloaded."]);
         }
     }
 
