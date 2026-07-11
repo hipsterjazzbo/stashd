@@ -20,6 +20,8 @@ use App\Vault\MediaItemId;
 use App\Vault\MediaItemRepository;
 use App\Vault\MediaItemSourceRepository;
 use InvalidArgumentException;
+use RuntimeException;
+use Tempest\Database\Database;
 
 use function Tempest\Support\str;
 
@@ -44,6 +46,7 @@ final readonly class CreateStashFromDiscovery
         private CommandDispatchService $commandDispatch,
         private DownloadPolicyEvaluator $downloadPolicy,
         private DiscoverStashInput $discovery,
+        private Database $database,
     ) {
     }
 
@@ -79,41 +82,7 @@ final readonly class CreateStashFromDiscovery
 
         $syncMode = SyncMode::tryFrom((string) ($options['sync_mode'] ?? SyncMode::Automatic->value)) ?? SyncMode::Automatic;
 
-        $isFirstInput = $this->stashInputs->listForStash($stashId) === [];
-
-        $stashInput = $this->stashInputs->create(
-            stashId: $stashId,
-            providerKey: $resolved->providerKey,
-            inputType: $inputType,
-            sourceUri: $resolved->sourceUri->toString(),
-            providerInputId: $resolved->providerInputId,
-            title: $resolved->title,
-            syncMode: $syncMode,
-            options: $inputOptions,
-        );
-
-        if ($stash->iconUri === null && $resolved->sourceAvatarUri !== null) {
-            $this->stashes->update($stash, iconUri: $resolved->sourceAvatarUri->toString());
-        }
-
-        // Only the stash's first input defaults its name -- a stash created via
-        // the "+ New stash" modal with a link but no typed title gets 'New Stash'
-        // from StashController::create() (no channel info exists at that point,
-        // before any input is resolved); this backfills it once that's known,
-        // the same way iconUri already does above. Later inputs on an
-        // already-named (possibly multi-source) stash must never overwrite it.
-        // The slug gets the same treatment -- otherwise it's stuck as
-        // new-stash-N forever even once the name backfills, since slugs are
-        // never regenerated from a name change elsewhere.
-        if ($isFirstInput && $stash->name === 'New Stash' && $resolved->sourceTitle !== null) {
-            $this->stashes->update(
-                $stash,
-                name: $resolved->sourceTitle,
-                slug: $this->stashes->nextAvailableSlug($this->stashes->slugify($resolved->sourceTitle)),
-            );
-        }
-
-        $stashInputId = StashInputId::fromPrimaryKey($stashInput->id);
+        $stashInput = null;
         $mediaItemsCreated = 0;
         $mediaItemsReused = 0;
         $stashItemsCreated = 0;
@@ -122,79 +91,130 @@ final readonly class CreateStashFromDiscovery
         /** @var list<string> $downloadableMediaItemIds */
         $downloadableMediaItemIds = [];
 
-        foreach (array_values($discoveredItems) as $index => $item) {
-            if (! is_array($item)) {
-                continue;
+        $committed = $this->database->withinTransaction(function () use (
+            $stash,
+            $stashId,
+            $resolved,
+            $inputType,
+            $syncMode,
+            $inputOptions,
+            $discoveredItems,
+            $excludedContentTypes,
+            &$stashInput,
+            &$mediaItemsCreated,
+            &$mediaItemsReused,
+            &$stashItemsCreated,
+            &$stashItemsReused,
+            &$downloadableMediaItemIds,
+        ): void {
+            $isFirstInput = $this->stashInputs->listForStash($stashId) === [];
+            $stashInput = $this->stashInputs->findByStashAndProviderInput(
+                $stashId,
+                $resolved->providerKey,
+                $resolved->providerInputId,
+            ) ?? $this->stashInputs->create(
+                stashId: $stashId,
+                providerKey: $resolved->providerKey,
+                inputType: $inputType,
+                sourceUri: $resolved->sourceUri->toString(),
+                providerInputId: $resolved->providerInputId,
+                title: $resolved->title,
+                syncMode: $syncMode,
+                options: $inputOptions,
+            );
+
+            if ($stash->iconUri === null && $resolved->sourceAvatarUri !== null) {
+                $this->stashes->update($stash, iconUri: $resolved->sourceAvatarUri->toString());
             }
 
-            $providerItemId = str((string) ($item['provider_item_id'] ?? ''))->trim()->toString();
-            $canonicalUriRaw = str((string) ($item['canonical_uri'] ?? ''))->trim()->toString();
-            $title = str((string) ($item['title'] ?? 'Untitled'))->trim()->toString();
-            $description = is_string($item['description'] ?? null) && str($item['description'])->trim()->isNotEmpty()
-                ? str($item['description'])->trim()->toString()
-                : null;
-
-            if ($providerItemId === '' || $canonicalUriRaw === '') {
-                continue;
+            if ($isFirstInput && $stash->name === 'New Stash' && $resolved->sourceTitle !== null) {
+                $this->stashes->update(
+                    $stash,
+                    name: $resolved->sourceTitle,
+                    slug: $this->stashes->nextAvailableSlug($this->stashes->slugify($resolved->sourceTitle)),
+                );
             }
 
-            $canonicalUri = StashdUri::parse($canonicalUriRaw);
+            $stashInputId = StashInputId::fromPrimaryKey($stashInput->id);
 
-            $existingMedia = $this->mediaItems->findByProviderIdentity($resolved->providerKey, $providerItemId);
+            foreach (array_values($discoveredItems) as $index => $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
 
-            if ($existingMedia === null) {
-                $mediaItem = $this->mediaItems->create(
-                    providerKey: $resolved->providerKey,
-                    providerItemId: $providerItemId,
-                    canonicalUri: $canonicalUri,
-                    title: $title,
-                    description: $description,
-                    durationSeconds: isset($item['duration_seconds']) ? (int) $item['duration_seconds'] : null,
-                    publishedAt: ProviderDates::tryParse(is_string($item['published_at'] ?? null) ? $item['published_at'] : null),
-                    thumbnailUri: is_string($item['thumbnail_uri'] ?? null) && str($item['thumbnail_uri'])->trim()->isNotEmpty()
+                $providerItemId = str((string) ($item['provider_item_id'] ?? ''))->trim()->toString();
+                $canonicalUriRaw = str((string) ($item['canonical_uri'] ?? ''))->trim()->toString();
+                $title = str((string) ($item['title'] ?? 'Untitled'))->trim()->toString();
+                $description = is_string($item['description'] ?? null) && str($item['description'])->trim()->isNotEmpty()
+                    ? str($item['description'])->trim()->toString()
+                    : null;
+
+                if ($providerItemId === '' || $canonicalUriRaw === '') {
+                    continue;
+                }
+
+                $canonicalUri = StashdUri::parse($canonicalUriRaw);
+
+                $existingMedia = $this->mediaItems->findByProviderIdentity($resolved->providerKey, $providerItemId);
+
+                if ($existingMedia === null) {
+                    $mediaItem = $this->mediaItems->create(
+                        providerKey: $resolved->providerKey,
+                        providerItemId: $providerItemId,
+                        canonicalUri: $canonicalUri,
+                        title: $title,
+                        description: $description,
+                        durationSeconds: isset($item['duration_seconds']) ? (int) $item['duration_seconds'] : null,
+                        publishedAt: ProviderDates::tryParse(is_string($item['published_at'] ?? null) ? $item['published_at'] : null),
+                        thumbnailUri: is_string($item['thumbnail_uri'] ?? null) && str($item['thumbnail_uri'])->trim()->isNotEmpty()
                         ? StashdUri::parse(str($item['thumbnail_uri'])->trim()->toString())
                         : null,
-                    contentType: is_string($item['content_type'] ?? null) ? $item['content_type'] : null,
-                );
-                $mediaItemsCreated++;
-            } else {
-                $mediaItem = $existingMedia;
-                $mediaItemsReused++;
-            }
-
-            $mediaItemId = MediaItemId::fromPrimaryKey($mediaItem->id);
-
-            if ($this->mediaItemSources->findForMediaItemAndInput($mediaItemId, $stashInputId) === null) {
-                $this->mediaItemSources->create(
-                    mediaItemId: $mediaItemId,
-                    providerKey: $resolved->providerKey,
-                    providerInputId: $resolved->providerInputId,
-                    discoveredUri: $canonicalUri->toString(),
-                    stashInputId: $stashInputId,
-                    position: $index + 1,
-                );
-            }
-
-            if ($this->stashItems->findByStashAndMediaItem($stashId, $mediaItemId) === null) {
-                $contentType = is_string($item['content_type'] ?? null) ? $item['content_type'] : null;
-                $ignoredReason = $this->ignoredReason($title, $contentType, $inputOptions, $excludedContentTypes);
-
-                $stashItem = $this->stashItems->create(
-                    stashId: $stashId,
-                    mediaItemId: $mediaItemId,
-                    stashInputId: $stashInputId,
-                    position: $index + 1,
-                    ignoredReason: $ignoredReason,
-                    state: $ignoredReason !== null ? StashItemState::Ignored : StashItemState::Active,
-                );
-                $stashItemsCreated++;
-
-                if ($stashItem->state !== StashItemState::Ignored) {
-                    $downloadableMediaItemIds[] = $mediaItemId->toString();
+                        contentType: is_string($item['content_type'] ?? null) ? $item['content_type'] : null,
+                    );
+                    $mediaItemsCreated++;
+                } else {
+                    $mediaItem = $existingMedia;
+                    $mediaItemsReused++;
                 }
-            } else {
-                $stashItemsReused++;
+
+                $mediaItemId = MediaItemId::fromPrimaryKey($mediaItem->id);
+
+                if ($this->mediaItemSources->findForMediaItemAndInput($mediaItemId, $stashInputId) === null) {
+                    $this->mediaItemSources->create(
+                        mediaItemId: $mediaItemId,
+                        providerKey: $resolved->providerKey,
+                        providerInputId: $resolved->providerInputId,
+                        discoveredUri: $canonicalUri->toString(),
+                        stashInputId: $stashInputId,
+                        position: $index + 1,
+                    );
+                }
+
+                if ($this->stashItems->findByStashAndMediaItem($stashId, $mediaItemId) === null) {
+                    $contentType = is_string($item['content_type'] ?? null) ? $item['content_type'] : null;
+                    $ignoredReason = $this->ignoredReason($title, $contentType, $inputOptions, $excludedContentTypes);
+
+                    $stashItem = $this->stashItems->create(
+                        stashId: $stashId,
+                        mediaItemId: $mediaItemId,
+                        stashInputId: $stashInputId,
+                        position: $index + 1,
+                        ignoredReason: $ignoredReason,
+                        state: $ignoredReason !== null ? StashItemState::Ignored : StashItemState::Active,
+                    );
+                    $stashItemsCreated++;
+
+                    if ($stashItem->state !== StashItemState::Ignored) {
+                        $downloadableMediaItemIds[] = $mediaItemId->toString();
+                    }
+                } else {
+                    $stashItemsReused++;
+                }
             }
+        });
+
+        if (! $committed || $stashInput === null) {
+            throw new RuntimeException('Failed to commit stash input.');
         }
 
         if ($this->downloadPolicy->allowsAutomaticDownload($stash->downloadPolicy)) {

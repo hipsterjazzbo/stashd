@@ -10,9 +10,16 @@ use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
 use App\Vault\MediaItemRecord;
+use App\Vault\MediaItemSourceRecord;
 use App\Vault\MediaItemState;
+use Tempest\Database\Builder\QueryBuilders\BuildsQuery;
+use Tempest\Database\Config\DatabaseDialect;
+use Tempest\Database\Database;
 use Tempest\Database\PrimaryKey;
+use Tempest\Database\Query;
 use Tempest\Http\Status;
+use Tempest\Support\Str\ImmutableString;
+use UnitEnum;
 
 test('add input command commits discovered items into an existing stash', function (): void {
     $headers = $this->authHeaders();
@@ -51,6 +58,97 @@ test('add input command commits discovered items into an existing stash', functi
 
     expect(MediaItemRecord::count()->execute())->toBe(3)
         ->and(StashItemRecord::count()->execute())->toBe(3);
+});
+
+test('add-input persistence rolls back completely and retries cleanly after a transaction failure', function (): void {
+    $headers = $this->authHeaders();
+    $stash = $this->http->post('/api/v1/stashes', ['name' => 'Atomic Input'], headers: $headers)
+        ->assertStatus(Status::CREATED);
+    $preflight = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.preflight',
+        'options' => ['source_uri' => 'fake://channel/atomic-input'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $realDatabase = $this->container->get(Database::class);
+    $database = new class ($realDatabase) implements Database {
+        public bool $fail = true;
+
+        public function __construct(private Database $inner)
+        {
+        }
+
+        public DatabaseDialect $dialect { get => $this->inner->dialect; }
+
+        public null|string|UnitEnum $tag { get => $this->inner->tag; }
+
+        public function execute(BuildsQuery|Query $query): void
+        {
+            $this->inner->execute($query);
+        }
+
+        public function getLastInsertId(): ?PrimaryKey
+        {
+            return $this->inner->getLastInsertId();
+        }
+
+        public function fetch(BuildsQuery|Query $query): array
+        {
+            return $this->inner->fetch($query);
+        }
+
+        public function fetchFirst(BuildsQuery|Query $query): ?array
+        {
+            return $this->inner->fetchFirst($query);
+        }
+
+        public function withinTransaction(callable $callback): bool
+        {
+            return $this->inner->withinTransaction(function () use ($callback): void {
+                $callback();
+
+                if ($this->fail) {
+                    throw new \RuntimeException('forced rollback');
+                }
+            });
+        }
+
+        public function getRawSql(Query $query): ImmutableString
+        {
+            return $this->inner->getRawSql($query);
+        }
+    };
+    $this->container->singleton(Database::class, $database);
+
+    $service = $this->container->get(\App\Stashes\CreateStashFromDiscovery::class);
+    $stashRecord = $this->container->get(\App\Stashes\StashRepository::class)
+        ->find(\App\Stashes\StashId::parse($stash->body['stash']['id']));
+    $preflightCommand = $this->container->get(\App\Commands\CommandRepository::class)
+        ->find(\App\Commands\CommandId::parse($preflight->body['command_id']));
+
+    expect(fn () => $service->commitInput($stashRecord, $preflightCommand))
+        ->toThrow(\RuntimeException::class, 'Failed to commit stash input.');
+
+    expect(StashInputRecord::count()->execute())->toBe(0)
+        ->and(StashItemRecord::count()->execute())->toBe(0)
+        ->and(MediaItemRecord::count()->execute())->toBe(0)
+        ->and(MediaItemSourceRecord::count()->execute())->toBe(0);
+
+    $database->fail = false;
+    $result = $service->commitInput($stashRecord, $preflightCommand);
+
+    expect($result->mediaItemsCreated)->toBe(3)
+        ->and($result->stashItemsCreated)->toBe(3)
+        ->and(StashInputRecord::count()->execute())->toBe(1)
+        ->and(StashItemRecord::count()->execute())->toBe(3)
+        ->and(MediaItemSourceRecord::count()->execute())->toBe(3);
+
+    $downloadCommands = \App\Commands\CommandRecord::select()->where('type = ?', 'item.download')->all();
+
+    $service->commitInput($stashRecord, $preflightCommand);
+
+    expect(\App\Commands\CommandRecord::select()->where('type = ?', 'item.download')->all())
+        ->toHaveCount(count($downloadCommands));
 });
 
 test('add input reuses existing media items by provider identity', function (): void {

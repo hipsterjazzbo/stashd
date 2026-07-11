@@ -57,6 +57,20 @@ final class StashInputRepository
         return StashInputRecord::findById($id->toPrimaryKey());
     }
 
+    public function findByStashAndProviderInput(StashId $stashId, string $providerKey, string $providerInputId): ?StashInputRecord
+    {
+        $input = StashInputRecord::select()
+            ->where(
+                'stashId = ? AND providerKey = ? AND providerInputId = ?',
+                $stashId->toString(),
+                $providerKey,
+                $providerInputId,
+            )
+            ->first();
+
+        return $input instanceof StashInputRecord ? $input : null;
+    }
+
     public function save(StashInputRecord $record): StashInputRecord
     {
         $record->updatedAt = DateTime::now(Timezone::UTC);
