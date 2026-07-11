@@ -7,6 +7,8 @@ namespace App\Vault;
 use App\Broadcasts\BroadcastId;
 use App\Support\DurationSeconds;
 use App\Support\PrefixedUlidGenerator;
+use Tempest\Database\Builder\QueryBuilders\CountQueryBuilder;
+use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
 use function Tempest\Database\query;
@@ -120,12 +122,35 @@ final class AssetRepository
             ->all();
     }
 
-    /** @return list<AssetRecord> */
-    public function listReadyVaultAssets(): array
+    public function countReadyVaultAssets(): int
     {
-        return AssetRecord::select()
+        return CountQueryBuilder::fromQueryBuilder(
+            AssetRecord::select()
             ->where('state = ? AND path IS NOT NULL', AssetState::Ready)
-            ->all();
+        )->execute();
+    }
+
+    /** @return list<AssetRecord> */
+    public function listReadyVaultAssetsPage(?string $afterId, int $limit): array
+    {
+        $query = AssetRecord::select()
+            ->where('state = ? AND path IS NOT NULL', AssetState::Ready)
+            ->orderBy('id', Direction::ASC)
+            ->limit($limit);
+
+        if ($afterId !== null) {
+            $query->where('id > ?', $afterId);
+        }
+
+        $assets = [];
+
+        foreach ($query->all() as $asset) {
+            if ($asset instanceof AssetRecord) {
+                $assets[] = $asset;
+            }
+        }
+
+        return $assets;
     }
 
     /**

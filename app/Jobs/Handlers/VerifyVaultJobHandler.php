@@ -24,6 +24,8 @@ use Tempest\DateTime\Timezone;
 
 final readonly class VerifyVaultJobHandler implements JobHandler
 {
+    private const float PROGRESS_INTERVAL_SECONDS = 5.0;
+
     public function __construct(
         private VerifyVaultAssets $verify,
         private CommandRepository $commands,
@@ -55,7 +57,17 @@ final readonly class VerifyVaultJobHandler implements JobHandler
                 'outcome' => $outcome->value,
             ];
         } else {
-            $verifyResult = $this->verify->verifyAll();
+            $lastProgressAt = 0.0;
+            $verifyResult = $this->verify->verifyAll(function (int $checked, int $total) use ($context, $job, &$lastProgressAt): void {
+                $now = microtime(true);
+
+                if ($checked !== $total && $now - $lastProgressAt < self::PROGRESS_INTERVAL_SECONDS) {
+                    return;
+                }
+
+                $context->progress($job, JobProgressUpdate::ofSteps($checked, $total, 'Verifying Vault assets'));
+                $lastProgressAt = $now;
+            });
             $result = ['scope' => 'vault', ...$verifyResult->toArray()];
         }
 

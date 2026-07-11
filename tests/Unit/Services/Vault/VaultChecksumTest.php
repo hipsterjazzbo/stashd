@@ -26,3 +26,18 @@ test('vault checksum verify passes when stored checksum is absent', function ():
 
     unlink($path);
 });
+
+test('vault checksum invokes its callback while streaming large files', function (): void {
+    $path = sys_get_temp_dir() . '/stashd-checksum-' . bin2hex(random_bytes(4));
+    file_put_contents($path, str_repeat('x', 2 * 1024 * 1024 + 1));
+    $chunks = 0;
+
+    $computed = VaultChecksum::computeFile($path, function () use (&$chunks): void {
+        $chunks++;
+    });
+
+    expect($computed)->toBe('sha256:' . hash_file('sha256', $path))
+        ->and($chunks)->toBe(3);
+
+    unlink($path);
+});

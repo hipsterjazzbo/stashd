@@ -1555,12 +1555,6 @@ parameters:
 			path: app/Vault/AssetRepository.php
 
 		-
-			message: '#^Method App\\Vault\\AssetRepository\:\:listReadyVaultAssets\(\) should return list\<App\\Vault\\AssetRecord\> but returns array\<mixed\>\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Vault/AssetRepository.php
-
-		-
 			message: '#^Cannot cast mixed to string\.$#'
 			identifier: cast.string
 			count: 2

@@ -7,11 +7,14 @@ namespace Tests\Feature;
 use App\Config\StashdConfig;
 use App\Stashes\DownloadPolicy;
 use App\Stashes\StashRecord;
+use App\Vault\AssetKind;
+use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
 use App\Vault\AssetState;
 use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
 use App\Vault\MediaItemState;
+use App\Vault\VerifyVaultAssets;
 use Tempest\Http\Status;
 
 test('item.download moves fake media from temp into vault and marks assets ready', function (): void {
@@ -104,6 +107,52 @@ test('retry download does not corrupt existing vault assets', function (): void 
         );
     expect($assets?->state)->toBe(AssetState::Ready)
         ->and($assets?->checksum)->toBe('sha256:' . $firstChecksum);
+});
+
+test('ready vault assets are traversed in stable pages without duplicate boundaries', function (): void {
+    [, , $mediaItemId] = $this->bootstrapFakeDownloadStash('verify-pages');
+    $assets = $this->container->get(AssetRepository::class);
+
+    foreach (range(1, 3) as $number) {
+        $assets->create(
+            mediaItemId: MediaItemId::parse($mediaItemId),
+            role: AssetRole::VaultOriginal,
+            kind: AssetKind::Video,
+            state: AssetState::Ready,
+            path: '/vault/verify-pages-' . $number . '.bin',
+        );
+    }
+
+    $firstPage = $assets->listReadyVaultAssetsPage(null, 2);
+    $secondPage = $assets->listReadyVaultAssetsPage((string) $firstPage[1]->id, 2);
+    $ids = array_map(static fn ($asset): string => (string) $asset->id, [...$firstPage, ...$secondPage]);
+
+    expect($firstPage)->toHaveCount(2)
+        ->and($secondPage)->toHaveCount(1)
+        ->and($ids)->toHaveCount(3)
+        ->and(array_unique($ids))->toHaveCount(3);
+});
+
+test('vault verification reports progress throughout a multi-asset scan', function (): void {
+    [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('verify-progress');
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'item.download',
+        'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $progress = [];
+    $result = $this->container->get(VerifyVaultAssets::class)->verifyAll(
+        function (int $checked, int $total) use (&$progress): void {
+            $progress[] = [$checked, $total];
+        },
+    );
+
+    expect($result->checked)->toBeGreaterThan(0)
+        ->and($progress[0])->toBe([0, $result->checked])
+        ->and($progress[array_key_last($progress)])->toBe([$result->checked, $result->checked])
+        ->and(count($progress))->toBeGreaterThanOrEqual($result->checked + 1);
 });
 
 test('system.verify_vault marks missing files without touching storage-unavailable roots', function (): void {

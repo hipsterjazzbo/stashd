@@ -8,11 +8,14 @@ use App\System\State\StateTransitionService;
 use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRepository;
 use App\System\Storage\StorageLocationState;
+use Closure;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
 final readonly class VerifyVaultAssets
 {
+    private const int PAGE_SIZE = 100;
+
     public function __construct(
         private AssetRepository $assets,
         private MediaItemRepository $mediaItems,
@@ -21,7 +24,8 @@ final readonly class VerifyVaultAssets
     ) {
     }
 
-    public function verifyAll(): VaultVerifyResult
+    /** @param null|Closure(int, int): void $onProgress */
+    public function verifyAll(?Closure $onProgress = null): VaultVerifyResult
     {
         $vault = $this->storageLocations->findByKey(StorageLocationKey::Vault);
 
@@ -40,16 +44,36 @@ final readonly class VerifyVaultAssets
         $restored = 0;
         $checksumMismatch = 0;
 
-        foreach ($this->assets->listReadyVaultAssets() as $asset) {
-            $checked++;
-            $result = $this->verifyAssetRecord($asset);
+        $total = $this->assets->countReadyVaultAssets();
+        $onProgress?->__invoke(0, $total);
+        $afterId = null;
 
-            match ($result) {
-                VerifyAssetOutcome::Missing => $missing++,
-                VerifyAssetOutcome::Restored => $restored++,
-                VerifyAssetOutcome::ChecksumMismatch => $checksumMismatch++,
-                default => null,
-            };
+        while (true) {
+            $assets = $this->assets->listReadyVaultAssetsPage($afterId, self::PAGE_SIZE);
+
+            if ($assets === []) {
+                break;
+            }
+
+            foreach ($assets as $asset) {
+                $result = $this->verifyAssetRecord(
+                    $asset,
+                    $onProgress === null ? null : function () use ($onProgress, $checked, $total): void {
+                        $onProgress($checked, $total);
+                    },
+                );
+                $checked++;
+                $onProgress?->__invoke($checked, $total);
+
+                match ($result) {
+                    VerifyAssetOutcome::Missing => $missing++,
+                    VerifyAssetOutcome::Restored => $restored++,
+                    VerifyAssetOutcome::ChecksumMismatch => $checksumMismatch++,
+                    default => null,
+                };
+            }
+
+            $afterId = (string) $assets[array_key_last($assets)]->id;
         }
 
         return new VaultVerifyResult(
@@ -78,7 +102,7 @@ final readonly class VerifyVaultAssets
         return $this->verifyAssetRecord($asset);
     }
 
-    private function verifyAssetRecord(AssetRecord $asset): VerifyAssetOutcome
+    private function verifyAssetRecord(AssetRecord $asset, ?Closure $onChecksumChunk = null): VerifyAssetOutcome
     {
         if ($asset->path === null) {
             return VerifyAssetOutcome::Skipped;
@@ -88,7 +112,7 @@ final readonly class VerifyVaultAssets
             return $this->markMissing($asset);
         }
 
-        if ($asset->checksum !== null && ! VaultChecksum::verifyFile($asset->path, $asset->checksum)) {
+        if ($asset->checksum !== null && ! VaultChecksum::verifyFile($asset->path, $asset->checksum, $onChecksumChunk)) {
             return $this->markChecksumMismatch($asset);
         }
 

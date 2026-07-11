@@ -4,20 +4,45 @@ declare(strict_types=1);
 
 namespace App\Vault;
 
+use Closure;
+
 /** SHA-256 checksum helper for Vault assets. Stored format: `sha256:{hex}`. */
 final class VaultChecksum
 {
+    private const int CHUNK_BYTES = 1048576;
+
     public const string ALGORITHM = 'sha256';
 
-    public static function computeFile(string $path): ?string
+    public static function computeFile(string $path, ?Closure $onChunk = null): ?string
     {
-        $hash = hash_file(self::ALGORITHM, $path);
+        $handle = @fopen($path, 'rb');
 
-        if ($hash === false) {
+        if ($handle === false) {
             return null;
         }
 
-        return self::format($hash);
+        $hash = hash_init(self::ALGORITHM);
+
+        try {
+            while (! feof($handle)) {
+                $chunk = fread($handle, self::CHUNK_BYTES);
+
+                if ($chunk === false) {
+                    return null;
+                }
+
+                if ($chunk === '') {
+                    continue;
+                }
+
+                hash_update($hash, $chunk);
+                $onChunk?->__invoke();
+            }
+        } finally {
+            fclose($handle);
+        }
+
+        return self::format(hash_final($hash));
     }
 
     public static function format(string $hexDigest): string
@@ -25,13 +50,13 @@ final class VaultChecksum
         return self::ALGORITHM . ':' . strtolower($hexDigest);
     }
 
-    public static function verifyFile(string $path, ?string $storedChecksum): bool
+    public static function verifyFile(string $path, ?string $storedChecksum, ?Closure $onChunk = null): bool
     {
         if ($storedChecksum === null || $storedChecksum === '') {
             return true;
         }
 
-        $computed = self::computeFile($path);
+        $computed = self::computeFile($path, $onChunk);
 
         if ($computed === null) {
             return false;
