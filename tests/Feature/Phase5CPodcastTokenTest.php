@@ -8,6 +8,7 @@ use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastItemRecord;
 use App\Broadcasts\BroadcastItemRepository;
 use App\Broadcasts\BroadcastRepository;
+use App\Broadcasts\Podcasts\PodcastTokenDigest;
 use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Stashes\StashItemId;
 use App\Stashes\StashItemRecord;
@@ -28,6 +29,15 @@ test('podcast token migration adds broadcast item token columns', function (): v
 
     expect($columns)->toContain('tokenSecretId')
         ->and($columns)->toContain('tokenPreview');
+});
+
+test('podcast token migration adds an indexed blind digest column', function (): void {
+    $database = $this->container->get(Database::class);
+    $columns = array_column($database->fetch(new Query('PRAGMA table_info(secrets)')) ?? [], 'name');
+    $indexes = array_column($database->fetch(new Query('PRAGMA index_list(secrets)')) ?? [], 'name');
+
+    expect($columns)->toContain('tokenDigest')
+        ->and($indexes)->toContain('secrets_token_digest');
 });
 
 test('broadcast item record maps podcast token columns', function (): void {
@@ -138,6 +148,81 @@ test('podcast item token is generated and stored encrypted', function (): void {
         ->and($reloaded?->tokenPreview)->not->toContain($token)
         ->and($secret?->encryptedValue)->not->toContain($token)
         ->and($this->container->get(SecretsService::class)->get($secret->key))->toBe($token);
+});
+
+test('podcast token lookup decrypts and records use for only the indexed candidate', function (): void {
+    [$headers, $stashId] = array_slice($this->bootstrapFakeDownloadStash('podcast-indexed-lookup'), 0, 2);
+
+    $first = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'podcast',
+        'name' => 'First Indexed Podcast',
+        'slug' => 'first-indexed-' . bin2hex(random_bytes(3)),
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $second = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'podcast',
+        'name' => 'Second Indexed Podcast',
+        'slug' => 'second-indexed-' . bin2hex(random_bytes(3)),
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    $broadcasts = $this->container->get(BroadcastRepository::class);
+    $secrets = $this->container->get(SecretRepository::class);
+    $firstRecord = $broadcasts->find(BroadcastId::parse($first->body['broadcast']['id']))
+        ?? throw new \RuntimeException('First podcast broadcast was not persisted.');
+    $secondRecord = $broadcasts->find(BroadcastId::parse($second->body['broadcast']['id']))
+        ?? throw new \RuntimeException('Second podcast broadcast was not persisted.');
+    $firstSecretRecord = SecretRecord::findById(new PrimaryKey($firstRecord->tokenSecretId))
+        ?? throw new \RuntimeException('First podcast token secret was not persisted.');
+    $secondSecretRecord = SecretRecord::findById(new PrimaryKey($secondRecord->tokenSecretId))
+        ?? throw new \RuntimeException('Second podcast token secret was not persisted.');
+    $firstSecret = $secrets->findByKey($firstSecretRecord->key)
+        ?? throw new \RuntimeException('First podcast token secret could not be loaded.');
+    $secondSecret = $secrets->findByKey($secondSecretRecord->key)
+        ?? throw new \RuntimeException('Second podcast token secret could not be loaded.');
+    $firstSecret->lastUsedAt = null;
+    $secondSecret->lastUsedAt = null;
+    $secrets->save($firstSecret);
+    $secrets->save($secondSecret);
+
+    $token = podcastTokenFromFeedUrl($first->body['broadcast']['feed_url']);
+    $resolved = $this->container->get(PodcastTokenService::class)->findPodcastBroadcastByFeedToken($token);
+    $firstReloaded = $secrets->findByKey($firstSecret->key);
+    $secondReloaded = $secrets->findByKey($secondSecret->key);
+
+    expect((string) $resolved?->id)->toBe($first->body['broadcast']['id'])
+        ->and($firstReloaded?->tokenDigest)->toBe($this->container->get(PodcastTokenDigest::class)->for($token))
+        ->and($firstReloaded?->lastUsedAt)->not->toBeNull()
+        ->and($secondReloaded?->lastUsedAt)->toBeNull();
+});
+
+test('podcast token digest backfill is idempotent', function (): void {
+    [$headers, $stashId] = array_slice($this->bootstrapFakeDownloadStash('podcast-digest-backfill'), 0, 2);
+    $created = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'podcast',
+        'name' => 'Backfilled Podcast',
+        'slug' => 'backfilled-' . bin2hex(random_bytes(3)),
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $broadcast = $this->container->get(BroadcastRepository::class)
+        ->find(BroadcastId::parse($created->body['broadcast']['id']))
+        ?? throw new \RuntimeException('Podcast broadcast was not persisted.');
+    $secret = SecretRecord::findById(new PrimaryKey($broadcast->tokenSecretId))
+        ?? throw new \RuntimeException('Podcast token secret was not persisted.');
+    $secrets = $this->container->get(SecretRepository::class);
+    $record = $secrets->findByKey($secret->key)
+        ?? throw new \RuntimeException('Podcast token secret could not be loaded.');
+    $record->tokenDigest = null;
+    $secrets->save($record);
+
+    $tokens = $this->container->get(PodcastTokenService::class);
+    $tokens->backfillMissingTokenDigests();
+    $backfilled = $secrets->findByKey($record->key)
+        ?? throw new \RuntimeException('Backfilled podcast token secret could not be loaded.');
+    $updatedAt = (string) $backfilled->updatedAt;
+    $tokens->backfillMissingTokenDigests();
+    $again = $secrets->findByKey($record->key)
+        ?? throw new \RuntimeException('Backfilled podcast token secret could not be reloaded.');
+
+    expect($backfilled->tokenDigest)->not->toBeNull()
+        ->and((string) $again->updatedAt)->toBe($updatedAt);
 });
 
 test('broadcast rotate token changes feed url and stores only safe command metadata', function (): void {

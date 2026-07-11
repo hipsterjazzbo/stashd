@@ -84,6 +84,16 @@ final class BroadcastRepository
             ->first();
     }
 
+    public function findPodcastByTokenSecretId(string $secretId): ?BroadcastRecord
+    {
+        $broadcast = BroadcastRecord::select()
+            ->include('tokenSecretId')
+            ->where('type = ? AND tokenSecretId = ?', 'podcast', $secretId)
+            ->first();
+
+        return $broadcast instanceof BroadcastRecord ? $broadcast : null;
+    }
+
     /**
      * Returns `$base` if it is free within this stash, otherwise the lowest
      * unused `$base-N` (N starts at 2) -- mirrors StashRepository's slug
@@ -120,18 +130,4 @@ final class BroadcastRepository
         return "{$base}-{$ordinal}";
     }
 
-    /**
-     * Podcast broadcasts that carry a feed token, used to resolve a raw feed
-     * token back to its broadcast for the public feed route.
-     *
-     * @return list<BroadcastRecord>
-     */
-    public function listPodcastBroadcastsWithFeedToken(): array
-    {
-        return BroadcastRecord::select()
-            ->include('tokenSecretId')
-            ->where('tokenSecretId IS NOT NULL AND type = ?', 'podcast')
-            ->orderBy('createdAt', \Tempest\Database\Direction::ASC)
-            ->all();
-    }
 }

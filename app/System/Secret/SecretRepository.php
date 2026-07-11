@@ -23,7 +23,7 @@ final class SecretRepository
     {
         return SecretRecord::select()
             ->where('key = ? AND revokedAt IS NULL', $key)
-            ->include('encryptedValue', 'nonce', 'metadata')
+            ->include('encryptedValue', 'nonce', 'tokenDigest', 'metadata')
             ->first();
     }
 
@@ -32,12 +32,39 @@ final class SecretRepository
         return SecretRecord::findById($id->toPrimaryKey());
     }
 
+    public function findActiveBroadcastTokenByDigest(string $digest): ?SecretRecord
+    {
+        $secret = SecretRecord::select()
+            ->where('type = ? AND tokenDigest = ? AND revokedAt IS NULL', SecretType::BroadcastToken->value, $digest)
+            ->first();
+
+        return $secret instanceof SecretRecord ? $secret : null;
+    }
+
+    /** @return list<SecretRecord> */
+    public function listActiveBroadcastTokensWithoutDigest(): array
+    {
+        $records = SecretRecord::select()
+            ->where('type = ? AND tokenDigest IS NULL AND revokedAt IS NULL', SecretType::BroadcastToken->value)
+            ->all();
+        $secrets = [];
+
+        foreach ($records as $record) {
+            if ($record instanceof SecretRecord) {
+                $secrets[] = $record;
+            }
+        }
+
+        return $secrets;
+    }
+
     /** @param array<string, mixed>|null $metadata */
     public function create(
         string $key,
         SecretType $type,
         string $encryptedValue,
         string $nonce,
+        ?string $tokenDigest = null,
         ?array $metadata = null,
     ): SecretRecord {
         $id = $this->ids->generate('secret')->toString();
@@ -46,6 +73,7 @@ final class SecretRepository
             type: $type,
             encryptedValue: $encryptedValue,
             nonce: $nonce,
+            tokenDigest: $tokenDigest,
             metadata: $metadata,
         );
         $record->id = new PrimaryKey($id);

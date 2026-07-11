@@ -26,6 +26,8 @@ final class SecretRecord
         #[Hidden]
         public string $nonce,
         #[Hidden]
+        public ?string $tokenDigest = null,
+        #[Hidden]
         public ?array $metadata = null,
         public ?DateTime $lastUsedAt = null,
         public ?DateTime $revokedAt = null,

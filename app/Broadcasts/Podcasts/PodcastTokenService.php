@@ -20,6 +20,7 @@ final readonly class PodcastTokenService
     public function __construct(
         private SecretsService $secrets,
         private SecretRepository $secretRecords,
+        private PodcastTokenDigest $digests,
         private BroadcastRepository $broadcasts,
         private BroadcastItemRepository $broadcastItems,
     ) {
@@ -44,9 +45,9 @@ final readonly class PodcastTokenService
     /**
      * Resolve a raw feed token back to its podcast broadcast.
      *
-     * Feed tokens are encrypted at rest, so there is no reverse index: candidate
-     * tokens are decrypted and compared with `hash_equals`. Revoked (rotated-old)
-     * tokens never match because {@see broadcastToken()} returns null for them.
+     * The blind digest finds one encrypted candidate; the decrypted token is
+     * still confirmed with `hash_equals`. Revoked tokens are excluded by the
+     * repository query.
      */
     public function findPodcastBroadcastByFeedToken(#[\SensitiveParameter] string $token): ?BroadcastRecord
     {
@@ -54,15 +55,13 @@ final readonly class PodcastTokenService
             return null;
         }
 
-        foreach ($this->broadcasts->listPodcastBroadcastsWithFeedToken() as $broadcast) {
-            $candidate = $this->broadcastToken($broadcast);
+        $secret = $this->secretRecords->findActiveBroadcastTokenByDigest($this->digests->for($token));
 
-            if ($candidate !== null && hash_equals($candidate, $token)) {
-                return $broadcast;
-            }
+        if ($secret === null || ! $this->matches($secret, $token)) {
+            return null;
         }
 
-        return null;
+        return $this->broadcasts->findPodcastByTokenSecretId((string) $secret->id);
     }
 
     public function broadcastToken(BroadcastRecord $broadcast): ?string
@@ -96,10 +95,8 @@ final readonly class PodcastTokenService
      * Resolve a raw episode token back to one of the matched broadcast's
      * items.
      *
-     * Item tokens are encrypted at rest, so candidate tokens for the already
-     * resolved broadcast are decrypted and compared with `hash_equals`. The
-     * lookup never crosses broadcasts: a token valid for another broadcast's
-     * item will not match here even if it decrypts successfully.
+     * The blind digest finds one encrypted candidate, scoped to the already
+     * resolved broadcast after `hash_equals` confirms the decrypted token.
      */
     public function findBroadcastItemByEpisodeToken(
         BroadcastRecord $broadcast,
@@ -109,15 +106,41 @@ final readonly class PodcastTokenService
             return null;
         }
 
-        foreach ($this->broadcastItems->listForBroadcast(BroadcastId::fromPrimaryKey($broadcast->id)) as $item) {
-            $candidate = $this->itemToken($item);
+        $secret = $this->secretRecords->findActiveBroadcastTokenByDigest($this->digests->for($itemToken));
 
-            if ($candidate !== null && hash_equals($candidate, $itemToken)) {
-                return $item;
-            }
+        if ($secret === null || ! $this->matches($secret, $itemToken)) {
+            return null;
         }
 
-        return null;
+        return $this->broadcastItems->findByBroadcastAndTokenSecretId(
+            BroadcastId::fromPrimaryKey($broadcast->id),
+            (string) $secret->id,
+        );
+    }
+
+    /** Backfills pre-index podcast tokens after the forward schema migration. */
+    public function backfillMissingTokenDigests(): void
+    {
+        foreach ($this->secretRecords->listActiveBroadcastTokensWithoutDigest() as $secret) {
+            try {
+                $token = $this->secrets->get($secret->key);
+            } catch (\RuntimeException) {
+                continue;
+            }
+
+            if ($token === null) {
+                continue;
+            }
+
+            $record = $this->secretRecords->findByKey($secret->key);
+
+            if ($record === null || $record->tokenDigest !== null) {
+                continue;
+            }
+
+            $record->tokenDigest = $this->digests->for($token);
+            $this->secretRecords->save($record);
+        }
     }
 
     public function ensureItemToken(BroadcastItemRecord $item): string
@@ -157,6 +180,8 @@ final readonly class PodcastTokenService
         ]);
 
         $secret = $this->requireSecretByKey($key);
+        $secret->tokenDigest = $this->digests->for($token);
+        $this->secretRecords->save($secret);
         $broadcast->tokenSecretId = (string) $secret->id;
         $broadcast->tokenPreview = self::preview($token);
         $this->broadcasts->save($broadcast);
@@ -174,6 +199,8 @@ final readonly class PodcastTokenService
         ]);
 
         $secret = $this->requireSecretByKey($key);
+        $secret->tokenDigest = $this->digests->for($token);
+        $this->secretRecords->save($secret);
         $item->tokenSecretId = (string) $secret->id;
         $item->tokenPreview = self::preview($token);
         $this->broadcastItems->save($item);
@@ -199,5 +226,16 @@ final readonly class PodcastTokenService
     {
         return $this->secretRecords->findByKey($key)
             ?? throw new \RuntimeException('Podcast token secret could not be persisted.');
+    }
+
+    private function matches(SecretRecord $secret, #[\SensitiveParameter] string $token): bool
+    {
+        try {
+            $candidate = $this->secrets->get($secret->key);
+        } catch (\RuntimeException) {
+            return false;
+        }
+
+        return $candidate !== null && hash_equals($candidate, $token);
     }
 }

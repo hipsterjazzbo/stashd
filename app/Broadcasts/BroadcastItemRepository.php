@@ -83,6 +83,16 @@ final class BroadcastItemRepository
             ->first();
     }
 
+    public function findByBroadcastAndTokenSecretId(BroadcastId $broadcastId, string $secretId): ?BroadcastItemRecord
+    {
+        $item = BroadcastItemRecord::select()
+            ->include('tokenSecretId')
+            ->where('broadcastId = ? AND tokenSecretId = ?', $broadcastId->toString(), $secretId)
+            ->first();
+
+        return $item instanceof BroadcastItemRecord ? $item : null;
+    }
+
     /** @return list<BroadcastItemRecord> */
     public function listForMediaItem(MediaItemId $mediaItemId): array
     {

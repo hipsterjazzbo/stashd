@@ -223,12 +223,6 @@ parameters:
 			path: app/Broadcasts/BroadcastRepository.php
 
 		-
-			message: '#^Method App\\Broadcasts\\BroadcastRepository\:\:listPodcastBroadcastsWithFeedToken\(\) should return list\<App\\Broadcasts\\BroadcastRecord\> but returns array\<mixed\>\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Broadcasts/BroadcastRepository.php
-
-		-
 			message: '#^Parameter \#1 \$callback of function array_map expects \(callable\(mixed\)\: mixed\)\|null, Closure\(App\\Broadcasts\\BroadcastRecord\)\: string given\.$#'
 			identifier: argument.type
 			count: 1
