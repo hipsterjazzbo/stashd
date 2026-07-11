@@ -648,7 +648,7 @@ if [ "$podcast_rebuild_state" != "completed" ]; then
     exit 1
 fi
 
-podcast_feed_container_path="/media/broadcasts/${podcast_broadcast_id}/feed.xml"
+podcast_feed_container_path="/media/broadcasts/podcast/Smoke Podcast/feed.xml"
 podcast_feed_host_path="$(media_host_path "$podcast_feed_container_path")"
 
 if [ ! -f "$podcast_feed_host_path" ]; then

@@ -13,7 +13,45 @@ permissions:
   packages: write
 
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.5"
+          extensions: sqlite3, mbstring
+          tools: composer
+          coverage: none
+          cache: composer
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Check code style
+        run: composer lint
+
+      - name: Run static analysis
+        run: composer test:static
+
+      - name: Run application tests
+        run: composer test
+
+  smoke:
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run container smoke test
+        run: composer test:docker-smoke
+
   build:
+    needs: [quality, smoke]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
