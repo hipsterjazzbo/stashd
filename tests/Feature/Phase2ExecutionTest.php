@@ -6,15 +6,33 @@ namespace Tests\Feature;
 
 use App\Auth\AuthContext;
 use App\Auth\AuthService;
+use App\Commands\CommandDispatchService;
+use App\Commands\CommandHandler;
+use App\Commands\CommandHandlerRegistry;
+use App\Commands\CommandRecord;
+use App\Commands\CommandRepository;
 use App\Commands\CommandType;
 use App\Jobs\JobIntent;
 use App\Jobs\JobRecord;
 use App\Jobs\JobState;
 use App\Jobs\JobWorkerService;
 use App\System\Activity\ActivityEventRecord;
+use App\System\Activity\ActivityEventService;
+use App\System\Event\EventPublisher;
+use RuntimeException;
+use Symfony\Component\Mercure\HubInterface;
+use Symfony\Component\Mercure\Jwt\TokenFactoryInterface;
+use Symfony\Component\Mercure\Update;
+use Tempest\Database\Builder\QueryBuilders\BuildsQuery;
+use Tempest\Database\Config\DatabaseDialect;
+use Tempest\Database\Database;
+use Tempest\Database\PrimaryKey;
+use Tempest\Database\Query;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 use Tempest\Http\Status;
+use Tempest\Support\Str\ImmutableString;
+use UnitEnum;
 
 test('commands api dispatches stash preflight command', function (): void {
     $headers = $this->authHeaders();
@@ -60,6 +78,129 @@ test('commands api rejects unsupported type', function (): void {
     ], headers: $headers);
 
     $response->assertStatus(Status::BAD_REQUEST);
+});
+
+test('command dispatch rolls back command and activity when its handler fails', function (): void {
+    $commandsBefore = count(CommandRecord::select()->all());
+    $jobsBefore = count(JobRecord::select()->all());
+    $activitiesBefore = count(ActivityEventRecord::select()->all());
+    $handler = new class () implements CommandHandler {
+        public function type(): CommandType
+        {
+            return CommandType::SystemStorageCheck;
+        }
+
+        public function validate(array $options): void
+        {
+        }
+
+        public function createJobs(CommandRecord $command, array $options): array
+        {
+            throw new RuntimeException('forced handler failure');
+        }
+
+        public function extras(CommandRecord $command, array $options): array
+        {
+            return [];
+        }
+    };
+    $dispatch = new CommandDispatchService(
+        commands: $this->container->get(CommandRepository::class),
+        handlers: new CommandHandlerRegistry([$handler]),
+        activity: $this->container->get(ActivityEventService::class),
+        publisher: $this->container->get(EventPublisher::class),
+        database: $this->container->get(Database::class),
+    );
+
+    expect(fn () => $dispatch->dispatch(CommandType::SystemStorageCheck, []))
+        ->toThrow(RuntimeException::class, 'Command dispatch failed.');
+
+    expect(CommandRecord::select()->all())->toHaveCount($commandsBefore)
+        ->and(JobRecord::select()->all())->toHaveCount($jobsBefore)
+        ->and(ActivityEventRecord::select()->all())->toHaveCount($activitiesBefore);
+});
+
+test('command dispatch publishes nothing when commit fails after creating its durable rows', function (): void {
+    $hub = new class () implements HubInterface {
+        /** @var list<Update> */
+        public array $published = [];
+
+        public function getPublicUrl(): string
+        {
+            return 'http://127.0.0.1:8474/.well-known/mercure';
+        }
+
+        public function getFactory(): ?TokenFactoryInterface
+        {
+            return null;
+        }
+
+        public function publish(Update $update): string
+        {
+            $this->published[] = $update;
+
+            return 'fake-id';
+        }
+    };
+    $this->container->singleton(HubInterface::class, $hub);
+
+    $commandsBefore = count(CommandRecord::select()->all());
+    $jobsBefore = count(JobRecord::select()->all());
+    $activitiesBefore = count(ActivityEventRecord::select()->all());
+    $realDatabase = $this->container->get(Database::class);
+    $database = new class ($realDatabase) implements Database {
+        public function __construct(private Database $inner)
+        {
+        }
+
+        public DatabaseDialect $dialect { get => $this->inner->dialect; }
+
+        public null|string|UnitEnum $tag { get => $this->inner->tag; }
+
+        public function execute(BuildsQuery|Query $query): void
+        {
+            $this->inner->execute($query);
+        }
+
+        public function getLastInsertId(): ?PrimaryKey
+        {
+            return $this->inner->getLastInsertId();
+        }
+
+        public function fetch(BuildsQuery|Query $query): array
+        {
+            return $this->inner->fetch($query);
+        }
+
+        public function fetchFirst(BuildsQuery|Query $query): ?array
+        {
+            return $this->inner->fetchFirst($query);
+        }
+
+        public function withinTransaction(callable $callback): bool
+        {
+            return $this->inner->withinTransaction(function () use ($callback): void {
+                $callback();
+
+                throw new RuntimeException('forced commit failure');
+            });
+        }
+
+        public function getRawSql(Query $query): ImmutableString
+        {
+            return $this->inner->getRawSql($query);
+        }
+    };
+    $this->container->singleton(Database::class, $database);
+    $dispatch = $this->container->get(CommandDispatchService::class);
+
+    expect(fn () => $dispatch->dispatch(CommandType::SystemStorageCheck, []))
+        ->toThrow(RuntimeException::class, 'Command dispatch failed.');
+
+    expect(CommandRecord::select()->all())->toHaveCount($commandsBefore)
+        ->and(JobRecord::select()->all())->toHaveCount($jobsBefore)
+        ->and(ActivityEventRecord::select()->all())->toHaveCount($activitiesBefore)
+        ->and($hub->published)->toBeEmpty();
 });
 
 test('system storage check command creates and completes storage job', function (): void {

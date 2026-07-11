@@ -21,7 +21,7 @@ final readonly class ActivityEventService
     ) {
     }
 
-    public function commandAccepted(CommandRecord $command): ActivityEventRecord
+    public function commandAccepted(CommandRecord $command, bool $publish = true): ActivityEventRecord
     {
         return $this->emit(
             level: ActivityLevel::Info,
@@ -31,6 +31,7 @@ final readonly class ActivityEventService
             entityId: (string) $command->id,
             commandId: (string) $command->id,
             groupKey: 'command:' . (string) $command->id,
+            publish: $publish,
         );
     }
 
@@ -499,6 +500,7 @@ final readonly class ActivityEventService
         ?string $commandId = null,
         ?string $groupKey = null,
         ?array $metadata = null,
+        bool $publish = true,
     ): ActivityEventRecord {
         $record = $this->events->create(
             level: $level,
@@ -515,7 +517,9 @@ final readonly class ActivityEventService
             metadata: $metadata,
         );
 
-        $this->publisher->activityCreated($record);
+        if ($publish) {
+            $this->publisher->activityCreated($record);
+        }
 
         return $record;
     }
