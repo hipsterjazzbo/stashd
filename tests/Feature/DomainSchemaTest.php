@@ -5,12 +5,20 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Broadcasts\BroadcastRecord;
+use App\Jobs\JobIntent;
+use App\Jobs\JobLane;
+use App\Jobs\JobRecord;
+use App\Jobs\JobState;
 use App\Stashes\StashInputRecord;
 use App\Stashes\StashItemRecord;
 use App\Stashes\StashRecord;
 use App\Vault\MediaItemRecord;
+use Tempest\Database\Builder\QueryBuilders\BuildsQuery;
 use Tempest\Database\Database;
+use Tempest\Database\Direction;
 use Tempest\Database\Query;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 
 test('domain schema migration creates all v1 tables on a fresh database', function (): void {
     $database = $this->container->get(Database::class);
@@ -89,6 +97,49 @@ test('job requires a valid command foreign key', function (): void {
         intent: \App\Jobs\JobIntent::Preflight,
         commandId: \App\Commands\CommandId::parse('cmd_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
     ))->toThrow(\Tempest\Database\Exceptions\QueryWasInvalid::class);
+});
+
+test('job workload indexes support pending, stale, and history queries', function (): void {
+    $database = $this->container->get(Database::class);
+    $indexes = array_column($database->fetch(new Query('PRAGMA index_list(jobs)')), 'name');
+
+    expect($indexes)->toContain(
+        'jobs_pending_claim',
+        'jobs_processing_heartbeat',
+        'jobs_media_item_download_history',
+    );
+
+    $now = DateTime::now(Timezone::UTC);
+    $pending = JobRecord::select()
+        ->where('state = ? AND (scheduledAt IS NULL OR scheduledAt <= ?)', JobState::Pending, $now)
+        ->orderBy('priority', Direction::ASC)
+        ->orderBy('createdAt', Direction::ASC)
+        ->limit(5);
+    $lane = JobRecord::select()
+        ->where('state = ? AND (scheduledAt IS NULL OR scheduledAt <= ?)', JobState::Pending, $now)
+        ->orderBy('priority', Direction::ASC)
+        ->orderBy('createdAt', Direction::ASC)
+        ->limit(5)
+        ->whereIn('intent', array_map(
+            static fn (JobIntent $intent): string => $intent->value,
+            JobLane::Bulk->intents(),
+        ));
+    $stale = JobRecord::select()
+        ->where('state = ? AND heartbeatAt IS NOT NULL AND heartbeatAt < ?', JobState::Processing, $now);
+    $history = JobRecord::select()
+        ->where('entityType = ? AND intent = ?', 'media_item', JobIntent::Download)
+        ->whereIn('entityId', ['media_01ARZ3NDEKTSV4RRFFQ69G5FAV'])
+        ->orderBy('createdAt', Direction::DESC)
+        ->orderBy('id', Direction::DESC);
+
+    expect(jobQueryPlan($database, $pending))->toContain('jobs_pending_claim')
+        ->not->toContain('SCAN jobs')
+        ->and(jobQueryPlan($database, $lane))->toContain('jobs_pending_claim')
+        ->not->toContain('SCAN jobs')
+        ->and(jobQueryPlan($database, $stale))->toContain('jobs_processing_heartbeat')
+        ->not->toContain('SCAN jobs')
+        ->and(jobQueryPlan($database, $history))->toContain('jobs_media_item_download_history')
+        ->not->toContain('SCAN jobs');
 });
 
 test('broadcast belongs to stash via foreign key', function (): void {
@@ -171,4 +222,12 @@ function schemaTableExists(Database $database, string $table): bool
     ));
 
     return $row !== null;
+}
+
+function jobQueryPlan(Database $database, BuildsQuery $builder): string
+{
+    $query = $builder->build();
+    $rows = $database->fetch(new Query('EXPLAIN QUERY PLAN ' . $query->compile(), $query->bindings));
+
+    return implode("\n", array_column($rows, 'detail'));
 }
