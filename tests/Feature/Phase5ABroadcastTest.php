@@ -14,9 +14,14 @@ use App\Config\StashdConfig;
 use App\Stashes\StashId;
 use App\Stashes\StashItemRecord;
 use App\System\Activity\ActivityEventRecord;
+use App\Vault\AssetKind;
+use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
+use App\Vault\AssetState;
 use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
+use App\Vault\MediaItemRepository;
+use App\Vault\MediaItemState;
 use Tempest\Http\Status;
 
 test('create jellyfin broadcast for stash returns snake_case json', function (): void {
@@ -92,6 +97,44 @@ test('previewing skips items that have not been downloaded yet', function (): vo
     expect($preview['eligible_item_count'])->toBe(0)
         ->and($preview['skipped_item_count'])->toBeGreaterThan(0)
         ->and($preview['vault_size_bytes'])->toBe(0);
+});
+
+test('ready vault original batch lookup excludes empty, non-ready, and pathless assets', function (): void {
+    $media = $this->container->get(MediaItemRepository::class);
+    $assets = $this->container->get(AssetRepository::class);
+    $ready = $media->create('fake', 'batch-ready', 'fake://item/batch-ready', 'Ready', MediaItemState::Ready);
+    $pending = $media->create('fake', 'batch-pending', 'fake://item/batch-pending', 'Pending', MediaItemState::Ready);
+    $pathless = $media->create('fake', 'batch-pathless', 'fake://item/batch-pathless', 'Pathless', MediaItemState::Ready);
+
+    $assets->create(
+        MediaItemId::parse((string) $ready->id),
+        AssetRole::VaultOriginal,
+        AssetKind::Video,
+        AssetState::Ready,
+        path: '/vault/batch-ready.mp4',
+    );
+    $assets->create(
+        MediaItemId::parse((string) $pending->id),
+        AssetRole::VaultOriginal,
+        AssetKind::Video,
+        AssetState::Pending,
+        path: '/vault/batch-pending.mp4',
+    );
+    $assets->create(
+        MediaItemId::parse((string) $pathless->id),
+        AssetRole::VaultOriginal,
+        AssetKind::Video,
+        AssetState::Ready,
+    );
+
+    expect($assets->readyVaultOriginalsByMediaItem([]))->toBeEmpty()
+        ->and($assets->readyVaultOriginalsByMediaItem([
+            (string) $ready->id,
+            (string) $pending->id,
+            (string) $pathless->id,
+        ]))->toHaveKey((string) $ready->id)
+        ->not->toHaveKey((string) $pending->id)
+        ->not->toHaveKey((string) $pathless->id);
 });
 
 test('previewing does not create a broadcast record', function (): void {

@@ -1537,30 +1537,6 @@ parameters:
 			path: app/Transcoding/AssetTranscodePodcastAudioCommandHandler.php
 
 		-
-			message: '#^Binary operation "\+" between \(float\|int\) and mixed results in an error\.$#'
-			identifier: binaryOp.invalid
-			count: 1
-			path: app/Vault/AssetRepository.php
-
-		-
-			message: '#^Cannot access property \$mediaItemId on mixed\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: app/Vault/AssetRepository.php
-
-		-
-			message: '#^Cannot access property \$sizeBytes on mixed\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: app/Vault/AssetRepository.php
-
-		-
-			message: '#^Cannot cast mixed to string\.$#'
-			identifier: cast.string
-			count: 1
-			path: app/Vault/AssetRepository.php
-
-		-
 			message: '#^Method App\\Vault\\AssetRepository\:\:findByMediaItemAndRole\(\) should return App\\Vault\\AssetRecord\|null but returns mixed\.$#'
 			identifier: return.type
 			count: 1

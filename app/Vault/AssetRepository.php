@@ -78,6 +78,32 @@ final class AssetRepository
             ->first();
     }
 
+    /**
+     * @param list<string> $mediaItemIds
+     * @return array<string, AssetRecord> keyed by media item id
+     */
+    public function readyVaultOriginalsByMediaItem(array $mediaItemIds): array
+    {
+        if ($mediaItemIds === []) {
+            return [];
+        }
+
+        $originals = [];
+
+        foreach (AssetRecord::select()
+            ->whereIn('mediaItemId', $mediaItemIds)
+            ->where('role = ? AND state = ? AND path IS NOT NULL', AssetRole::VaultOriginal, AssetState::Ready)
+            ->all() as $asset) {
+            if (! $asset instanceof AssetRecord) {
+                continue;
+            }
+
+            $originals[(string) $asset->mediaItemId] ??= $asset;
+        }
+
+        return $originals;
+    }
+
     /** @return list<AssetRecord> */
     public function listForMediaItem(MediaItemId $mediaItemId): array
     {
@@ -119,6 +145,10 @@ final class AssetRepository
         $totals = [];
 
         foreach (AssetRecord::select()->whereIn('mediaItemId', $mediaItemIds)->all() as $asset) {
+            if (! $asset instanceof AssetRecord) {
+                continue;
+            }
+
             $key = (string) $asset->mediaItemId;
             $totals[$key] = ($totals[$key] ?? 0) + ($asset->sizeBytes ?? 0);
         }

@@ -8,8 +8,6 @@ use App\Stashes\StashItemRepository;
 use App\Stashes\StashItemState;
 use App\Stashes\StashRepository;
 use App\Vault\AssetRepository;
-use App\Vault\AssetRole;
-use App\Vault\AssetState;
 use App\Vault\MediaItemRepository;
 use App\Vault\MediaItemState;
 
@@ -34,11 +32,13 @@ final readonly class BroadcastContextFactory
         $stashItems = $this->stashItems->listForStash($stashId);
 
         $mediaItems = [];
-        $vaultOriginals = [];
+        $readyMediaItemIds = [];
 
         foreach ($stashItems as $stashItem) {
             $mediaItemId = (string) $stashItem->mediaItemId;
-            $mediaItem = $this->mediaItems->find($stashItem->mediaItemId);
+            $mediaItem = isset($stashItem->mediaItem)
+                ? $stashItem->mediaItem
+                : $this->mediaItems->find($stashItem->mediaItemId);
 
             if ($mediaItem === null) {
                 continue;
@@ -46,28 +46,18 @@ final readonly class BroadcastContextFactory
 
             $mediaItems[$mediaItemId] = $mediaItem;
 
-            if ($mediaItem->state !== MediaItemState::Ready) {
-                $vaultOriginals[$mediaItemId] = null;
-
-                continue;
+            if ($mediaItem->state === MediaItemState::Ready) {
+                $readyMediaItemIds[] = $mediaItemId;
             }
+        }
 
-            $vaultOriginal = $this->assets->findByMediaItemAndRole(
-                $stashItem->mediaItemId,
-                AssetRole::VaultOriginal,
-            );
+        $readyVaultOriginals = $this->assets->readyVaultOriginalsByMediaItem($readyMediaItemIds);
+        $vaultOriginals = [];
 
-            if (
-                $vaultOriginal === null
-                || $vaultOriginal->state !== AssetState::Ready
-                || $vaultOriginal->path === null
-            ) {
-                $vaultOriginals[$mediaItemId] = null;
-
-                continue;
-            }
-
-            $vaultOriginals[$mediaItemId] = $vaultOriginal;
+        foreach ($mediaItems as $mediaItemId => $mediaItem) {
+            $vaultOriginals[$mediaItemId] = $mediaItem->state === MediaItemState::Ready
+                ? $readyVaultOriginals[$mediaItemId] ?? null
+                : null;
         }
 
         return new BroadcastContext(

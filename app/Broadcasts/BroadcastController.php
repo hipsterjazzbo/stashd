@@ -41,6 +41,7 @@ final readonly class BroadcastController
         private PodcastTokenService $podcastTokens,
         private PodcastEpisodeUrlBuilder $podcastUrls,
         private BroadcastLifecycleService $lifecycle,
+        private BroadcastContextFactory $contexts,
         private MediaItemRepository $mediaItems,
         private BroadcastPathBuilder $paths,
     ) {
@@ -69,10 +70,13 @@ final readonly class BroadcastController
             return $this->notFound('Stash not found.');
         }
 
+        $broadcasts = $this->broadcasts->listForStash(StashId::parse($stashId));
+        $context = $broadcasts === [] ? null : $this->contexts->build($broadcasts[0]);
+
         return new Json([
             'broadcasts' => array_map(
-                fn ($broadcast): array => $this->mapBroadcast($broadcast),
-                $this->broadcasts->listForStash(StashId::parse($stashId)),
+                fn ($broadcast): array => $this->mapBroadcast($broadcast, $context),
+                $broadcasts,
             ),
         ]);
     }
@@ -404,13 +408,13 @@ final readonly class BroadcastController
     }
 
     /** @return array<string, mixed> */
-    private function mapBroadcast(BroadcastRecord $broadcast): array
+    private function mapBroadcast(BroadcastRecord $broadcast, ?BroadcastContext $context = null): array
     {
         $broadcastId = BroadcastId::fromPrimaryKey($broadcast->id);
 
         $extra = [
             'items' => $this->mapBroadcastItems($this->broadcastItems->listForBroadcast($broadcastId)),
-            'impact' => ApiJson::encode($this->lifecycle->impact($broadcastId)->toArray()),
+            'impact' => ApiJson::encode($this->lifecycle->impactFor($broadcast, $context)->toArray()),
         ];
 
         if ($broadcast->type !== 'podcast') {

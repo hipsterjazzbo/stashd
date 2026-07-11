@@ -88,7 +88,7 @@ final readonly class BroadcastLifecycleService
             settings: $mediaKind === null ? null : ['media_kind' => $mediaKind],
         );
 
-        return $this->computeImpact($draftBroadcast);
+        return $this->impactFor($draftBroadcast);
     }
 
     /**
@@ -102,12 +102,12 @@ final readonly class BroadcastLifecycleService
         $broadcast = $this->broadcasts->find($broadcastId)
             ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
 
-        return $this->computeImpact($broadcast);
+        return $this->impactFor($broadcast);
     }
 
-    private function computeImpact(BroadcastRecord $broadcast): BroadcastCreationPreview
+    public function impactFor(BroadcastRecord $broadcast, ?BroadcastContext $context = null): BroadcastCreationPreview
     {
-        $context = $this->contextFactory->build($broadcast);
+        $context ??= $this->contextFactory->build($broadcast);
         $eligible = $this->contextFactory->publishableStashItems($context);
 
         $needsAudioTranscode = $broadcast->type === 'podcast' && PodcastMediaKind::forBroadcast($broadcast) === PodcastMediaKind::Audio;
