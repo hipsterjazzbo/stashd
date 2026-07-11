@@ -187,6 +187,20 @@ final readonly class YtdlpDownloader implements DownloaderInterface
             return 'download_ytdlp_rate_limited';
         }
 
+        // YouTube's bare "Video unavailable. This video is not available" (no
+        // further reason) has been observed to be a transient extraction
+        // glitch, not a real removal -- the same URL succeeded on immediate
+        // retry. Genuine permanent unavailability (privacy, takedown,
+        // country block, terminated account, ...) always comes with a
+        // specific reason suffix, so only the bare generic message is
+        // treated as retryable here.
+        if (
+            $needle->contains('this video is not available')
+            && ! $needle->contains(['private', 'removed', 'terminated', 'copyright', 'country', 'blocked', 'age-restricted', 'age restricted'])
+        ) {
+            return 'download_ytdlp_transient_unavailable';
+        }
+
         return null;
     }
 

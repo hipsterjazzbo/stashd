@@ -326,6 +326,82 @@ test('ytdlp downloader classifies rate-limit failures as retryable', function ()
     throw new \RuntimeException('Expected DownloadException was not thrown.');
 });
 
+test('ytdlp downloader classifies bare "video is not available" failures as retryable', function (): void {
+    $gateway = new class () implements YtdlpGateway {
+        public function probe(): YtdlpProbeResult
+        {
+            return new YtdlpProbeResult(true, 'yt-dlp', '2026.01.01');
+        }
+
+        public function extractInfo(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
+        {
+            throw new ProcessFailedException(
+                new ProcessResult(1, '', 'ERROR: [youtube] x: Video unavailable. This video is not available'),
+                new \Tempest\Process\PendingProcess(['yt-dlp']),
+            );
+        }
+
+        public function extractPlaylist(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
+        {
+            throw new \RuntimeException('not called');
+        }
+
+        public function download(string $url, string $workingDirectory, Options $options, ?callable $onProgress = null): \Ytdlphp\DownloadResult
+        {
+            throw new \RuntimeException('not called');
+        }
+    };
+
+    try {
+        ytdlpDownloader($gateway)->download(ytdlpDownloadRequest(DownloadPolicy::Video, sys_get_temp_dir()));
+    } catch (DownloadException $exception) {
+        expect($exception->errorCode)->toBe('download_ytdlp_transient_unavailable')
+            ->and($exception->retryable)->toBeTrue();
+
+        return;
+    }
+
+    throw new \RuntimeException('Expected DownloadException was not thrown.');
+});
+
+test('ytdlp downloader keeps a specific removal reason non-retryable', function (): void {
+    $gateway = new class () implements YtdlpGateway {
+        public function probe(): YtdlpProbeResult
+        {
+            return new YtdlpProbeResult(true, 'yt-dlp', '2026.01.01');
+        }
+
+        public function extractInfo(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
+        {
+            throw new ProcessFailedException(
+                new ProcessResult(1, '', 'ERROR: [youtube] x: Video unavailable. This video is not available because the YouTube account associated with this video has been terminated'),
+                new \Tempest\Process\PendingProcess(['yt-dlp']),
+            );
+        }
+
+        public function extractPlaylist(string $url, string $workingDirectory, ?Options $options = null): VideoInfo
+        {
+            throw new \RuntimeException('not called');
+        }
+
+        public function download(string $url, string $workingDirectory, Options $options, ?callable $onProgress = null): \Ytdlphp\DownloadResult
+        {
+            throw new \RuntimeException('not called');
+        }
+    };
+
+    try {
+        ytdlpDownloader($gateway)->download(ytdlpDownloadRequest(DownloadPolicy::Video, sys_get_temp_dir()));
+    } catch (DownloadException $exception) {
+        expect($exception->errorCode)->toBe('download_ytdlp_failed')
+            ->and($exception->retryable)->toBeFalse();
+
+        return;
+    }
+
+    throw new \RuntimeException('Expected DownloadException was not thrown.');
+});
+
 test('ytdlp options builder applies configured cookies file to extraction, video, and audio options', function (): void {
     $builder = new YtdlpOptionsBuilder(ytdlpTestConfig(cookiesFile: '/secrets/cookies.txt'));
 

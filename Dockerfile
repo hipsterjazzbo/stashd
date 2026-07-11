@@ -52,6 +52,23 @@ RUN case "${TARGETARCH}" in \
     && curl -L "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ytdlpAsset}" -o /usr/local/bin/yt-dlp \
     && chmod a+rx /usr/local/bin/yt-dlp
 
+# yt-dlp's YouTube extractor needs an external JS runtime to fully solve
+# player signature/challenge JS; without one it runs in a degraded mode
+# ("YouTube extraction without a JS runtime has been deprecated") that can
+# intermittently misreport a playable video as unavailable. Deno is yt-dlp's
+# own zero-config default runtime ("Only deno is enabled by default") and
+# ships as a single static binary, so no extra yt-dlp flags are needed once
+# it's on PATH.
+RUN case "${TARGETARCH}" in \
+        amd64) denoTarget="x86_64-unknown-linux-gnu" ;; \
+        arm64) denoTarget="aarch64-unknown-linux-gnu" ;; \
+        *) echo "Unsupported architecture for deno: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && curl -L "https://github.com/denoland/deno/releases/latest/download/deno-${denoTarget}.zip" -o /tmp/deno.zip \
+    && unzip -o /tmp/deno.zip -d /usr/local/bin \
+    && rm /tmp/deno.zip \
+    && chmod a+rx /usr/local/bin/deno
+
 COPY --from=composer /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
