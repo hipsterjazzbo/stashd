@@ -14,6 +14,7 @@ use Tempest\Database\PrimaryKey;
 use function Tempest\Database\query;
 
 use Tempest\DateTime\DateTime;
+use Tempest\DateTime\FormatPattern;
 use Tempest\DateTime\Timezone;
 
 final class JobRepository
@@ -118,6 +119,40 @@ final class JobRepository
         }
 
         return null;
+    }
+
+    public function parkForRetry(JobRecord $job, string $lastError, DateTime $scheduledAt): bool
+    {
+        $updatedAt = DateTime::now(Timezone::UTC);
+        $statement = $this->connection->prepare(
+            'UPDATE jobs
+             SET state = :pending, startedAt = NULL, heartbeatAt = NULL,
+                 ownerToken = NULL, lastError = :lastError,
+                 scheduledAt = :scheduledAt, updatedAt = :updatedAt
+             WHERE id = :id AND state = :processing',
+        );
+        $statement->execute([
+            'pending' => JobState::Pending->value,
+            'lastError' => $lastError,
+            'scheduledAt' => $scheduledAt->format(FormatPattern::SQL_DATE_TIME, Timezone::UTC),
+            'updatedAt' => $updatedAt->format(FormatPattern::SQL_DATE_TIME, Timezone::UTC),
+            'id' => (string) $job->id,
+            'processing' => JobState::Processing->value,
+        ]);
+
+        if ($statement->rowCount() !== 1) {
+            return false;
+        }
+
+        $job->state = JobState::Pending;
+        $job->startedAt = null;
+        $job->heartbeatAt = null;
+        $job->ownerToken = null;
+        $job->lastError = $lastError;
+        $job->scheduledAt = $scheduledAt;
+        $job->updatedAt = $updatedAt;
+
+        return true;
     }
 
     /** @return list<JobRecord> */

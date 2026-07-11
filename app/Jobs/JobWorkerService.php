@@ -162,13 +162,11 @@ final readonly class JobWorkerService implements JobWorkerCallbacks
 
         $index = min(max($job->attempts - 1, 0), count(self::RETRY_BACKOFF_SECONDS) - 1);
 
-        $job->lastError = $error;
-        $job->startedAt = null;
-        $job->heartbeatAt = null;
-        $job->ownerToken = null;
-        $job->scheduledAt = DateTime::now(Timezone::UTC)->plusSeconds(self::RETRY_BACKOFF_SECONDS[$index]);
-        $this->jobs->save($job);
-        $this->transitions->transitionJob($job, JobState::Pending);
+        $this->jobs->parkForRetry(
+            $job,
+            $error,
+            DateTime::now(Timezone::UTC)->plusSeconds(self::RETRY_BACKOFF_SECONDS[$index]),
+        );
     }
 
     private function failJob(JobRecord $job, string $error): void

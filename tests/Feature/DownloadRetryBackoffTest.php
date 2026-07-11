@@ -65,11 +65,42 @@ test('a retryable download failure is parked as pending with a future scheduledA
     $job = JobRecord::findById($job->id);
     expect($job->state)->toBe(JobState::Pending)
         ->and($job->attempts)->toBe(1)
+        ->and($job->startedAt)->toBeNull()
+        ->and($job->heartbeatAt)->toBeNull()
+        ->and($job->ownerToken)->toBeNull()
+        ->and($job->lastError)->toContain('download_ytdlp_rate_limited')
         ->and($job->scheduledAt)->not->toBeNull()
         ->and($job->scheduledAt->isAfter(DateTime::now(Timezone::UTC)))->toBeTrue();
 
     // A scheduled-for-later job is not claimed by the next tick.
     expect($jobs->claimNextPending())->toBeNull();
+});
+
+test('parking a processing job for retry is one guarded state change', function (): void {
+    $jobs = $this->container->get(JobRepository::class);
+    $created = $jobs->create(intent: JobIntent::Enrich, entityType: 'test');
+    $job = $jobs->claimNextPending(ownerToken: 'worker:123');
+
+    expect((string) $job->id)->toBe((string) $created->id)
+        ->and($job->state)->toBe(JobState::Processing)
+        ->and($job->heartbeatAt)->not->toBeNull();
+
+    $scheduledAt = DateTime::now(Timezone::UTC)->plusSeconds(30);
+
+    expect($jobs->parkForRetry($job, 'retry later', $scheduledAt))->toBeTrue()
+        ->and($job->state)->toBe(JobState::Pending)
+        ->and($job->startedAt)->toBeNull()
+        ->and($job->heartbeatAt)->toBeNull()
+        ->and($job->ownerToken)->toBeNull();
+
+    $persisted = JobRecord::findById($job->id);
+
+    expect($persisted->state)->toBe(JobState::Pending)
+        ->and($persisted->startedAt)->toBeNull()
+        ->and($persisted->heartbeatAt)->toBeNull()
+        ->and($persisted->ownerToken)->toBeNull()
+        ->and($persisted->lastError)->toBe('retry later')
+        ->and($persisted->scheduledAt)->not->toBeNull();
 });
 
 test('a retryable download failure fails permanently once maxAttempts is exhausted', function (): void {
