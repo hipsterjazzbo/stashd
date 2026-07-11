@@ -32,10 +32,6 @@ final class UserRepository
 
     public function createAdmin(string $username, string $passwordHash): UserRecord
     {
-        if (UserRecord::count()->execute() > 0) {
-            throw new InvalidArgumentException('Admin account already exists.');
-        }
-
         $id = $this->ids->generate('user')->toString();
         $record = new UserRecord(
             username: $username,
@@ -47,7 +43,15 @@ final class UserRepository
         $record->createdAt ??= $now;
         $record->updatedAt ??= $now;
 
-        query(UserRecord::class)->insert($record)->execute();
+        try {
+            query(UserRecord::class)->insert($record)->execute();
+        } catch (\Throwable $exception) {
+            if (UserRecord::count()->execute() > 0) {
+                throw new InvalidArgumentException('Admin account already exists.', previous: $exception);
+            }
+
+            throw $exception;
+        }
 
         return $record;
     }

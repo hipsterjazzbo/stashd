@@ -6,6 +6,7 @@ namespace App\Auth;
 
 use App\System\Event\MercurePublisher;
 use App\System\Event\MercureSecret;
+use InvalidArgumentException;
 use RuntimeException;
 use SensitiveParameter;
 use Symfony\Component\Mercure\Jwt\LcobucciFactory;
@@ -47,10 +48,14 @@ final readonly class AuthService
             throw new SetupAlreadyCompleted('Admin account already exists.');
         }
 
-        $user = $this->users->createAdmin(
-            username: $username,
-            passwordHash: $this->hashPassword($password),
-        );
+        try {
+            $user = $this->users->createAdmin(
+                username: $username,
+                passwordHash: $this->hashPassword($password),
+            );
+        } catch (InvalidArgumentException) {
+            throw new SetupAlreadyCompleted('Admin account already exists.');
+        }
 
         $this->context->set($user);
 
