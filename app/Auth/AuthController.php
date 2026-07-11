@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth;
 
+use App\Http\ClientAddressResolver;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
 use Tempest\DateTime\DateTime;
@@ -25,6 +26,7 @@ final readonly class AuthController
         private AuthService $auth,
         private AuthContext $context,
         private CookieManager $cookies,
+        private ClientAddressResolver $clientAddresses,
     ) {
     }
 
@@ -89,7 +91,7 @@ final readonly class AuthController
         }
 
         try {
-            $user = $this->auth->login($username, $password);
+            $user = $this->auth->login($username, $password, $this->clientAddresses->resolve($request));
         } catch (SetupRequired) {
             return new Json([
                 'error' => [
@@ -97,7 +99,7 @@ final readonly class AuthController
                     'message' => 'Create the admin account before logging in.',
                 ],
             ], Status::FORBIDDEN);
-        } catch (InvalidCredentials) {
+        } catch (InvalidCredentials|LoginThrottled) {
             return new Json([
                 'error' => [
                     'code' => 'invalid_credentials',

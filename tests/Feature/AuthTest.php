@@ -9,6 +9,8 @@ use App\Auth\ApiTokenScopes;
 use App\Auth\AuthService;
 use App\Auth\UserRecord;
 use App\Auth\UserRepository;
+use App\Config\TrustedProxyConfig;
+use App\Http\ClientAddressResolver;
 use InvalidArgumentException;
 use PDO;
 use PDOException;
@@ -17,6 +19,8 @@ use Tempest\Database\Database;
 use Tempest\Database\Query;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+use Tempest\Http\GenericRequest;
+use Tempest\Http\Method;
 use Tempest\Http\Status;
 
 test('owner setup creates the first user', function (): void {
@@ -255,6 +259,96 @@ test('invalid login credentials are rejected', function (): void {
 
     $response->assertStatus(Status::UNAUTHORIZED);
     expect($response->body['error']['code'])->toBe('invalid_credentials');
+});
+
+test('client addresses trust forwarded headers only from configured proxy peers', function (): void {
+    $_SERVER['REMOTE_ADDR'] = '10.0.0.2';
+    $request = new GenericRequest(Method::POST, '/api/v1/auth/login', headers: ['X-Forwarded-For' => '198.51.100.42, 10.0.0.1']);
+
+    expect(new ClientAddressResolver(new TrustedProxyConfig())->resolve($request))->toBe('10.0.0.2')
+        ->and(new ClientAddressResolver(new TrustedProxyConfig(['10.0.0.2']))->resolve($request))->toBe('198.51.100.42');
+});
+
+test('login failures are throttled without changing the invalid-credential response', function (): void {
+    $_SERVER['REMOTE_ADDR'] = '198.51.100.10';
+    $this->http->post('/api/v1/auth/setup', [
+        'username' => 'owner',
+        'password' => 'secret-password',
+    ])->assertStatus(Status::CREATED);
+
+    for ($attempt = 0; $attempt < 6; $attempt++) {
+        $response = $this->http->post('/api/v1/auth/login', [
+            'username' => 'owner',
+            'password' => 'wrong-password',
+        ]);
+
+        $response->assertStatus(Status::UNAUTHORIZED);
+        expect($response->body)->toBe([
+            'error' => [
+                'code' => 'invalid_credentials',
+                'message' => 'Invalid username or password.',
+            ],
+        ]);
+    }
+
+    $row = $this->container->get(Database::class)->fetchFirst(new Query('SELECT keyHash FROM login_attempts'));
+    expect((string) $row['keyHash'])->not->toContain('owner')
+        ->and((string) $row['keyHash'])->not->toContain('198.51.100.10');
+});
+
+test('successful login resets failures and expired attempts recover', function (): void {
+    $_SERVER['REMOTE_ADDR'] = '198.51.100.11';
+    $this->http->post('/api/v1/auth/setup', [
+        'username' => 'owner',
+        'password' => 'secret-password',
+    ])->assertStatus(Status::CREATED);
+
+    for ($attempt = 0; $attempt < 4; $attempt++) {
+        $this->http->post('/api/v1/auth/login', [
+            'username' => 'owner',
+            'password' => 'wrong-password',
+        ])->assertStatus(Status::UNAUTHORIZED);
+    }
+
+    $this->http->post('/api/v1/auth/login', [
+        'username' => 'owner',
+        'password' => 'secret-password',
+    ])->assertOk();
+
+    for ($attempt = 0; $attempt < 5; $attempt++) {
+        $this->http->post('/api/v1/auth/login', [
+            'username' => 'owner',
+            'password' => 'wrong-password',
+        ])->assertStatus(Status::UNAUTHORIZED);
+    }
+
+    $this->container->get(Database::class)->execute(new Query('UPDATE login_attempts SET expiresAt = CURRENT_TIMESTAMP'));
+
+    $this->http->post('/api/v1/auth/login', [
+        'username' => 'owner',
+        'password' => 'secret-password',
+    ])->assertOk();
+});
+
+test('unknown usernames receive the same login failure response', function (): void {
+    $_SERVER['REMOTE_ADDR'] = '198.51.100.12';
+    $this->http->post('/api/v1/auth/setup', [
+        'username' => 'owner',
+        'password' => 'secret-password',
+    ])->assertStatus(Status::CREATED);
+
+    $known = $this->http->post('/api/v1/auth/login', [
+        'username' => 'owner',
+        'password' => 'wrong-password',
+    ]);
+    $unknown = $this->http->post('/api/v1/auth/login', [
+        'username' => 'nobody',
+        'password' => 'wrong-password',
+    ]);
+
+    $known->assertStatus(Status::UNAUTHORIZED);
+    $unknown->assertStatus(Status::UNAUTHORIZED);
+    expect($unknown->body)->toBe($known->body);
 });
 
 test('api tokens can be revoked', function (): void {

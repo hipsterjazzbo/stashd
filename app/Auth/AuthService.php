@@ -34,6 +34,7 @@ final readonly class AuthService
         private UserRepository $users,
         private ApiTokenRepository $tokens,
         private AuthContext $context,
+        private LoginAttemptLimiter $loginAttempts,
     ) {
     }
 
@@ -62,18 +63,22 @@ final readonly class AuthService
         return $user;
     }
 
-    public function login(string $username, #[SensitiveParameter] string $password): UserRecord
+    public function login(string $username, #[SensitiveParameter] string $password, string $clientAddress = 'unknown'): UserRecord
     {
         if ($this->isSetupRequired()) {
             throw new SetupRequired('Complete admin setup before logging in.');
         }
 
+        $this->loginAttempts->ensureAllowed($username, $clientAddress);
         $user = $this->users->findByUsername($username);
 
         if ($user === null || ! password_verify($password, $user->passwordHash)) {
+            $this->loginAttempts->recordFailure($username, $clientAddress);
+
             throw new InvalidCredentials('Invalid username or password.');
         }
 
+        $this->loginAttempts->reset($username, $clientAddress);
         $this->context->set($user);
 
         return $user;

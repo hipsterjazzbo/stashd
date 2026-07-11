@@ -90,6 +90,7 @@ pest()->extend(IntegrationTestCase::class)
         // Tempest's request mapper reads cookies from it. Pest runs every
         // test in the same process, so it must not leak between tests.
         $_COOKIE = [];
+        unset($_SERVER['REMOTE_ADDR']);
 
         $this->useTestingDatabase();
         $this->database->reset();
