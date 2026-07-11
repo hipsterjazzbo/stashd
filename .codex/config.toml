@@ -1,0 +1,6 @@
+[mcp_servers.lerd]
+command = "lerd"
+args = ["mcp"]
+
+[mcp_servers.lerd.env]
+LERD_SITE_PATH = "/home/hazel/Projects/stashd"
