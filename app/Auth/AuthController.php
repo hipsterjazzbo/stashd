@@ -145,7 +145,16 @@ final readonly class AuthController
             ], Status::BAD_REQUEST);
         }
 
-        $scopes = isset($body['scopes']) && is_array($body['scopes']) ? $body['scopes'] : null;
+        if (array_key_exists('scopes', $body) && $body['scopes'] !== null && ! is_array($body['scopes'])) {
+            return new Json([
+                'error' => [
+                    'code' => 'validation_error',
+                    'message' => 'scopes must be an array.',
+                ],
+            ], Status::BAD_REQUEST);
+        }
+
+        $scopes = isset($body['scopes']) ? $body['scopes'] : null;
 
         try {
             $expiresAt = isset($body['expires_at']) && is_string($body['expires_at'])
@@ -160,7 +169,16 @@ final readonly class AuthController
             ], Status::BAD_REQUEST);
         }
 
-        $token = $this->auth->createApiToken($user, $name, $scopes, $expiresAt);
+        try {
+            $token = $this->auth->createApiToken($user, $name, $scopes, $expiresAt);
+        } catch (\InvalidArgumentException $exception) {
+            return new Json([
+                'error' => [
+                    'code' => 'validation_error',
+                    'message' => $exception->getMessage(),
+                ],
+            ], Status::BAD_REQUEST);
+        }
 
         return new Json($token, Status::CREATED);
     }

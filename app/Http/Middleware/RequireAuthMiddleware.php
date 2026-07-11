@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Auth\ApiScopePolicy;
 use App\Auth\AuthContext;
 use App\Auth\AuthService;
 use Tempest\Http\Request;
@@ -24,6 +25,7 @@ final readonly class RequireAuthMiddleware implements HttpMiddleware
     public function __construct(
         private AuthService $auth,
         private AuthContext $context,
+        private ApiScopePolicy $scopes,
     ) {
     }
 
@@ -45,9 +47,9 @@ final readonly class RequireAuthMiddleware implements HttpMiddleware
                 ], Status::FORBIDDEN);
             }
 
-            $user = $this->auth->resolveFromRequest($request);
+            $principal = $this->auth->resolveFromRequest($request);
 
-            if ($user === null) {
+            if ($principal === null) {
                 return new Json([
                     'error' => [
                         'code' => 'authentication_required',
@@ -56,11 +58,20 @@ final readonly class RequireAuthMiddleware implements HttpMiddleware
                 ], Status::UNAUTHORIZED);
             }
 
-            $this->context->set($user);
+            $this->context->setPrincipal($principal);
+
+            if (! $principal->allows($this->scopes->requiredFor($request))) {
+                return new Json([
+                    'error' => [
+                        'code' => 'scope_required',
+                        'message' => 'This API token does not grant access to this operation.',
+                    ],
+                ], Status::FORBIDDEN);
+            }
 
             return $next($request);
         } finally {
-            $this->context->set(null);
+            $this->context->setPrincipal(null);
         }
     }
 }

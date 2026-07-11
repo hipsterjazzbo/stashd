@@ -31,6 +31,21 @@ abstract class IntegrationTestCase extends IntegrationTest
         return ['Authorization' => 'Bearer ' . $token['token']];
     }
 
+    /**
+     * @param list<string> $scopes
+     *
+     * @return array{Authorization: string}
+     */
+    public function scopedAuthHeaders(array $scopes): array
+    {
+        $created = $this->http->post('/api/v1/auth/tokens', [
+            'name' => 'scoped-' . bin2hex(random_bytes(3)),
+            'scopes' => $scopes,
+        ], headers: $this->authHeaders())->assertStatus(\Tempest\Http\Status::CREATED);
+
+        return ['Authorization' => 'Bearer ' . $created->body['token']];
+    }
+
     public function processAllJobs(): void
     {
         $worker = $this->container->get(\App\Jobs\JobWorkerService::class);

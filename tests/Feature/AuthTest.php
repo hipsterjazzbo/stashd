@@ -15,6 +15,8 @@ use PDOException;
 use Tempest\Database\Config\SQLiteConfig;
 use Tempest\Database\Database;
 use Tempest\Database\Query;
+use Tempest\DateTime\DateTime;
+use Tempest\DateTime\Timezone;
 use Tempest\Http\Status;
 
 test('owner setup creates the first user', function (): void {
@@ -280,7 +282,7 @@ test('api token scopes are stored as a typed value object', function (): void {
 
     $created = $this->http->post('/api/v1/auth/tokens', [
         'name' => 'scoped-token',
-        'scopes' => ['media:read', ' media:read ', '', 'broadcast:write', 123],
+        'scopes' => ['media:read', ' media:read ', 'broadcast:write'],
     ], headers: $headers)->assertStatus(Status::CREATED);
 
     $record = ApiTokenRecord::select()
@@ -313,4 +315,94 @@ test('api token scopes are stored as a typed value object', function (): void {
 
     expect($scopedToken)->not->toBeNull()
         ->and($scopedToken['scopes'])->toBe(['media:read', 'broadcast:write']);
+});
+
+test('api token creation rejects unknown, non-string, and non-array scopes', function (): void {
+    $headers = $this->authHeaders();
+
+    foreach ([['unknown:scope'], ['media:read', 123], 'media:read'] as $scopes) {
+        $response = $this->http->post('/api/v1/auth/tokens', [
+            'name' => 'invalid-scope',
+            'scopes' => $scopes,
+        ], headers: $headers);
+
+        $response->assertStatus(Status::BAD_REQUEST);
+        expect($response->body['error']['code'])->toBe('validation_error');
+    }
+});
+
+test('a read-scoped token can read media but cannot mutate stashes', function (): void {
+    $headers = $this->scopedAuthHeaders(['media:read']);
+
+    $this->http->get('/api/v1/items', headers: $headers)->assertOk();
+
+    $denied = $this->http->post('/api/v1/stashes', ['name' => 'Denied'], headers: $headers)
+        ->assertStatus(Status::FORBIDDEN);
+
+    expect($denied->body)->toBe([
+        'error' => [
+            'code' => 'scope_required',
+            'message' => 'This API token does not grant access to this operation.',
+        ],
+    ]);
+});
+
+test('a stash-write token can mutate stashes but cannot read unrelated media', function (): void {
+    $headers = $this->scopedAuthHeaders(['stash:write']);
+
+    $this->http->post('/api/v1/stashes', ['name' => 'Scoped Stash'], headers: $headers)
+        ->assertStatus(Status::CREATED);
+    $this->http->get('/api/v1/items', headers: $headers)->assertStatus(Status::FORBIDDEN);
+});
+
+test('a media-server-write token can mutate media servers but cannot administer tokens', function (): void {
+    $headers = $this->scopedAuthHeaders(['media-server:write']);
+
+    $this->http->post('/api/v1/media-servers', [
+        'type' => 'jellyfin',
+        'name' => 'Scoped Jellyfin',
+        'base_uri' => 'http://jellyfin.test',
+        'token' => 'fixture-secret',
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->http->get('/api/v1/auth/tokens', headers: $headers)->assertStatus(Status::FORBIDDEN);
+});
+
+test('a token-management grant can administer and revoke itself', function (): void {
+    $created = $this->http->post('/api/v1/auth/tokens', [
+        'name' => 'token-manager',
+        'scopes' => ['tokens:manage'],
+    ], headers: $this->authHeaders())->assertStatus(Status::CREATED);
+    $headers = ['Authorization' => 'Bearer ' . $created->body['token']];
+
+    $this->http->get('/api/v1/auth/tokens', headers: $headers)->assertOk();
+    $this->http->delete('/api/v1/auth/tokens/' . $created->body['id'], headers: $headers)->assertOk();
+    $this->http->get('/api/v1/auth/tokens', headers: $headers)->assertStatus(Status::UNAUTHORIZED);
+});
+
+test('an expired scoped token remains unauthenticated', function (): void {
+    $auth = $this->container->get(AuthService::class);
+    $user = $this->container->get(UserRepository::class)->findByUsername('owner');
+
+    if ($user === null) {
+        $this->authHeaders();
+        $user = $this->container->get(UserRepository::class)->findByUsername('owner');
+    }
+
+    $created = $auth->createApiToken(
+        $user,
+        'expired-reader',
+        ['media:read'],
+        DateTime::now(Timezone::UTC)->minusSeconds(1),
+    );
+
+    $this->http->get('/api/v1/items', headers: ['Authorization' => 'Bearer ' . $created['token']])
+        ->assertStatus(Status::UNAUTHORIZED);
+});
+
+test('legacy empty-scope tokens retain full owner access', function (): void {
+    $headers = $this->scopedAuthHeaders([]);
+
+    $this->http->post('/api/v1/stashes', ['name' => 'Legacy Full Access'], headers: $headers)
+        ->assertStatus(Status::CREATED);
+    $this->http->get('/api/v1/auth/tokens', headers: $headers)->assertOk();
 });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth;
 
+use InvalidArgumentException;
 use Tempest\Mapper\SerializeAs;
 
 #[SerializeAs('api_token_scopes')]
@@ -26,13 +27,17 @@ final readonly class ApiTokenScopes
 
         foreach ($values as $value) {
             if (! is_string($value)) {
-                continue;
+                throw new InvalidArgumentException('API token scopes must be strings.');
             }
 
             $scope = trim($value);
 
             if ($scope === '') {
-                continue;
+                throw new InvalidArgumentException('API token scopes must not be empty.');
+            }
+
+            if (ApiScope::tryFrom($scope) === null) {
+                throw new InvalidArgumentException('Unknown API token scope.');
             }
 
             $scopes[$scope] = $scope;
@@ -46,5 +51,4 @@ final readonly class ApiTokenScopes
     {
         return $this->values;
     }
-
 }

@@ -84,20 +84,20 @@ final readonly class AuthService
         $this->context->set(null);
     }
 
-    public function resolveFromRequest(Request $request): ?UserRecord
+    public function resolveFromRequest(Request $request): ?AuthenticatedPrincipal
     {
         $authorization = $this->headerValue($request, 'Authorization');
 
         // Bearer header keeps precedence: an explicit (even if invalid) token
         // must not silently fall back to a cookie or session.
         if ($authorization !== null && preg_match('/^Bearer\s+(\S+)\s*$/i', $authorization, $matches)) {
-            return $this->resolveFromToken($matches[1]);
+            return $this->resolveFromToken($matches[1], session: false);
         }
 
         $cookie = $request->cookies[self::SESSION_COOKIE] ?? null;
 
         if ($cookie !== null && is_string($cookie->value) && $cookie->value !== '') {
-            return $this->resolveFromToken($cookie->value);
+            return $this->resolveFromToken($cookie->value, session: true);
         }
 
         // No fallback to Tempest's native Authenticator/Session here: those
@@ -108,7 +108,7 @@ final readonly class AuthService
         return null;
     }
 
-    private function resolveFromToken(#[SensitiveParameter] string $plainToken): ?UserRecord
+    private function resolveFromToken(#[SensitiveParameter] string $plainToken, bool $session): ?AuthenticatedPrincipal
     {
         $token = $this->tokens->findByHash(hash('sha256', $plainToken));
 
@@ -128,9 +128,8 @@ final readonly class AuthService
 
         $token->lastUsedAt = DateTime::now(Timezone::UTC);
         $token->save();
-        $this->context->set($user);
 
-        return $user;
+        return new AuthenticatedPrincipal($user, $session, $token->scopes);
     }
 
     /**
@@ -174,6 +173,7 @@ final readonly class AuthService
     /** @return array{id: string, token: string, token_preview: string, name: string} */
     public function createApiToken(UserRecord $user, string $name, ?array $scopes = null, ?DateTime $expiresAt = null): array
     {
+        $scopes = $scopes === null ? null : ApiTokenScopes::fromArray($scopes)->toArray();
         $plainToken = 'stashd_pat_' . bin2hex(random_bytes(24));
         $record = $this->tokens->create(
             userId: UserId::fromPrimaryKey($user->id),

@@ -11,25 +11,35 @@ use Tempest\Container\Singleton;
 #[Singleton]
 final class AuthContext implements Resettable
 {
-    private ?UserRecord $user = null;
+    private ?AuthenticatedPrincipal $principal = null;
 
     public function set(?UserRecord $user): void
     {
-        $this->user = $user;
+        $this->principal = $user === null ? null : new AuthenticatedPrincipal($user, session: true);
+    }
+
+    public function setPrincipal(?AuthenticatedPrincipal $principal): void
+    {
+        $this->principal = $principal;
     }
 
     public function user(): ?UserRecord
     {
-        return $this->user;
+        return $this->principal?->user;
     }
 
     public function requireUser(): UserRecord
     {
-        return $this->user ?? throw new AuthenticationRequired('Authentication required.');
+        return ($this->principal ?? throw new AuthenticationRequired('Authentication required.'))->user;
+    }
+
+    public function principal(): ?AuthenticatedPrincipal
+    {
+        return $this->principal;
     }
 
     public function reset(): void
     {
-        $this->user = null;
+        $this->principal = null;
     }
 }
