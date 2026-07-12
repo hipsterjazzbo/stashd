@@ -16,6 +16,7 @@ final readonly class PodcastEpisode
         public string $enclosureUrl,
         public int $enclosureLength,
         public string $enclosureMimeType,
+        public ?string $imageUrl = null,
     ) {
     }
 }

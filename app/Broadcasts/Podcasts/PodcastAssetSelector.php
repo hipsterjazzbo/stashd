@@ -57,6 +57,17 @@ final readonly class PodcastAssetSelector
         return null;
     }
 
+    public function artworkAsset(MediaItemId $mediaItemId): ?AssetRecord
+    {
+        foreach ($this->assets->listForMediaItem($mediaItemId) as $asset) {
+            if ($asset->role === AssetRole::SourceThumbnail && $asset->state === AssetState::Ready && $asset->path !== null && is_file($asset->path)) {
+                return $asset;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * The ready video VaultOriginal for `$mediaItemId`, if any — used only to
      * decide whether a podcast configured for audio can fall back to

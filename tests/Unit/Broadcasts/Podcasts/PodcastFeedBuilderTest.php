@@ -28,6 +28,7 @@ test('podcast feed builder emits valid escaped deterministic rss', function (): 
             enclosureUrl: 'http://localhost:8474/b/feed-token/items/item-token/episode.mp3',
             enclosureLength: 456,
             enclosureMimeType: 'audio/mpeg',
+            imageUrl: 'https://example.com/episode.jpg',
         ),
         new PodcastEpisode(
             guid: 'stashd:broadcast:one:item:one',
@@ -52,5 +53,6 @@ test('podcast feed builder emits valid escaped deterministic rss', function (): 
         ->and($first)->toContain('<podcast:guid>917393e3-1b1e-5cef-ace4-edaa54e1f810</podcast:guid>')
         ->and($first)->toContain('<br />')
         ->and($first)->toContain('<a href="https://example.com/support">https://example.com/support</a>')
+        ->and($first)->toContain('<itunes:image href="https://example.com/episode.jpg" />')
         ->and(strpos($first, 'Episode One'))->toBeLessThan(strpos($first, 'Episode &lt;Two&gt;'));
 });

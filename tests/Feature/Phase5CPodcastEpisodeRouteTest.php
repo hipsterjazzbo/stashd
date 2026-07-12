@@ -65,6 +65,32 @@ test('valid audio podcast episode token returns an X-Accel-Redirect to the Vault
     expect($response->body)->toBeNull();
 });
 
+test('valid podcast item token returns its source thumbnail through Caddy', function (): void {
+    [$headers, $stashId, $mediaItemId] = podcastEpisodeReadyStash($this, 'episode-artwork');
+    $config = $this->container->get(StashdConfig::class);
+    podcastEpisodeCreateAsset($config, $this->container->get(AssetRepository::class), $mediaItemId, AssetKind::Audio, 'original.mp3', 'audio/mpeg', 'audio');
+    $media = MediaItemRecord::findById(new PrimaryKey($mediaItemId));
+    $path = $config->vaultPath() . '/podcast-episode-tests/' . $media->providerItemId . '/thumbnail.jpg';
+    file_put_contents($path, 'jpeg');
+    $this->container->get(AssetRepository::class)->create(
+        mediaItemId: MediaItemId::parse($mediaItemId), role: AssetRole::SourceThumbnail, kind: AssetKind::Image,
+        state: AssetState::Ready, path: $path, relativePath: 'podcast-episode-tests/' . $media->providerItemId . '/thumbnail.jpg',
+        mimeType: 'image/jpeg', sizeBytes: 4,
+    );
+
+    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', ['type' => 'podcast', 'name' => 'Artwork', 'slug' => 'artwork-' . bin2hex(random_bytes(3))], headers: $headers)->assertStatus(Status::CREATED);
+    $this->http->post('/api/v1/commands', ['type' => 'broadcast.rebuild', 'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']]], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $xml = simplexml_load_string((string) file_get_contents(podcastEpisodeFeedPath($config, $broadcast->body['broadcast']['id'])));
+    $image = $xml->channel->item->children('http://www.itunes.com/dtds/podcast-1.0.dtd')->image;
+    $url = (string) $image->attributes()['href'];
+    $parts = podcastEpisodeUrlParts((string) $xml->channel->item->enclosure['url']);
+    expect($url)->toContain('/artwork');
+    $response = $this->http->get('/b/' . rawurlencode($parts['broadcastToken']) . '/items/' . rawurlencode($parts['itemToken']) . '/artwork');
+    $response->assertStatus(Status::OK)->assertHeaderContains('Content-Type', 'image/jpeg')->assertHeaderContains('X-Accel-Redirect', podcastEpisodeExpectedAccelPath($mediaItemId, 'thumbnail.jpg'));
+});
+
 test('valid video podcast episode token returns an X-Accel-Redirect to the Vault asset', function (): void {
     [$headers, $stashId, $mediaItemId] = podcastEpisodeReadyStash($this, 'episode-video');
     $config = $this->container->get(StashdConfig::class);

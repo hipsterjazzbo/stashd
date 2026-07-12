@@ -331,6 +331,9 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
             enclosureUrl: $this->urls->episodeUrl($broadcastToken, $itemToken, $selection->extension),
             enclosureLength: $selection->length,
             enclosureMimeType: $selection->mimeType,
+            imageUrl: $this->assets->artworkAsset($stashItem->mediaItemId) === null
+                ? null
+                : $this->urls->artworkUrl($broadcastToken, $itemToken),
         );
     }
 
@@ -353,7 +356,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
             feedUrl: $this->urls->feedUrl($broadcastToken),
             linkUrl: $settings->linkUrl,
             author: $settings->author,
-            imageUrl: $settings->imageUrl,
+            imageUrl: $settings->imageUrl ?? $this->nonEmptyString($context->stash->iconUri),
             fundingUrl: $fundingUrl,
             language: $settings->language,
             explicit: $settings->explicit,

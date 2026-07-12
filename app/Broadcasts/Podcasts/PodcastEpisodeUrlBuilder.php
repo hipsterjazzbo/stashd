@@ -26,6 +26,11 @@ final readonly class PodcastEpisodeUrlBuilder
             . '/episode.' . rawurlencode($extension);
     }
 
+    public function artworkUrl(string $broadcastToken, string $itemToken): string
+    {
+        return $this->baseUrl() . '/b/' . rawurlencode($broadcastToken) . '/items/' . rawurlencode($itemToken) . '/artwork';
+    }
+
     private function baseUrl(): string
     {
         return rtrim($this->config->publicUrl, '/');

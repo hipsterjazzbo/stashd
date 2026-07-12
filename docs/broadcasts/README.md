@@ -35,6 +35,12 @@ Not implemented:
 
 Podcast feeds are tokenized HTTP distribution surfaces, not Plex/Jellyfin filesystem views. Podcast formats do **not** use `AbstractSeriesBroadcastType`.
 
+### Artwork
+
+- Feed artwork uses the stash channel avatar (`iconUri`) unless an explicit podcast `image_url` setting is present.
+- Episode artwork uses a ready Vault `source_thumbnail` asset when available; feeds omit the item-level `itunes:image` otherwise.
+- Episode artwork is served at `/b/{broadcastToken}/items/{itemToken}/artwork` through the same token checks and Caddy internal redirect as episode media. It never exposes a Vault path or generates an image at request time.
+
 The public feed route is implemented:
 
 ```text
