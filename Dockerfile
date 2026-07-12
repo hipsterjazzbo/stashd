@@ -5,7 +5,9 @@ FROM docker.io/composer:2 AS composer
 # The vite-plugin-tempest plugin normally shells out to `php tempest vite:config`
 # for its settings; we feed it inline via TEMPEST_PLUGIN_CONFIGURATION_OVERRIDE
 # so this stage stays pure Node (no PHP needed).
-FROM docker.io/node:22-bookworm-slim AS assets
+FROM docker.io/node:22-bookworm-slim AS node
+
+FROM node AS assets
 WORKDIR /app
 ENV TEMPEST_PLUGIN_CONFIGURATION_OVERRIDE='{"build_directory":"build","bridge_file_name":"vite-tempest","manifest":"manifest.json","entrypoints":["src/main.entrypoint.ts"]}'
 COPY package.json package-lock.json ./
@@ -103,6 +105,7 @@ FROM base AS dev
 # `composer install` and `npm run build` run against the host checkout, e.g.
 # through lerd's exec tooling) -- the same prerequisites any non-Dockerized
 # local PHP setup would need.
+COPY --from=node /usr/local /usr/local
 RUN install-php-extensions xdebug pcov
 
 COPY docker/php-dev.ini /usr/local/etc/php/conf.d/zz-stashd-dev.ini

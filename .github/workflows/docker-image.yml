@@ -19,38 +19,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
+      - name: Build Lerd development image
+        run: docker build --target dev -t stashd:ci .
 
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "8.5"
-          extensions: sqlite3, mbstring
-          tools: composer
-          coverage: none
-          cache: composer
-
-      - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist --no-progress
-
-      - name: Check code style
-        run: composer lint
-
-      - name: Run static analysis
-        run: composer test:static
-
-      - name: Typecheck frontend
-        run: npm run typecheck
-
-      - name: Run application tests
-        run: composer test
+      - name: Run quality checks in Lerd
+        run: |
+          docker run --rm --entrypoint sh \
+            -v "$GITHUB_WORKSPACE:/var/www/html" \
+            -w /var/www/html \
+            stashd:ci -lc '
+              git config --global --add safe.directory /var/www/html
+              composer install --no-interaction --prefer-dist --no-progress
+              npm ci
+              composer lint
+              composer test:static
+              npm run typecheck
+              composer test:parallel
+            '
 
   smoke:
     needs: quality
