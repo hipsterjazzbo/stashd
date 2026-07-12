@@ -98,7 +98,9 @@ publish()/verify() find no audio asset
 
 ### Funding link detection
 
-Podcast feed metadata supports a `<funding url="...">` tag (already part of `PodcastFeedMetadata`/`PodcastFeedBuilder`). The funding URL is resolved in `PodcastBroadcastFormat::metadata()`:
+Podcast feeds emit iTunes, Atom, `content`, and Podcasting 2.0 namespaces. Descriptions retain line breaks and safely linkify plain HTTP(S) URLs in `content:encoded`; provider HTML is escaped, never trusted. Private feeds emit `<itunes:block>yes</itunes:block>`, and a plugin-owned `podcast_guid` is persisted in broadcast settings so `<podcast:guid>` survives feed-token rotation.
+
+Podcast feed metadata supports a `<podcast:funding url="...">` tag. The funding URL is resolved in `PodcastBroadcastPlugin::metadata()`:
 
 1. Manual `settings['funding_url']` on the broadcast, if non-blank — always wins.
 2. Otherwise, `PodcastFundingLinkDetector` scans the descriptions of media items actually included in that rebuild (active stash items with a successfully selected Vault asset) for a recognizable funding link.

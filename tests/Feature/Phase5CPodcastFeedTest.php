@@ -68,6 +68,7 @@ test('broadcast.rebuild writes deterministic audio podcast feed with tokenized e
     $feedXml = (string) file_get_contents(podcastFeedPath($config, $broadcast->body['broadcast']['id']));
     $xml = simplexml_load_string($feedXml);
     expect($xml)->not->toBeFalse();
+    $podcast = $xml->channel->children('https://podcastindex.org/namespace/1.0');
 
     $item = BroadcastItemRecord::select()
         ->where('broadcastId = ?', $broadcast->body['broadcast']['id'])
@@ -78,6 +79,7 @@ test('broadcast.rebuild writes deterministic audio podcast feed with tokenized e
         ->and($command['result']['verify']['ok'])->toBeTrue()
         ->and((string) $xml->channel->title)->toBe('Audio & Feed')
         ->and((string) $xml->channel->description)->toBe('Private <audio> feed')
+        ->and((string) $podcast->guid)->toMatch('/^[0-9a-f-]{36}$/')
         ->and((string) $xml->channel->item->title)->toBe('Fake Episode 1')
         ->and((string) $xml->channel->item->description)->toBe('Fake episode 1 description.')
         ->and((string) $xml->channel->item->guid)->toBe('stashd:broadcast:' . $broadcast->body['broadcast']['id'] . ':item:' . (string) $item->id)
@@ -100,6 +102,21 @@ test('broadcast.rebuild writes deterministic audio podcast feed with tokenized e
     expect($secondCommand['result']['verify']['ok'])->toBeTrue()
         ->and($secondFeedXml)->toBe($feedXml)
         ->and($secondFeedXml)->not->toContain((string) $item->tokenPreview);
+
+    $guid = (string) $podcast->guid;
+    $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rotate_token',
+        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+    $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild',
+        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $rotated = simplexml_load_string((string) file_get_contents(podcastFeedPath($config, $broadcast->body['broadcast']['id'])));
+    expect((string) $rotated->channel->children('https://podcastindex.org/namespace/1.0')->guid)->toBe($guid);
 });
 
 test('broadcast.rebuild writes video podcast feed for supported ready video asset', function (): void {
@@ -450,7 +467,9 @@ test('manual funding url setting wins over a detected link in episode descriptio
     $feedXml = (string) file_get_contents(podcastFeedPath($config, $broadcast->body['broadcast']['id']));
     $xml = simplexml_load_string($feedXml);
 
-    expect((string) $xml->channel->funding['url'])->toBe('https://example.test/manual-support')
+    $funding = $xml->channel->children('https://podcastindex.org/namespace/1.0')->funding;
+
+    expect((string) $funding->attributes()['url'])->toBe('https://example.test/manual-support')
         ->and((string) $xml->channel->description)->not->toContain('patreon.com');
 });
 
@@ -486,7 +505,9 @@ test('detected funding link is used in the feed when no manual setting exists', 
     $feedXml = (string) file_get_contents(podcastFeedPath($config, $broadcast->body['broadcast']['id']));
     $xml = simplexml_load_string($feedXml);
 
-    expect((string) $xml->channel->funding['url'])->toBe('https://ko-fi.com/example');
+    $funding = $xml->channel->children('https://podcastindex.org/namespace/1.0')->funding;
+
+    expect((string) $funding->attributes()['url'])->toBe('https://ko-fi.com/example');
 });
 
 test('podcast feed omits funding tag when no manual or detected funding link exists', function (): void {

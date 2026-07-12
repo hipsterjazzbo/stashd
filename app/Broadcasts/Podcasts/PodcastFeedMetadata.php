@@ -14,6 +14,10 @@ final readonly class PodcastFeedMetadata
         public ?string $author = null,
         public ?string $imageUrl = null,
         public ?string $fundingUrl = null,
+        public string $language = 'en',
+        public bool $explicit = false,
+        public bool $complete = false,
+        public ?string $podcastGuid = null,
     ) {
     }
 }

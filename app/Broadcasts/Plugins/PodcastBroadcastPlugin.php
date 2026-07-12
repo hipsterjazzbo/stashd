@@ -11,6 +11,7 @@ use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastItemRecord;
 use App\Broadcasts\BroadcastItemRepository;
 use App\Broadcasts\BroadcastItemState;
+use App\Broadcasts\BroadcastRepository;
 use App\Broadcasts\BroadcastPathBuilder;
 use App\Broadcasts\BroadcastPlan;
 use App\Broadcasts\BroadcastPlannedSidecar;
@@ -22,6 +23,7 @@ use App\Broadcasts\FileKind;
 use App\Broadcasts\Podcasts\PodcastEpisode;
 use App\Broadcasts\Podcasts\PodcastFeedBuilder;
 use App\Broadcasts\Podcasts\PodcastFeedMetadata;
+use App\Broadcasts\Podcasts\PodcastFeedSettings;
 use App\Broadcasts\Podcasts\PodcastGuid;
 use App\Broadcasts\Podcasts\PodcastMediaKind;
 use App\Broadcasts\Podcasts\PodcastTokenService;
@@ -34,6 +36,7 @@ use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * Podcast broadcast plugin — generates RSS podcast feeds with episode media URLs.
@@ -45,6 +48,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         private BroadcastContextFactory $contextFactory,
         private BroadcastPathBuilder $paths,
         private BroadcastItemRepository $broadcastItems,
+        private BroadcastRepository $broadcasts,
         private \App\Broadcasts\Podcasts\PodcastAssetSelector $assets,
         private PodcastTokenService $tokens,
         private \App\Broadcasts\Podcasts\PodcastEpisodeUrlBuilder $urls,
@@ -72,6 +76,9 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
             new UiControl('title', 'Podcast Title', 'text'),
             new UiControl('description', 'Podcast Description', 'text'),
             new UiControl('author', 'Author', 'text'),
+            new UiControl('language', 'Language', 'text', 'en'),
+            new UiControl('explicit', 'Explicit', 'select', 'false', ['false', 'true']),
+            new UiControl('complete', 'Complete', 'select', 'false', ['false', 'true']),
             new UiControl('funding_url', 'Funding URL', 'text'),
             new UiControl('media_kind', 'Media Kind', 'select', null, ['audio', 'video']),
         ];
@@ -330,25 +337,46 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
     /** @param list<string|null> $includedDescriptions */
     private function metadata(BroadcastContext $context, string $broadcastToken, array $includedDescriptions): PodcastFeedMetadata
     {
-        $settings = $this->settings($context);
-        $title = $this->nonEmptyString($settings['title'] ?? null)
+        $settings = PodcastFeedSettings::fromArray($this->settings($context));
+        $title = $settings->title
             ?? $context->stash->name
             ?? $context->broadcast->name;
-        $description = $this->nonEmptyString($settings['description'] ?? null)
+        $description = $settings->description
             ?? $context->stash->description
             ?? 'Private Stashd podcast feed.';
-        $fundingUrl = $this->nonEmptyString($settings['funding_url'] ?? null)
+        $fundingUrl = $settings->fundingUrl
             ?? $this->fundingDetector->detect($includedDescriptions);
 
         return new PodcastFeedMetadata(
             title: $title,
             description: $description,
             feedUrl: $this->urls->feedUrl($broadcastToken),
-            linkUrl: $this->nonEmptyString($settings['link_url'] ?? null),
-            author: $this->nonEmptyString($settings['author'] ?? null),
-            imageUrl: $this->nonEmptyString($settings['image_url'] ?? null),
+            linkUrl: $settings->linkUrl,
+            author: $settings->author,
+            imageUrl: $settings->imageUrl,
             fundingUrl: $fundingUrl,
+            language: $settings->language,
+            explicit: $settings->explicit,
+            complete: $settings->complete,
+            podcastGuid: $this->feedGuid($context),
         );
+    }
+
+    private function feedGuid(BroadcastContext $context): string
+    {
+        $settings = $context->broadcast->settings ?? [];
+        $guid = $settings['podcast_guid'] ?? null;
+
+        if (is_string($guid) && Uuid::isValid($guid)) {
+            return $guid;
+        }
+
+        $guid = Uuid::v4()->toRfc4122();
+        $settings['podcast_guid'] = $guid;
+        $context->broadcast->settings = $settings;
+        $this->broadcasts->save($context->broadcast);
+
+        return $guid;
     }
 
     private function episodeTitle(\App\Stashes\StashItemRecord $stashItem, MediaItemRecord $mediaItem): string

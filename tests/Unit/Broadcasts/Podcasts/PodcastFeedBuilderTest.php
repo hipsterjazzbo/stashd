@@ -17,12 +17,13 @@ test('podcast feed builder emits valid escaped deterministic rss', function (): 
         description: 'Private "feed" & archive',
         feedUrl: 'http://localhost:8474/b/feed-token/feed.xml',
         author: 'Author & Co',
+        podcastGuid: '917393e3-1b1e-5cef-ace4-edaa54e1f810',
     );
     $episodes = [
         new PodcastEpisode(
             guid: 'stashd:broadcast:one:item:two',
             title: 'Episode <Two>',
-            description: 'Description & details',
+            description: "Description & details\nhttps://example.com/support",
             publishedAt: DateTime::parse('2026-01-02T12:00:00Z', Timezone::UTC),
             enclosureUrl: 'http://localhost:8474/b/feed-token/items/item-token/episode.mp3',
             enclosureLength: 456,
@@ -48,5 +49,8 @@ test('podcast feed builder emits valid escaped deterministic rss', function (): 
         ->and($first)->toContain('url="http://localhost:8474/b/feed-token/items/item-token-1/episode.mp3"')
         ->and($first)->toContain('length="123"')
         ->and($first)->toContain('type="audio/mpeg"')
+        ->and($first)->toContain('<podcast:guid>917393e3-1b1e-5cef-ace4-edaa54e1f810</podcast:guid>')
+        ->and($first)->toContain('<br />')
+        ->and($first)->toContain('<a href="https://example.com/support">https://example.com/support</a>')
         ->and(strpos($first, 'Episode One'))->toBeLessThan(strpos($first, 'Episode &lt;Two&gt;'));
 });
