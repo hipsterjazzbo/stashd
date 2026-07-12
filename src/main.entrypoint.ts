@@ -1376,12 +1376,41 @@ function stashDetailComponent(stashId: string) {
 			return this.jobs.find((job) => job.entity_type === 'media_item' && job.entity_id === mediaItemId && job.state === 'processing') ?? null
 		},
 
-		// Same idea as activeJobFor, but for a broadcast rebuild/verify/prune/
-		// trigger/rotate_token job (BroadcastCommandHandler records
-		// entity_type 'broadcast') -- the state badge alone only ever said
-		// "processing" with no sense of what's happening or how far along.
-		activeBroadcastJobFor(broadcastId: string): JobSummary | null {
-			return this.jobs.find((job) => job.entity_type === 'broadcast' && job.entity_id === broadcastId && job.state === 'processing') ?? null
+		broadcastJobFor(broadcastId: string): JobSummary | null {
+			return this.jobs.find((job) => job.entity_type === 'broadcast' && job.entity_id === broadcastId && ['pending', 'processing'].includes(job.state)) ?? null
+		},
+
+		broadcastTranscodeJobs(broadcast: BroadcastSummary): JobSummary[] {
+			const mediaItemIds = new Set(broadcast.items.map((item) => item.media_item_id))
+			return this.jobs.filter((job) => job.intent === 'transcode_podcast_audio'
+				&& job.entity_id !== null
+				&& mediaItemIds.has(job.entity_id)
+				&& ['pending', 'processing'].includes(job.state))
+		},
+
+		broadcastReadyItemCount(broadcast: BroadcastSummary): number {
+			return broadcast.items.filter((item) => item.state === 'ready').length
+		},
+
+		broadcastStatus(broadcast: BroadcastSummary): string {
+			const job = this.broadcastJobFor(broadcast.id)
+			if (job?.state === 'pending') return 'Queued — waiting for downloads and a worker'
+			if (job?.state === 'processing') return job.progress_label ?? 'Building broadcast'
+
+			const transcodes = this.broadcastTranscodeJobs(broadcast)
+			if (transcodes.length > 0) return `${transcodes.length} audio transcode${transcodes.length === 1 ? '' : 's'} in progress — this will update automatically`
+
+			if (broadcast.last_built_at === null) return 'Not built yet — nothing is running'
+			if ((broadcast.impact?.eligible_item_count ?? 0) === 0) {
+				const waiting = broadcast.impact?.skipped_item_count ?? 0
+				return waiting > 0
+					? `Built; waiting for ${waiting} item${waiting === 1 ? '' : 's'} to finish downloading`
+					: 'Built; waiting for items to be discovered'
+			}
+			if (broadcast.state === 'failed') return 'Build failed'
+			if (broadcast.state === 'stale') return `${this.broadcastProblemItems(broadcast).length} item${this.broadcastProblemItems(broadcast).length === 1 ? '' : 's'} need attention`
+
+			return `Up to date · built ${formatRelativeTime(broadcast.last_built_at)}`
 		},
 
 		// Compact "N ready · N processing · N stale" summary of a broadcast's

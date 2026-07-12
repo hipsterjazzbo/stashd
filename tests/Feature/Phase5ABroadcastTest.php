@@ -34,10 +34,67 @@ test('create jellyfin broadcast for stash returns snake_case json', function ():
     ], headers: $headers)->assertStatus(Status::CREATED);
 
     expect($response->body)->toHaveKey('broadcast')
+        ->and($response->body)->toHaveKey('build_command_id')
         ->and($response->body['broadcast']['type'])->toBe('jellyfin')
         ->and($response->body['broadcast']['state'])->toBe('pending')
         ->and($response->body['broadcast']['stash_id'])->toBe($stashId)
         ->and($response->body['broadcast']['last_planned_at'])->toBeNull();
+
+    $command = $this->http->get('/api/v1/commands/' . $response->body['build_command_id'], headers: $headers)->assertOk();
+    expect($command->body['command']['type'])->toBe('broadcast.rebuild')
+        ->and($command->body['jobs'][0]['state'])->toBe('pending');
+});
+
+test('an initial podcast build waits cleanly when stash media is not ready', function (): void {
+    [$headers, $stashId] = array_slice($this->bootstrapFakeDownloadStash('broadcast-waits-for-media'), 0, 2);
+
+    $response = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'podcast',
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    $this->processAllJobs();
+
+    $broadcast = $this->http->get('/api/v1/broadcasts/' . $response->body['broadcast']['id'], headers: $headers)
+        ->assertOk()
+        ->body['broadcast'];
+
+    expect($broadcast['state'])->toBe('ready')
+        ->and($broadcast['last_error'])->toBeNull()
+        ->and($broadcast['items'])->toBeEmpty()
+        ->and($broadcast['impact']['eligible_item_count'])->toBe(0)
+        ->and($broadcast['impact']['skipped_item_count'])->toBeGreaterThan(0);
+});
+
+test('a broadcast created before input discovery rebuilds after the new media downloads', function (): void {
+    $headers = $this->authHeaders();
+    $stash = $this->http->post('/api/v1/stashes', [
+        'name' => 'Still Discovering',
+        'download_policy' => 'video',
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $stashId = $stash->body['stash']['id'];
+
+    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'jellyfin',
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $broadcastId = $broadcast->body['broadcast']['id'];
+    $this->processAllJobs();
+
+    $preflight = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.preflight',
+        'options' => ['source_uri' => 'fake://channel/still-discovering'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $result = $this->http->get('/api/v1/broadcasts/' . $broadcastId, headers: $headers)->assertOk()->body['broadcast'];
+    expect($result['state'])->toBe('ready')
+        ->and($result['last_error'])->toBeNull()
+        ->and($result['items'])->toHaveCount(3)
+        ->and(array_unique(array_column($result['items'], 'state')))->toBe(['ready']);
 });
 
 test('previewing a jellyfin broadcast reports eligible items and their vault size, with nothing needing transcode', function (): void {
@@ -213,7 +270,7 @@ test('broadcast.plan produces intended files without writing to disk', function 
             'stash_id' => $stashId,
         ],
     ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
+    $this->container->get(\App\Jobs\JobWorkerService::class)->processNextJob();
 
     expect($this->http->get('/api/v1/commands/' . $download->body['command_id'], headers: $headers)->body['command']['state'])
         ->toBe('completed');

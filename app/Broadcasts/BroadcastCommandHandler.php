@@ -61,7 +61,7 @@ final readonly class BroadcastCommandHandler implements CommandHandler
                 commandId: $commandId,
                 entityType: 'broadcast',
                 entityId: PrefixedUlid::parse($payload['broadcast_id']),
-                priority: 40,
+                priority: 60,
                 payload: $payload,
             ),
         ];

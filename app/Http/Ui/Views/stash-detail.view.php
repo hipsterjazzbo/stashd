@@ -113,7 +113,10 @@
 				</section>
 
 				<section class="rounded-lg border border-line bg-panel/60">
-					<h2 class="border-b border-line px-4 py-3 text-[13px] font-semibold text-cream">Broadcasts</h2>
+					<div class="border-b border-line px-4 py-3">
+						<h2 class="text-[13px] font-semibold text-cream">Broadcasts</h2>
+						<p class="mt-0.5 text-[12px] text-muted">Generated views of this stash, with live build status.</p>
+					</div>
 					<p class="px-4 py-3 text-[13px] text-muted" x-show="broadcasts.length === 0">No broadcasts yet.</p>
 					<ul class="divide-y divide-line/60" x-show="broadcasts.length > 0">
 						<template x-for="broadcast in broadcasts" x-bind:key="broadcast.id">
@@ -131,16 +134,31 @@
 
 								<p class="mt-1 text-[12px] text-error" x-show="broadcast.last_error" x-text="broadcast.last_error"></p>
 
-								<template x-if="activeBroadcastJobFor(broadcast.id)">
+								<div class="mt-3 rounded border border-line bg-espresso p-3">
+									<p class="flex items-center gap-2 text-[13px] text-cream">
+										<span class="h-1.5 w-1.5 shrink-0 rounded-full"
+											x-bind:class="broadcastJobFor(broadcast.id) || broadcastTranscodeJobs(broadcast).length > 0 ? 'bg-amber pulse-dot' : statusBadge(broadcast.state).dot"></span>
+										<span x-text="broadcastStatus(broadcast)"></span>
+									</p>
+									<p class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted">
+										<span><strong class="font-medium text-cream" x-text="broadcastReadyItemCount(broadcast)"></strong> published</span>
+										<span><strong class="font-medium text-cream" x-text="broadcast.impact?.eligible_item_count ?? 0"></strong> ready in Vault</span>
+										<span x-show="(broadcast.impact?.skipped_item_count ?? 0) > 0"><strong class="font-medium text-cream" x-text="broadcast.impact?.skipped_item_count"></strong> waiting</span>
+										<span x-show="broadcastProblemItems(broadcast).length > 0"><strong class="font-medium text-warn" x-text="broadcastProblemItems(broadcast).length"></strong> need attention</span>
+										<span x-text="formatBytes(broadcast.impact?.vault_size_bytes) + ' in Vault'"></span>
+									</p>
+
+									<template x-if="broadcastJobFor(broadcast.id)?.state === 'processing'">
 									<div class="mt-2 flex items-center gap-2">
 										<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber pulse-dot"></span>
-										<span class="shrink-0 text-[11px] text-muted" x-text="activeBroadcastJobFor(broadcast.id).progress_label ?? activeBroadcastJobFor(broadcast.id).intent.replace(/_/g, ' ')"></span>
+										<span class="shrink-0 text-[11px] text-muted" x-text="broadcastJobFor(broadcast.id)?.progress_label ?? 'Building'"></span>
 										<div class="h-1.5 flex-1 rounded-full bg-espresso">
-											<div class="h-1.5 rounded-full bg-amber" x-bind:style="'width: ' + (activeBroadcastJobFor(broadcast.id).progress_percent ?? 0) + '%'"></div>
+											<div class="h-1.5 rounded-full bg-amber transition-[width] duration-200" x-bind:style="'width: ' + (broadcastJobFor(broadcast.id)?.progress_percent ?? 0) + '%'"></div>
 										</div>
-										<span class="shrink-0 text-[11px] text-muted" x-text="Math.round(activeBroadcastJobFor(broadcast.id).progress_percent ?? 0) + '%'"></span>
+										<span class="shrink-0 text-[11px] text-muted" x-text="Math.round(broadcastJobFor(broadcast.id)?.progress_percent ?? 0) + '%'"></span>
 									</div>
-								</template>
+									</template>
+								</div>
 
 								<div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1" x-show="broadcast.items.length > 0">
 									<template x-for="row in broadcastItemStateCounts(broadcast)" x-bind:key="row.state">
@@ -151,7 +169,10 @@
 									</template>
 								</div>
 
-								<ul class="mt-2 space-y-1" x-show="broadcastProblemItems(broadcast).length > 0">
+								<details class="mt-3" x-show="broadcastProblemItems(broadcast).length > 0">
+									<summary class="cursor-pointer list-none text-[12px] text-warn transition-colors hover:text-cream [&::-webkit-details-marker]:hidden"
+										x-text="broadcastProblemItems(broadcast).length + ' item' + (broadcastProblemItems(broadcast).length === 1 ? '' : 's') + ' need attention'"></summary>
+								<ul class="mt-2 max-h-56 space-y-1 overflow-y-auto">
 									<template x-for="item in broadcastProblemItems(broadcast)" x-bind:key="item.id">
 										<li class="rounded border border-line bg-espresso px-2 py-1 text-[11px]">
 											<div class="flex items-center gap-2">
@@ -165,8 +186,11 @@
 										</li>
 									</template>
 								</ul>
+								</details>
 
-								<div class="mt-2 rounded border border-line bg-espresso p-2" x-show="broadcast.impact">
+								<details class="mt-3 text-[12px] text-muted" x-show="broadcast.impact">
+									<summary class="cursor-pointer list-none transition-colors hover:text-cream [&::-webkit-details-marker]:hidden">Storage details</summary>
+								<div class="mt-2 rounded border border-line bg-espresso p-2">
 									<p class="text-[12px] text-muted">
 										<span x-text="broadcast.impact?.eligible_item_count"></span> item<span x-show="broadcast.impact?.eligible_item_count !== 1">s</span> published
 										(<span x-text="formatBytes(broadcast.impact?.vault_size_bytes)"></span> already in the Vault).
@@ -181,15 +205,19 @@
 										<span x-text="broadcast.impact?.transcode_item_count"></span> transcoded — extra space beyond the Vault original.
 									</p>
 								</div>
+								</details>
 
 								<div class="mt-2 flex flex-wrap gap-2">
 									<button type="button"
-										class="inline-flex items-center gap-1.5 rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-50"
-										x-bind:disabled="actionPending === broadcast.id + ':rebuild'"
-										x-on:click="runBroadcastAction(broadcast.id, 'rebuild')">
+									class="inline-flex items-center gap-1.5 rounded bg-amber px-3 py-1.5 text-[12px] font-semibold text-espresso transition-colors hover:bg-amber-dim disabled:opacity-50"
+									x-bind:disabled="actionPending === broadcast.id + ':rebuild' || broadcastJobFor(broadcast.id)"
+									x-on:click="runBroadcastAction(broadcast.id, 'rebuild')">
 										<span x-show="actionPending === broadcast.id + ':rebuild'" class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
-										rebuild
-									</button>
+									<span x-text="broadcast.last_built_at ? 'Rebuild' : 'Build now'"></span>
+								</button>
+								<details class="relative text-[12px] text-muted">
+									<summary class="cursor-pointer list-none rounded border border-line px-2 py-1.5 transition-colors hover:text-cream [&::-webkit-details-marker]:hidden">Maintenance</summary>
+									<div class="mt-2 flex flex-wrap gap-2">
 									<button type="button"
 										class="inline-flex items-center gap-1.5 rounded border border-line px-2 py-1 text-[12px] text-muted transition-colors hover:text-cream disabled:opacity-50"
 										x-bind:disabled="actionPending === broadcast.id + ':verify'"
@@ -212,6 +240,8 @@
 										<span x-show="actionPending === broadcast.id + ':rotate_token'" class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
 										rotate token
 									</button>
+									</div>
+								</details>
 								</div>
 
 								<div class="mt-3 rounded border border-line bg-espresso p-2" x-show="broadcast.feed_url">
@@ -225,7 +255,9 @@
 									<p class="mt-1 text-[12px] text-warn">Anyone with this link can listen — treat it like a password.</p>
 								</div>
 
-								<div class="mt-3 rounded border border-line bg-espresso p-2"
+								<details class="mt-3 text-[12px] text-muted">
+									<summary class="cursor-pointer list-none transition-colors hover:text-cream [&::-webkit-details-marker]:hidden">Settings</summary>
+								<div class="mt-2 rounded border border-line bg-espresso p-2"
 									x-init="ensureDestinationPathDraft(broadcast)">
 									<p class="text-[11px] uppercase tracking-wide text-muted">Destination path</p>
 									<p class="mt-1 text-[12px] text-muted">Where this broadcast's files are written. Stashd creates and exclusively manages one folder named after the broadcast directly under this path — it never touches anything else already there. Leave blank for the default location inside the Stashd media volume.</p>
@@ -263,11 +295,14 @@
 										</button>
 									</div>
 								</template>
+								</details>
 							</li>
 						</template>
 					</ul>
 
-					<div class="border-t border-line p-4">
+					<details class="border-t border-line p-4">
+						<summary class="cursor-pointer list-none text-[13px] font-semibold text-amber transition-colors hover:text-amber-dim [&::-webkit-details-marker]:hidden">+ Add broadcast</summary>
+					<div class="mt-3">
 						<div class="flex items-center gap-2">
 							<select x-model="newBroadcastType" x-on:change="onBroadcastTypeChanged()"
 								class="rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber">
@@ -343,6 +378,7 @@
 							</div>
 						</div>
 					</div>
+					</details>
 				</section>
 
 				<section class="rounded-lg border border-line bg-panel/60">

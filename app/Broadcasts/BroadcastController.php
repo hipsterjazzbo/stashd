@@ -9,6 +9,8 @@ use App\Broadcasts\Api\BroadcastResource;
 use App\Broadcasts\Podcasts\PodcastEpisodeUrlBuilder;
 use App\Broadcasts\Podcasts\PodcastMediaKind;
 use App\Broadcasts\Podcasts\PodcastTokenService;
+use App\Commands\CommandDispatchService;
+use App\Commands\CommandType;
 use App\Http\Api\ApiJson;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
@@ -44,6 +46,7 @@ final readonly class BroadcastController
         private BroadcastContextFactory $contexts,
         private MediaItemRepository $mediaItems,
         private BroadcastPathBuilder $paths,
+        private CommandDispatchService $commands,
     ) {
     }
 
@@ -201,8 +204,13 @@ final readonly class BroadcastController
             settings: $settings,
         );
 
+        $build = $this->commands->dispatch(CommandType::BroadcastRebuild, [
+            'broadcast_id' => (string) $broadcast->id,
+        ]);
+
         return new Json([
             'broadcast' => $this->mapBroadcast($broadcast),
+            'build_command_id' => (string) $build->command->id,
             'policy_mismatch' => $this->policyMismatch($stash->downloadPolicy, $broadcast),
         ], Status::CREATED);
     }

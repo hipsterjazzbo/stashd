@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Stashes;
 
+use App\Broadcasts\BroadcastRepository;
 use App\Commands\CommandDispatchService;
 use App\Commands\CommandId;
 use App\Commands\CommandRecord;
@@ -46,6 +47,7 @@ final readonly class CreateStashFromDiscovery
         private CommandDispatchService $commandDispatch,
         private DownloadPolicyEvaluator $downloadPolicy,
         private DiscoverStashInput $discovery,
+        private BroadcastRepository $broadcasts,
         private Database $database,
     ) {
     }
@@ -224,6 +226,12 @@ final readonly class CreateStashFromDiscovery
                     'stashId' => $stashId->toString(),
                 ]);
             }
+        }
+
+        foreach ($this->broadcasts->listForStash($stashId) as $broadcast) {
+            $this->commandDispatch->dispatch(CommandType::BroadcastRebuild, [
+                'broadcast_id' => (string) $broadcast->id,
+            ]);
         }
 
         return new StashInputCommitResult(

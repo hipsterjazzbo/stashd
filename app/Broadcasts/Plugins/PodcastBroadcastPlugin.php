@@ -117,10 +117,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         $failed = [];
         $included = 0;
 
-        foreach ($context->stashItems as $stashItem) {
-            if ($stashItem->state !== StashItemState::Active) {
-                continue;
-            }
+        foreach ($this->contextFactory->publishableStashItems($context) as $stashItem) {
 
             $mediaItem = $context->mediaItems[(string) $stashItem->mediaItemId] ?? null;
             $item = $this->findOrCreateItem($context, $stashItem);
@@ -196,10 +193,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
             $missing[] = 'feed.xml';
         }
 
-        foreach ($context->stashItems as $stashItem) {
-            if ($stashItem->state !== StashItemState::Active) {
-                continue;
-            }
+        foreach ($this->contextFactory->publishableStashItems($context) as $stashItem) {
 
             $item = $this->broadcastItems->findByBroadcastAndStashItem(
                 BroadcastId::fromPrimaryKey($context->broadcast->id),
@@ -244,7 +238,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         $staleCount = count($stale) + count($missing);
 
         return new BroadcastVerifyResult(
-            ok: $staleCount === 0 && count($valid) > 0,
+            ok: $staleCount === 0,
             validCount: count($valid),
             staleCount: $staleCount,
             validItemIds: $valid,

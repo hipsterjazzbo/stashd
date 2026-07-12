@@ -343,12 +343,6 @@ parameters:
 			path: app/Broadcasts/Plugins/AbstractSeriesBroadcastPlugin.php
 
 		-
-			message: '#^Property App\\Broadcasts\\Plugins\\PodcastBroadcastPlugin\:\:\$contextFactory is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: app/Broadcasts/Plugins/PodcastBroadcastPlugin.php
-
-		-
 			message: '#^Parameter \#1 \$array \(list\<App\\Vault\\AssetRecord\>\) of array_values is already a list, call has no effect\.$#'
 			identifier: arrayValues.list
 			count: 1

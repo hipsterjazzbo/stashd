@@ -236,6 +236,8 @@ media, only write `feed.xml`).
 
 ## Lifecycle
 
+Creating a broadcast automatically queues its first rebuild. Broadcast work runs after already-queued downloads in the bulk lane, and finishing input discovery queues another rebuild after its new downloads so a broadcast created while a new stash is still being populated catches up automatically. Podcast items without ready Vault media are treated as waiting rather than failed; an empty feed is a valid initial build.
+
 | Step | Command | Writes disk? |
 |---|---|---|
 | Plan | `broadcast.plan` | No — computes intended files + sidecars |

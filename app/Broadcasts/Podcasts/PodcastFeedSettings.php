@@ -51,6 +51,6 @@ final readonly class PodcastFeedSettings
     /** @param array<string, mixed> $settings */
     private static function boolean(array $settings, string $key): bool
     {
-        return $settings[$key] === true || $settings[$key] === 'true';
+        return ($settings[$key] ?? false) === true || ($settings[$key] ?? false) === 'true';
     }
 }
