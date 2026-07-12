@@ -73,9 +73,14 @@ test('valid podcast item token returns its source thumbnail through Caddy', func
     $path = $config->vaultPath() . '/podcast-episode-tests/' . $media->providerItemId . '/thumbnail.jpg';
     file_put_contents($path, 'jpeg');
     $this->container->get(AssetRepository::class)->create(
-        mediaItemId: MediaItemId::parse($mediaItemId), role: AssetRole::SourceThumbnail, kind: AssetKind::Image,
-        state: AssetState::Ready, path: $path, relativePath: 'podcast-episode-tests/' . $media->providerItemId . '/thumbnail.jpg',
-        mimeType: 'image/jpeg', sizeBytes: 4,
+        mediaItemId: MediaItemId::parse($mediaItemId),
+        role: AssetRole::SourceThumbnail,
+        kind: AssetKind::Image,
+        state: AssetState::Ready,
+        path: $path,
+        relativePath: 'podcast-episode-tests/' . $media->providerItemId . '/thumbnail.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 4,
     );
 
     $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', ['type' => 'podcast', 'name' => 'Artwork', 'slug' => 'artwork-' . bin2hex(random_bytes(3))], headers: $headers)->assertStatus(Status::CREATED);

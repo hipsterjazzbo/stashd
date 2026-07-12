@@ -71,7 +71,9 @@ final readonly class PodcastAssetSelector
     public function captionAsset(MediaItemId $mediaItemId): ?AssetRecord
     {
         foreach ($this->assets->listForMediaItem($mediaItemId) as $asset) {
-            if ($asset->role === AssetRole::Subtitle && $asset->state === AssetState::Ready && $asset->path !== null && is_file($asset->path)) return $asset;
+            if ($asset->role === AssetRole::Subtitle && $asset->state === AssetState::Ready && $asset->path !== null && is_file($asset->path)) {
+                return $asset;
+            }
         }
         return null;
     }
