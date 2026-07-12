@@ -62,8 +62,27 @@ jobs:
       - name: Run container smoke test
         run: composer test:docker-smoke
 
+  e2e:
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install browser dependencies
+        run: npm ci && npx playwright install --with-deps chromium
+
+      - name: Run authenticated browser smoke test
+        run: tests/e2e/run.sh
+
   build:
-    needs: [quality, smoke]
+    needs: [quality, smoke, e2e]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
