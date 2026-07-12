@@ -1230,20 +1230,21 @@ function stashDetailComponent(stashId: string) {
 			this.loading = false
 
 			this.onBroadcastTypeChanged()
+			const watch = (this as unknown as { $watch(property: string, callback: () => void): void }).$watch.bind(this)
 
 			// Filter/search/showIgnored changes are query params now (server
 			// -side filtering, see refreshItems()), not a client-side recompute
 			// -- each needs its own re-fetch, not just an offset reset. Search
 			// is debounced so typing doesn't fire a request per keystroke.
-			this.$watch('itemStatusFilter', () => {
+			watch('itemStatusFilter', () => {
 				this.itemsOffset = 0
 				void this.refreshItems()
 			})
-			this.$watch('showIgnored', () => {
+			watch('showIgnored', () => {
 				this.itemsOffset = 0
 				void this.refreshItems()
 			})
-			this.$watch('itemSearch', () => {
+			watch('itemSearch', () => {
 				this.itemsOffset = 0
 				if (this.itemSearchDebounce) clearTimeout(this.itemSearchDebounce)
 				this.itemSearchDebounce = setTimeout(() => void this.refreshItems(), 300)

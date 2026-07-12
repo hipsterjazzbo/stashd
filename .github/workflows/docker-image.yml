@@ -19,6 +19,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -36,6 +45,9 @@ jobs:
 
       - name: Run static analysis
         run: composer test:static
+
+      - name: Typecheck frontend
+        run: npm run typecheck
 
       - name: Run application tests
         run: composer test
