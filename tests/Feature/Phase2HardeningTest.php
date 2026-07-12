@@ -130,6 +130,9 @@ test('job failed events publish redacted last_error to the Mercure hub', functio
     $payload = json_decode($lastUpdate->getData(), associative: true);
 
     expect($payload['event'])->toBe('job.failed')
+        ->and($payload['id'])->toBe((string) $job->id)
+        ->and($payload['entity_type'])->toBe($job->entityType)
+        ->and($payload)->not->toHaveKey('payload')
         ->and($payload['last_error'])->not->toContain('stashd_pat_')
         ->and($payload['last_error'])->toContain('[REDACTED]');
 });

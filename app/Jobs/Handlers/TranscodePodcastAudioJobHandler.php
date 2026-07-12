@@ -75,13 +75,12 @@ final readonly class TranscodePodcastAudioJobHandler implements JobHandler
                 audioAssetId: $audioAssetId,
                 jobId: PrefixedUlid::parse((string) $job->id),
                 onProgress: function (FfmpegProgress $progress) use ($job, $context, &$lastForwardedAt): void {
-                    // ffmpeg's -progress pipe emits roughly every 0.5s; forwarding
-                    // every update would be a DB write + SSE publish each time for
-                    // no benefit. The final update always forwards regardless.
+                    // Keep the UI live without persisting every ffmpeg callback.
+                    // The final update always forwards regardless.
                     $now = microtime(true);
                     $isFinal = $progress->percent >= 100.0;
 
-                    if (! $isFinal && $now - $lastForwardedAt < 1.0) {
+                    if (! $isFinal && $now - $lastForwardedAt < 0.25) {
                         return;
                     }
 

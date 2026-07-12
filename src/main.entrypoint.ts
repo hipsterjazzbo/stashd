@@ -381,7 +381,7 @@ function activityLogEntryToEvent(entry: ActivityLogEntry): ActivityEvent {
 const EVENT_TYPES = ['job.created', 'job.progress', 'job.completed', 'job.failed', 'activity.created'] as const
 
 type MercureListener = (event: ActivityEvent) => void
-type ConnectionListener = (connected: boolean) => void
+type ConnectionListener = (connected: boolean, reconnected: boolean) => void
 
 // crypto.randomUUID() only exists in secure contexts (HTTPS or localhost) --
 // unavailable over a plain-HTTP LAN IP, a real access pattern for this app.
@@ -404,6 +404,7 @@ function randomEventId(): string {
 const mercureListeners = new Map<string, Set<MercureListener>>()
 const mercureConnectionListeners = new Set<ConnectionListener>()
 let mercureSource: EventSource | null = null
+let mercureConnectedOnce = false
 
 // The hub requires a subscriber JWT (no `anonymous`); this mints one and
 // sets it as the `mercureAuthorization` cookie the browser then sends
@@ -418,11 +419,13 @@ function ensureMercureConnection(): void {
 	mercureSource = new EventSource(`/.well-known/mercure?topic=${encodeURIComponent('stashd/events')}`)
 
 	mercureSource.onopen = () => {
-		for (const listener of mercureConnectionListeners) listener(true)
+		const reconnected = mercureConnectedOnce
+		mercureConnectedOnce = true
+		for (const listener of mercureConnectionListeners) listener(true, reconnected)
 	}
 
 	mercureSource.onerror = () => {
-		for (const listener of mercureConnectionListeners) listener(false)
+		for (const listener of mercureConnectionListeners) listener(false, false)
 		// The JWT is short-lived (~1h) -- remint on every drop so the
 		// browser's automatic reconnect carries a fresh cookie.
 		void refreshMercureSubscription().catch(() => {})
@@ -430,7 +433,8 @@ function ensureMercureConnection(): void {
 
 	mercureSource.onmessage = (raw: MessageEvent<string>) => {
 		const { event, ...payload } = JSON.parse(raw.data) as { event: string } & Record<string, unknown>
-		const wrapped: ActivityEvent = { id: randomEventId(), event, payload, created_at: new Date().toISOString() }
+		const id = event === 'activity.created' && typeof payload.id === 'string' ? `activity:${payload.id}` : randomEventId()
+		const wrapped: ActivityEvent = { id, event, payload, created_at: new Date().toISOString() }
 
 		for (const listener of mercureListeners.get(event) ?? []) listener(wrapped)
 	}
@@ -451,11 +455,17 @@ function subscribeToEvents(types: readonly string[], listener: MercureListener):
 }
 
 function subscribeToConnectionState(listener: ConnectionListener): () => void {
-	void refreshMercureSubscription().then(ensureMercureConnection).catch(() => {})
 	mercureConnectionListeners.add(listener)
+	void refreshMercureSubscription().then(ensureMercureConnection).catch(() => {})
 
 	return () => mercureConnectionListeners.delete(listener)
 }
+
+document.addEventListener('visibilitychange', () => {
+	if (!('EventSource' in window) || document.visibilityState !== 'visible' || mercureSource?.readyState !== EventSource.OPEN) return
+
+	for (const listener of mercureConnectionListeners) listener(true, true)
+})
 
 /**
  * Resolves once `checkTerminal` returns true, subscribing to the shared
@@ -471,11 +481,13 @@ function awaitSseTerminal(checkTerminal: () => Promise<boolean>): () => void {
 	let closed = false
 	let fallback: ReturnType<typeof setInterval> | null = null
 	let unsubscribe: (() => void) | null = null
+	let unsubscribeConnection: (() => void) | null = null
 
 	const finish = () => {
 		if (closed) return
 		closed = true
 		unsubscribe?.()
+		unsubscribeConnection?.()
 		if (fallback !== null) clearInterval(fallback)
 	}
 
@@ -485,11 +497,14 @@ function awaitSseTerminal(checkTerminal: () => Promise<boolean>): () => void {
 	}
 
 	unsubscribe = subscribeToEvents(EVENT_TYPES, () => void tick())
+	unsubscribeConnection = subscribeToConnectionState((connected, reconnected) => {
+		if (connected && reconnected) void tick()
+	})
 
-	// ponytail: SSE delivery isn't guaranteed (dropped connection, missed
-	// event) — this poll guarantees the caller eventually notices a terminal
-	// state even if every SSE event is lost.
-	fallback = setInterval(() => void tick(), 3000)
+	// ponytail: unsupported browsers have no stream to trigger terminal
+	// detection, so retain polling only there; reconnect performs the normal
+	// resync in browsers with EventSource.
+	if (!('EventSource' in window)) fallback = setInterval(() => void tick(), 3000)
 
 	void tick()
 
@@ -537,6 +552,66 @@ interface JobSummary {
 	heartbeat_at: string | null
 	created_at: string
 	updated_at: string
+	payload?: Record<string, unknown> | null
+}
+
+function realtimeJob(event: ActivityEvent): JobSummary | null {
+	if (!event.event.startsWith('job.')) return null
+
+	const payload = event.payload
+	if (typeof payload.id !== 'string' || typeof payload.intent !== 'string' || typeof payload.state !== 'string') return null
+
+	return {
+		id: payload.id,
+		command_id: typeof payload.command_id === 'string' ? payload.command_id : null,
+		intent: payload.intent,
+		entity_type: typeof payload.entity_type === 'string' ? payload.entity_type : null,
+		entity_id: typeof payload.entity_id === 'string' ? payload.entity_id : null,
+		state: payload.state,
+		progress_current: typeof payload.progress_current === 'number' ? payload.progress_current : null,
+		progress_total: typeof payload.progress_total === 'number' ? payload.progress_total : null,
+		progress_percent: typeof payload.progress_percent === 'number' ? payload.progress_percent : null,
+		progress_label: typeof payload.progress_label === 'string' ? payload.progress_label : null,
+		last_error: typeof payload.last_error === 'string' ? payload.last_error : null,
+		started_at: typeof payload.started_at === 'string' ? payload.started_at : null,
+		finished_at: typeof payload.finished_at === 'string' ? payload.finished_at : null,
+		heartbeat_at: typeof payload.heartbeat_at === 'string' ? payload.heartbeat_at : null,
+		created_at: typeof payload.created_at === 'string' ? payload.created_at : event.created_at,
+		updated_at: typeof payload.updated_at === 'string' ? payload.updated_at : event.created_at,
+	}
+}
+
+function upsertJob(jobs: JobSummary[], job: JobSummary): JobSummary[] {
+	const index = jobs.findIndex((candidate) => candidate.id === job.id)
+	if (index === -1) return [job, ...jobs]
+
+	return jobs.map((candidate) => candidate.id === job.id ? { ...candidate, ...job } : candidate)
+}
+
+function isTerminalJobEvent(event: ActivityEvent): boolean {
+	return event.event === 'job.completed' || event.event === 'job.failed'
+}
+
+function realtimeActivity(event: ActivityEvent): ActivityLogEntry | null {
+	if (event.event !== 'activity.created') return null
+
+	const payload = event.payload
+	if (typeof payload.id !== 'string' || typeof payload.type !== 'string' || typeof payload.message !== 'string') return null
+
+	return {
+		id: payload.id,
+		level: typeof payload.level === 'string' ? payload.level : 'info',
+		type: payload.type,
+		message: payload.message,
+		entity_type: typeof payload.entity_type === 'string' ? payload.entity_type : null,
+		entity_id: typeof payload.entity_id === 'string' ? payload.entity_id : null,
+		stash_id: typeof payload.stash_id === 'string' ? payload.stash_id : null,
+		media_item_id: typeof payload.media_item_id === 'string' ? payload.media_item_id : null,
+		broadcast_id: typeof payload.broadcast_id === 'string' ? payload.broadcast_id : null,
+		job_id: typeof payload.job_id === 'string' ? payload.job_id : null,
+		command_id: typeof payload.command_id === 'string' ? payload.command_id : null,
+		created_at: typeof payload.created_at === 'string' ? payload.created_at : event.created_at,
+	}
 }
 
 interface ResolvedInputSummary {
@@ -879,7 +954,24 @@ function dashboardComponent() {
 			this.loading = false
 
 			if ('EventSource' in window) {
-				subscribeToEvents(EVENT_TYPES, () => void this.refresh())
+				subscribeToEvents(EVENT_TYPES, (event) => {
+				const activity = realtimeActivity(event)
+				if (activity === null) return
+
+				const current = this.activitySummary[0]
+				const next = current?.type === activity.type && current.stash_id === activity.stash_id
+					? { ...current, count: current.count + 1, level: activity.level, message: activity.message, created_at: activity.created_at }
+					: { type: activity.type, level: activity.level, stash_id: activity.stash_id, message: activity.message, count: 1, created_at: activity.created_at }
+				this.activitySummary = current?.type === activity.type && current.stash_id === activity.stash_id
+					? [next, ...this.activitySummary.slice(1)].slice(0, 8)
+					: [next, ...this.activitySummary].slice(0, 8)
+
+				const job = realtimeJob(event)
+				if (job?.intent === 'storage_check' && isTerminalJobEvent(event)) void this.refreshHealth()
+			})
+				subscribeToConnectionState((connected, reconnected) => {
+					if (connected && reconnected) void this.refresh()
+				})
 			} else {
 				setInterval(() => void this.refresh(), 5000)
 			}
@@ -935,6 +1027,15 @@ function dashboardComponent() {
 				.filter((message): message is string => message !== null)
 
 			this.error = failures.length > 0 ? `Could not reach: ${failures.join(', ')}.` : null
+		},
+
+		async refreshHealth() {
+			try {
+				const response = await getWithRetry('/api/v1/system/health')
+				if (response.ok) this.health = await response.json()
+			} catch {
+				// The reconnect resync remains the recovery path for a transient miss.
+			}
 		},
 	}
 }
@@ -1011,6 +1112,15 @@ function stashesComponent() {
 		async init() {
 			await this.refresh()
 			this.loading = false
+
+			if ('EventSource' in window) {
+				subscribeToEvents(['activity.created'], (event) => {
+					if (realtimeActivity(event)?.entity_type === 'stash') void this.refresh()
+				})
+				subscribeToConnectionState((connected, reconnected) => {
+					if (connected && reconnected) void this.refresh()
+				})
+			}
 		},
 
 		async refresh() {
@@ -1259,13 +1369,30 @@ function stashDetailComponent(stashId: string) {
 			}
 
 			if ('EventSource' in window) {
-				subscribeToEvents(EVENT_TYPES, () => void this.refresh())
+				subscribeToEvents(EVENT_TYPES, (event) => void this.applyRealtime(event))
+				subscribeToConnectionState((connected, reconnected) => {
+					if (connected && reconnected) void this.refresh()
+				})
+			} else {
+				setInterval(() => void this.refresh(), 5000)
+			}
+		},
+
+		applyRealtime(event: ActivityEvent) {
+			const job = realtimeJob(event)
+			if (job !== null) {
+				this.jobs = upsertJob(this.jobs, job)
+				if (!isTerminalJobEvent(event)) return
+
+				if (job.entity_type === 'media_item') void this.refreshItems()
+				if (job.entity_type === 'broadcast') void this.refreshBroadcasts()
+				return
 			}
 
-			// ponytail: SSE delivery isn't guaranteed (dropped connection, missed
-			// event) -- without this, a broadcast rebuild's progress bar can
-			// freeze on-screen forever even though the job finished server-side.
-			setInterval(() => void this.refresh(), 5000)
+			const activity = realtimeActivity(event)
+			if (activity?.stash_id !== stashId) return
+			if (activity.media_item_id !== null) void this.refreshItems()
+			if (activity.broadcast_id !== null) void this.refreshBroadcasts()
 		},
 
 		// Fetches just the current page, filtered/sorted server-side --
@@ -1342,6 +1469,16 @@ function stashDetailComponent(stashId: string) {
 				this.error = 'Could not reach the server.'
 			} finally {
 				this.itemsRefreshing = false
+			}
+		},
+
+		async refreshBroadcasts() {
+			try {
+				const response = await apiFetch(`/api/v1/stashes/${stashId}/broadcasts`)
+				const body = await response.json()
+				this.broadcasts = body.broadcasts ?? this.broadcasts
+			} catch (cause) {
+				if (!(cause instanceof UnauthenticatedError)) this.error = 'Could not reach the server.'
 			}
 		},
 
@@ -1473,17 +1610,25 @@ function stashDetailComponent(stashId: string) {
 			return this.activeJobFor(item.media_item_id) !== null
 		},
 
-		// this.items is already the current page, filtered/sorted server-side --
-		// this just pins actively-downloading items above the page's sort order,
-		// which is cheap to do client-side since it only ever re-sorts the
-		// current page (<= itemsLimit items), not the whole stash.
 		displayItems(): StashItemSummary[] {
-			return [...this.items].sort((a, b) => {
-				const aDownloading = this.isDownloading(a)
-				const bDownloading = this.isDownloading(b)
-				if (aDownloading !== bDownloading) return aDownloading ? -1 : 1
-				return 0
-			})
+			return this.items
+		},
+
+		activeDownloadJobs(): JobSummary[] {
+			return this.jobs.filter((job) => job.intent === 'download'
+				&& job.state === 'processing'
+				&& job.payload?.stash_id === stashId)
+		},
+
+		overallDownloadProgress(): number {
+			const jobs = this.activeDownloadJobs()
+			return jobs.length === 0 ? 0 : jobs.reduce((total, job) => total + (job.progress_percent ?? 0), 0) / jobs.length
+		},
+
+		overallDownloadLabel(): string {
+			const jobs = this.activeDownloadJobs()
+			if (jobs.length === 1) return jobs[0].progress_label ?? 'Downloading item'
+			return `Downloading ${jobs.length} items`
 		},
 
 		// Count of stash-item-level ignored items (StashItemState::Ignored) --
@@ -1507,23 +1652,8 @@ function stashDetailComponent(stashId: string) {
 			}))
 		},
 
-		// Flattens items + their active job (if any) into one list so the items
-		// table's x-for can render a full-width progress row directly under its
-		// own item, in order. Alpine's x-for template can only have a single root
-		// element, so two parallel x-for loops over `items` can't be interleaved
-		// per-item -- this single loop with a type discriminator is what makes
-		// that possible. No slicing needed -- displayItems() is already just the
-		// current page.
 		itemRows(): Array<{ type: 'item' | 'progress'; key: string; item: StashItemSummary; job: JobSummary | null }> {
-			const rows: Array<{ type: 'item' | 'progress'; key: string; item: StashItemSummary; job: JobSummary | null }> = []
-			for (const item of this.displayItems()) {
-				rows.push({ type: 'item', key: item.id, item, job: null })
-				const job = this.activeJobFor(item.media_item_id)
-				if (job) {
-					rows.push({ type: 'progress', key: `${item.id}:progress`, item, job })
-				}
-			}
-			return rows
+			return this.displayItems().map((item) => ({ type: 'item', key: item.id, item, job: null }))
 		},
 
 		hasPrevItemsPage(): boolean {
@@ -2144,6 +2274,16 @@ function vaultComponent() {
 		async init() {
 			await this.refresh()
 			this.loading = false
+
+			if (!('EventSource' in window)) return
+
+			subscribeToEvents(EVENT_TYPES, (event) => {
+				const job = realtimeJob(event)
+				if (job?.entity_type === 'media_item' && isTerminalJobEvent(event)) void this.refresh()
+			})
+			subscribeToConnectionState((connected, reconnected) => {
+				if (connected && reconnected) void this.refresh()
+			})
 		},
 
 		async refresh() {
@@ -2206,7 +2346,16 @@ function vaultDetailComponent(itemId: string) {
 			this.loading = false
 
 			if ('EventSource' in window) {
-				subscribeToEvents(EVENT_TYPES, () => void this.refresh())
+				subscribeToEvents(EVENT_TYPES, (event) => {
+				const job = realtimeJob(event)
+				const activity = realtimeActivity(event)
+				if ((job?.entity_type === 'media_item' && job.entity_id === itemId && isTerminalJobEvent(event)) || activity?.media_item_id === itemId) {
+					void this.refresh()
+				}
+			})
+				subscribeToConnectionState((connected, reconnected) => {
+					if (connected && reconnected) void this.refresh()
+				})
 			}
 		},
 
@@ -2264,6 +2413,15 @@ function settingsComponent() {
 		async init() {
 			await this.refresh()
 			this.loading = false
+
+			if (!('EventSource' in window)) return
+
+			subscribeToEvents(['activity.created'], (event) => {
+				if (realtimeActivity(event)?.entity_type === 'media_server') void this.refresh()
+			})
+			subscribeToConnectionState((connected, reconnected) => {
+				if (connected && reconnected) void this.refresh()
+			})
 		},
 
 		async refresh() {

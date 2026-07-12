@@ -44,6 +44,30 @@ test('owner can create a Fake-provider stash and open its Vault item', async ({ 
 	const body = await items.json() as { items: { media_item_id: string }[] };
 	expect(body.items).not.toHaveLength(0);
 
+	// Progress arrives over the shared Mercure stream. The stash view used to
+	// refetch /jobs (and four unrelated endpoints) for every progress message;
+	// a new download must now update the in-memory job without that request
+	// storm. The fake downloader completes quickly, so this also exercises the
+	// terminal event path.
+	let jobListRequests = 0;
+	page.on('request', (request) => {
+		if (new URL(request.url()).pathname === '/api/v1/jobs') jobListRequests++;
+	});
+	// Let the add-input command's terminal resync and the first Mercure
+	// connection settle before measuring this separate download.
+	await page.waitForTimeout(3000);
+	jobListRequests = 0;
+
+	const download = await page.request.post('/api/v1/commands', {
+		data: {
+			type: 'item.download',
+			options: { media_item_id: body.items[0].media_item_id, stash_id: page.url().split('/').pop() },
+		},
+	});
+	expect(download.ok()).toBeTruthy();
+	await page.waitForTimeout(1500);
+	expect(jobListRequests).toBe(0);
+
 	await page.goto('/vault/' + body.items[0].media_item_id);
 	await expect(page.getByRole('heading', { name: 'Vault item' })).toBeVisible();
 });

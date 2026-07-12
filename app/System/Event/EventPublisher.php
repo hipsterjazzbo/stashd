@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\System\Event;
 
+use App\Jobs\Api\JobRealtimeResource;
 use App\Jobs\JobRecord;
-use App\Support\DurationSeconds;
 use App\System\Activity\ActivityEventRecord;
+use App\System\Activity\Api\ActivityEventResource;
 use App\System\Secret\SecretsService;
 
 final readonly class EventPublisher
@@ -19,59 +20,37 @@ final readonly class EventPublisher
 
     public function jobCreated(JobRecord $job): void
     {
-        $this->mercure->publish('job.created', [
-            'job_id' => (string) $job->id,
-            'command_id' => $job->commandId,
-            'intent' => $job->intent->value,
-            'state' => $job->state->value,
-        ]);
+        $this->jobChanged('job.created', $job);
     }
 
     public function jobProgress(JobRecord $job): void
     {
-        $this->mercure->publish('job.progress', [
-            'job_id' => (string) $job->id,
-            'command_id' => $job->commandId,
-            'intent' => $job->intent->value,
-            'progress_current' => $job->progressCurrent,
-            'progress_total' => $job->progressTotal,
-            'progress_percent' => $job->progressPercent,
-            'progress_label' => $job->progressLabel,
-            'progress_eta_seconds' => DurationSeconds::toSeconds($job->progressEtaSeconds),
-            'progress_rate' => $job->progressRate,
-        ]);
+        $this->jobChanged('job.progress', $job);
     }
 
     public function jobCompleted(JobRecord $job): void
     {
-        $this->mercure->publish('job.completed', [
-            'job_id' => (string) $job->id,
-            'command_id' => $job->commandId,
-            'intent' => $job->intent->value,
-            'state' => $job->state->value,
-        ]);
+        $this->jobChanged('job.completed', $job);
     }
 
     public function jobFailed(JobRecord $job): void
     {
-        $this->mercure->publish('job.failed', [
-            'job_id' => (string) $job->id,
-            'command_id' => $job->commandId,
-            'intent' => $job->intent->value,
-            'state' => $job->state->value,
-            'last_error' => $job->lastError === null ? null : $this->secrets->redact($job->lastError),
-        ]);
+        $this->jobChanged('job.failed', $job);
     }
 
     public function activityCreated(ActivityEventRecord $event): void
     {
-        $this->mercure->publish('activity.created', [
-            'activity_id' => (string) $event->id,
-            'level' => $event->level->value,
-            'type' => $event->type,
-            'message' => $event->message,
-            'command_id' => $event->commandId,
-            'job_id' => $event->jobId,
-        ]);
+        $this->mercure->publish('activity.created', ActivityEventResource::fromRecord($event)->toArray());
+    }
+
+    private function jobChanged(string $event, JobRecord $job): void
+    {
+        $data = JobRealtimeResource::fromRecord($job)->toArray();
+
+        if (is_string($data['last_error'])) {
+            $data['last_error'] = $this->secrets->redact($data['last_error']);
+        }
+
+        $this->mercure->publish($event, $data);
     }
 }

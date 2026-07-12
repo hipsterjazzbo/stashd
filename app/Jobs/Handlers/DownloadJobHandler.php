@@ -89,7 +89,7 @@ final readonly class DownloadJobHandler implements JobHandler
                     $isFinal = ($progress->percent ?? 0.0) >= 100.0;
                     $now = microtime(true);
 
-                    if (! $isFinal && $now - $lastForwardedAt < 1.0) {
+                    if (! $isFinal && $now - $lastForwardedAt < 0.25) {
                         return;
                     }
 
