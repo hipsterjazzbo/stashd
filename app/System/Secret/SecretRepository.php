@@ -22,7 +22,8 @@ final class SecretRepository
     public function findByKey(string $key): ?SecretRecord
     {
         return SecretRecord::select()
-            ->where('key = ? AND revokedAt IS NULL', $key)
+            ->where('key', $key)
+            ->whereNull('revokedAt')
             ->include('encryptedValue', 'nonce', 'tokenDigest', 'metadata')
             ->first();
     }
@@ -35,7 +36,9 @@ final class SecretRepository
     public function findActiveBroadcastTokenByDigest(string $digest): ?SecretRecord
     {
         $secret = SecretRecord::select()
-            ->where('type = ? AND tokenDigest = ? AND revokedAt IS NULL', SecretType::BroadcastToken->value, $digest)
+            ->where('type', SecretType::BroadcastToken)
+            ->where('tokenDigest', $digest)
+            ->whereNull('revokedAt')
             ->first();
 
         return $secret instanceof SecretRecord ? $secret : null;
@@ -45,7 +48,9 @@ final class SecretRepository
     public function listActiveBroadcastTokensWithoutDigest(): array
     {
         $records = SecretRecord::select()
-            ->where('type = ? AND tokenDigest IS NULL AND revokedAt IS NULL', SecretType::BroadcastToken->value)
+            ->where('type', SecretType::BroadcastToken)
+            ->whereNull('tokenDigest')
+            ->whereNull('revokedAt')
             ->all();
         $secrets = [];
 

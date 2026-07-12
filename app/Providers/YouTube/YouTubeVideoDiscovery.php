@@ -8,7 +8,9 @@ use App\Providers\Core\DiscoveredItem;
 use App\Providers\ProviderHttpClient;
 use App\Providers\ResolvedInput;
 use App\Providers\StashdUri;
+use Tempest\Support\Json\Exception\JsonCouldNotBeDecoded;
 
+use function Tempest\Support\Json\decode;
 use function Tempest\Support\str;
 
 final readonly class YouTubeVideoDiscovery
@@ -32,7 +34,7 @@ final readonly class YouTubeVideoDiscovery
         if ($response->isSuccessful()) {
             try {
                 /** @var array<string, mixed> $payload */
-                $payload = json_decode($response->body, true, flags: JSON_THROW_ON_ERROR);
+                $payload = decode($response->body);
                 $title = is_string($payload['title'] ?? null) && str($payload['title'])->trim()->isNotEmpty()
                     ? str($payload['title'])->trim()->toString()
                     : $title;
@@ -40,7 +42,7 @@ final readonly class YouTubeVideoDiscovery
                     ? StashdUri::parse(str($payload['thumbnail_url'])->trim()->toString())
                     : null;
                 $rawMetadata['oembed'] = $payload;
-            } catch (\JsonException) {
+            } catch (JsonCouldNotBeDecoded) {
             }
         }
 

@@ -66,7 +66,8 @@ final class MediaItemRepository
     public function findByProviderIdentity(string $providerKey, string $providerItemId): ?MediaItemRecord
     {
         return MediaItemRecord::select()
-            ->where('providerKey = ? AND providerItemId = ?', $providerKey, $providerItemId)
+            ->where('providerKey', $providerKey)
+            ->where('providerItemId', $providerItemId)
             ->first();
     }
 
@@ -97,7 +98,7 @@ final class MediaItemRepository
 
     public function count(): int
     {
-        return query(MediaItemRecord::class)->count()->execute();
+        return MediaItemRecord::count()->execute();
     }
 
     /**

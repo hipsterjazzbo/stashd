@@ -50,18 +50,16 @@ final class MediaItemSourceRepository
         StashInputId $stashInputId,
     ): ?MediaItemSourceRecord {
         return MediaItemSourceRecord::select()
-            ->where('mediaItemId = ? AND stashInputId = ?', $mediaItemId->toString(), $stashInputId->toString())
+            ->where('mediaItemId', $mediaItemId->toString())
+            ->where('stashInputId', $stashInputId->toString())
             ->first();
     }
 
     public function deleteForStashInput(StashInputId $stashInputId): void
     {
-        $sources = MediaItemSourceRecord::select()
-            ->where('stashInputId = ?', $stashInputId->toString())
-            ->all();
-
-        foreach ($sources as $source) {
-            $source->delete();
-        }
+        query(MediaItemSourceRecord::class)
+            ->delete()
+            ->where('stashInputId', $stashInputId->toString())
+            ->execute();
     }
 }

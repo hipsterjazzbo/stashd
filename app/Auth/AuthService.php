@@ -125,16 +125,10 @@ final readonly class AuthService
             return null;
         }
 
-        $user = $this->users->findById($token->userId);
-
-        if ($user === null) {
-            return null;
-        }
-
         $token->lastUsedAt = DateTime::now(Timezone::UTC);
         $token->save();
 
-        return new AuthenticatedPrincipal($user, $session, $token->scopes);
+        return new AuthenticatedPrincipal($token->user, $session, $token->scopes);
     }
 
     /**

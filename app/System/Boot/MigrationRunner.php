@@ -12,6 +12,9 @@ use Tempest\Database\Exceptions\QueryWasInvalid;
 use Tempest\Database\Migrations\Migration;
 use Tempest\Database\Migrations\MigrationManager;
 use Tempest\Database\Migrations\RunnableMigrations;
+use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
+
+use function Tempest\Support\Filesystem\create_directory;
 
 final readonly class MigrationRunner
 {
@@ -51,7 +54,7 @@ final readonly class MigrationRunner
         try {
             return array_map(
                 static fn (Migration $migration): string => $migration->name,
-                Migration::select()->all(),
+                Migration::all(),
             );
         } catch (QueryWasInvalid $exception) {
             if ($this->database->dialect->isTableNotFoundError($exception)) {
@@ -69,7 +72,9 @@ final readonly class MigrationRunner
         }
 
         $backupDir = $this->config->backupsPath();
-        if (! is_dir($backupDir) && ! mkdir($backupDir, 0775, true) && ! is_dir($backupDir)) {
+        try {
+            create_directory($backupDir, 0o775);
+        } catch (FilesystemException) {
             throw new RuntimeException("Stashd cannot create backup directory: {$backupDir}");
         }
 

@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace App\Vault;
 
 use App\Broadcasts\Api\BroadcastResource;
-use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastItemRepository;
+use App\Broadcasts\BroadcastRecord;
 use App\Broadcasts\BroadcastRepository;
 use App\Http\Middleware\RequireAuthMiddleware;
 use App\Http\Routing\AllowApiClients;
 use App\Stashes\Api\StashResource;
-use App\Stashes\StashId;
 use App\Stashes\StashItemRepository;
+use App\Stashes\StashRecord;
 use App\Stashes\StashRepository;
 use App\Support\Http\QueryPagination;
 use App\Vault\Api\AssetResource;
@@ -124,15 +124,16 @@ final readonly class MediaItemController
             $this->stashItems->listForMediaItem($mediaItemId),
         )));
 
-        $stashes = array_filter(array_map(
-            fn (string $stashId) => $this->stashes->find(StashId::parse($stashId)),
+        $stashesById = $this->stashes->listByIds($stashIds);
+        $stashes = array_values(array_filter(array_map(
+            static fn (string $stashId): ?StashRecord => $stashesById[$stashId] ?? null,
             $stashIds,
-        ));
+        )));
 
         return new Json([
             'stashes' => array_map(
                 static fn ($stash): array => StashResource::fromRecord($stash)->toArray(),
-                array_values($stashes),
+                $stashes,
             ),
         ]);
     }
@@ -154,15 +155,16 @@ final readonly class MediaItemController
             $this->broadcastItems->listForMediaItem($mediaItemId),
         )));
 
-        $broadcasts = array_filter(array_map(
-            fn (string $broadcastId) => $this->broadcasts->find(BroadcastId::parse($broadcastId)),
+        $broadcastsById = $this->broadcasts->listByIds($broadcastIds);
+        $broadcasts = array_values(array_filter(array_map(
+            static fn (string $broadcastId): ?BroadcastRecord => $broadcastsById[$broadcastId] ?? null,
             $broadcastIds,
-        ));
+        )));
 
         return new Json([
             'broadcasts' => array_map(
                 static fn ($broadcast): array => BroadcastResource::fromRecord($broadcast)->toArray(),
-                array_values($broadcasts),
+                $broadcasts,
             ),
         ]);
     }

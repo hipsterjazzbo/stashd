@@ -1123,18 +1123,6 @@ parameters:
 			path: app/Stashes/StashRepository.php
 
 		-
-			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Stashes/StashRepository.php
-
-		-
-			message: '#^Using nullsafe property access "\?\-\>title" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Stashes/StashRepository.php
-
-		-
 			message: '#^Method App\\System\\Activity\\ActivityEventRepository\:\:listRecent\(\) should return list\<App\\System\\Activity\\ActivityEventRecord\> but returns array\<App\\System\\Activity\\ActivityEventRecord\>\.$#'
 			identifier: return.type
 			count: 1
@@ -1589,12 +1577,6 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: app/Vault/MediaItemRepository.php
-
-		-
-			message: '#^Cannot call method delete\(\) on mixed\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: app/Vault/MediaItemSourceRepository.php
 
 		-
 			message: '#^Method App\\Vault\\MediaItemSourceRepository\:\:findForMediaItemAndInput\(\) should return App\\Vault\\MediaItemSourceRecord\|null but returns mixed\.$#'

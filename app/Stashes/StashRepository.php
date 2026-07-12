@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Stashes;
 
 use App\Support\PrefixedUlidGenerator;
-use App\Vault\MediaItemId;
 use App\Vault\MediaItemRepository;
 use App\Vault\MediaItemSourceRepository;
 use Tempest\Database\Database;
@@ -68,7 +67,29 @@ final class StashRepository
 
     public function findBySlug(string $slug): ?StashRecord
     {
-        return StashRecord::select()->where('slug = ?', $slug)->first();
+        return StashRecord::select()->where('slug', $slug)->first();
+    }
+
+    /**
+     * @param list<string> $ids
+     * @return array<string, StashRecord> keyed by id
+     */
+    public function listByIds(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $stashes = [];
+
+        /** @var list<StashRecord> $records */
+        $records = StashRecord::select()->whereIn('id', $ids)->all();
+
+        foreach ($records as $stash) {
+            $stashes[(string) $stash->id] = $stash;
+        }
+
+        return $stashes;
     }
 
     public function slugify(string $name): string
@@ -215,19 +236,23 @@ final class StashRepository
             $otherStashIdsByMediaItemId[(string) $otherItem->mediaItemId][(string) $otherItem->stashId] = true;
         }
 
-        $stashNamesById = [];
+        $otherStashIds = [];
 
-        foreach ($otherStashIdsByMediaItemId as $otherStashIds) {
-            foreach (array_keys($otherStashIds) as $otherStashId) {
-                $stashNamesById[$otherStashId] ??= $this->find(StashId::parse($otherStashId))?->name ?? 'Unknown stash';
-            }
+        foreach ($otherStashIdsByMediaItemId as $idsByStashId) {
+            $otherStashIds += $idsByStashId;
         }
+
+        $stashNamesById = array_map(
+            static fn (StashRecord $stash): string => $stash->name,
+            $this->listByIds(array_keys($otherStashIds)),
+        );
+        $mediaItemsById = $this->mediaItems->listByIds($mediaItemIds);
 
         $sharedItems = [];
         $orphanedItems = [];
 
         foreach ($mediaItemIds as $mediaItemId) {
-            $title = $this->mediaItems->find(MediaItemId::parse($mediaItemId))?->title ?? $mediaItemId;
+            $title = $mediaItemsById[$mediaItemId]->title ?? $mediaItemId;
             $otherStashIds = array_keys($otherStashIdsByMediaItemId[$mediaItemId] ?? []);
 
             if ($otherStashIds === []) {
@@ -240,7 +265,7 @@ final class StashRepository
                 'mediaItemId' => $mediaItemId,
                 'title' => $title,
                 'sharedWithStashes' => array_map(
-                    static fn (string $otherStashId): array => ['id' => $otherStashId, 'name' => $stashNamesById[$otherStashId]],
+                    static fn (string $otherStashId): array => ['id' => $otherStashId, 'name' => $stashNamesById[$otherStashId] ?? 'Unknown stash'],
                     $otherStashIds,
                 ),
             ];

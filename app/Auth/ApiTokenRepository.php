@@ -48,7 +48,9 @@ final class ApiTokenRepository
     public function findByHash(string $tokenHash): ?ApiTokenRecord
     {
         return ApiTokenRecord::select()
-            ->where('tokenHash = ? AND revokedAt IS NULL', $tokenHash)
+            ->with('user')
+            ->where('tokenHash', $tokenHash)
+            ->whereNull('revokedAt')
             ->first();
     }
 
@@ -56,7 +58,8 @@ final class ApiTokenRepository
     public function listForUser(UserId $userId): array
     {
         return ApiTokenRecord::select()
-            ->where('userId = ? AND revokedAt IS NULL', $userId->toString())
+            ->where('userId', $userId->toString())
+            ->whereNull('revokedAt')
             ->orderBy('createdAt', \Tempest\Database\Direction::DESC)
             ->all();
     }

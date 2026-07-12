@@ -7,7 +7,6 @@ namespace App\Vault;
 use App\Broadcasts\BroadcastId;
 use App\Support\DurationSeconds;
 use App\Support\PrefixedUlidGenerator;
-use Tempest\Database\Builder\QueryBuilders\CountQueryBuilder;
 use Tempest\Database\Direction;
 use Tempest\Database\PrimaryKey;
 
@@ -78,7 +77,8 @@ final class AssetRepository
     public function findByMediaItemAndRole(MediaItemId $mediaItemId, AssetRole $role): ?AssetRecord
     {
         return AssetRecord::select()
-            ->where('mediaItemId = ? AND role = ?', $mediaItemId->toString(), $role)
+            ->where('mediaItemId', $mediaItemId->toString())
+            ->where('role', $role)
             ->first();
     }
 
@@ -96,7 +96,9 @@ final class AssetRepository
 
         foreach (AssetRecord::select()
             ->whereIn('mediaItemId', $mediaItemIds)
-            ->where('role = ? AND state = ? AND path IS NOT NULL', AssetRole::VaultOriginal, AssetState::Ready)
+            ->where('role', AssetRole::VaultOriginal)
+            ->where('state', AssetState::Ready)
+            ->whereNotNull('path')
             ->all() as $asset) {
             if (! $asset instanceof AssetRecord) {
                 continue;
@@ -112,7 +114,7 @@ final class AssetRepository
     public function listForMediaItem(MediaItemId $mediaItemId): array
     {
         return AssetRecord::select()
-            ->where('mediaItemId = ?', $mediaItemId->toString())
+            ->where('mediaItemId', $mediaItemId->toString())
             ->all();
     }
 
@@ -120,28 +122,30 @@ final class AssetRepository
     public function listByBroadcastAndRole(BroadcastId $broadcastId, AssetRole $role): array
     {
         return AssetRecord::select()
-            ->where('broadcastId = ? AND role = ?', $broadcastId->toString(), $role)
+            ->where('broadcastId', $broadcastId->toString())
+            ->where('role', $role)
             ->all();
     }
 
     public function countReadyVaultAssets(): int
     {
-        return CountQueryBuilder::fromQueryBuilder(
-            AssetRecord::select()
-            ->where('state = ? AND path IS NOT NULL', AssetState::Ready)
-        )->execute();
+        return AssetRecord::count()
+            ->where('state', AssetState::Ready)
+            ->whereNotNull('path')
+            ->execute();
     }
 
     /** @return list<AssetRecord> */
     public function listReadyVaultAssetsPage(?string $afterId, int $limit): array
     {
         $query = AssetRecord::select()
-            ->where('state = ? AND path IS NOT NULL', AssetState::Ready)
+            ->where('state', AssetState::Ready)
+            ->whereNotNull('path')
             ->orderBy('id', Direction::ASC)
             ->limit($limit);
 
         if ($afterId !== null) {
-            $query->where('id > ?', $afterId);
+            $query->where('id', $afterId, '>');
         }
 
         $assets = [];

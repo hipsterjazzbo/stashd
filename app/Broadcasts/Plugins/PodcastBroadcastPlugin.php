@@ -39,6 +39,9 @@ use App\Vault\MediaItemRecord;
 use Symfony\Component\Uid\Uuid;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
+use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
+
+use function Tempest\Support\Filesystem\create_directory;
 
 /**
  * Podcast broadcast plugin — generates RSS podcast feeds with episode media URLs.
@@ -435,7 +438,9 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
     {
         $directory = dirname($path);
 
-        if (! is_dir($directory) && ! mkdir($directory, 0775, true) && ! is_dir($directory)) {
+        try {
+            create_directory($directory, 0o775);
+        } catch (FilesystemException) {
             throw BroadcastException::withCode('podcast_feed_write_failed', 'Podcast feed could not be written.');
         }
 

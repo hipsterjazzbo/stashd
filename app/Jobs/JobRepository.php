@@ -62,7 +62,9 @@ final class JobRepository
     public function hasPendingOrProcessing(JobIntent $intent, PrefixedUlid $entityId): bool
     {
         return JobRecord::select()
-            ->where('intent = ? AND entityId = ? AND state IN (?, ?)', $intent, $entityId->toString(), JobState::Pending, JobState::Processing)
+            ->where('intent', $intent)
+            ->where('entityId', $entityId->toString())
+            ->whereIn('state', [JobState::Pending, JobState::Processing])
             ->first() !== null;
     }
 
@@ -166,7 +168,9 @@ final class JobRepository
     public function listProcessingStale(DateTime $staleBefore): array
     {
         return JobRecord::select()
-            ->where('state = ? AND heartbeatAt IS NOT NULL AND heartbeatAt < ?', JobState::Processing, $staleBefore)
+            ->where('state', JobState::Processing)
+            ->whereNotNull('heartbeatAt')
+            ->where('heartbeatAt', $staleBefore, '<')
             ->all();
     }
 
@@ -183,7 +187,7 @@ final class JobRepository
     public function listRecent(int $limit = 50): array
     {
         $processing = JobRecord::select()
-            ->where('state = ?', JobState::Processing)
+            ->where('state', JobState::Processing)
             ->orderBy('createdAt', Direction::ASC)
             ->all();
 
@@ -214,7 +218,7 @@ final class JobRepository
     public function listForCommand(CommandId $commandId): array
     {
         return JobRecord::select()
-            ->where('commandId = ?', $commandId->toString())
+            ->where('commandId', $commandId->toString())
             ->orderBy('createdAt', Direction::ASC)
             ->all();
     }
@@ -240,7 +244,8 @@ final class JobRepository
         // second as the failure it's replacing would tie -- id (a ULID) is
         // monotonic and breaks the tie in actual creation order.
         $jobs = JobRecord::select()
-            ->where('entityType = ? AND intent = ?', 'media_item', JobIntent::Download)
+            ->where('entityType', 'media_item')
+            ->where('intent', JobIntent::Download)
             ->whereIn('entityId', $mediaItemIds)
             ->orderBy('createdAt', Direction::DESC)
             ->orderBy('id', Direction::DESC)

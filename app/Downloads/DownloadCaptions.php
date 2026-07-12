@@ -16,6 +16,9 @@ use App\Vault\MediaItemId;
 use App\Vault\MediaItemRepository;
 use App\Vault\MoveFileIntoVault;
 use App\Vault\VaultPathBuilder;
+use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
+
+use function Tempest\Support\Filesystem\create_directory;
 
 final readonly class DownloadCaptions
 {
@@ -27,7 +30,9 @@ final readonly class DownloadCaptions
     {
         $media = $this->mediaItems->find($mediaItemId) ?? throw DownloadException::withCode('media_item_not_found', 'Media item not found.');
         $temp = sys_get_temp_dir() . '/stashd-captions-' . $jobId;
-        if (! is_dir($temp) && ! mkdir($temp, 0775, true) && ! is_dir($temp)) {
+        try {
+            create_directory($temp, 0o775);
+        } catch (FilesystemException) {
             throw DownloadException::withCode('temp_not_writable', 'Could not create caption staging directory.');
         }
 

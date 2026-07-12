@@ -56,14 +56,16 @@ final class BroadcastTriggerRepository
     public function listForBroadcast(BroadcastId $broadcastId): array
     {
         return BroadcastTriggerRecord::select()
-            ->where('broadcastId = ?', $broadcastId->toString())
+            ->where('broadcastId', $broadcastId->toString())
             ->all();
     }
 
     public function findEnabledScanTrigger(BroadcastId $broadcastId, BroadcastTriggerType $type): ?BroadcastTriggerRecord
     {
         return BroadcastTriggerRecord::select()
-            ->where('broadcastId = ? AND type = ? AND enabled = 1', $broadcastId->toString(), $type)
+            ->where('broadcastId', $broadcastId->toString())
+            ->where('type', $type)
+            ->where('enabled', true)
             ->first();
     }
 }

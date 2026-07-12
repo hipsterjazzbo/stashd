@@ -8,6 +8,9 @@ use RuntimeException;
 use Tempest\Database\Config\SQLiteConfig;
 use Tempest\Database\Database;
 use Tempest\Database\Query;
+use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
+
+use function Tempest\Support\Filesystem\create_directory;
 
 /**
  * Applies SQLite pragmas on Tempest's active database connection.
@@ -26,7 +29,9 @@ final readonly class SqliteConfigurator
     {
         if ($sqliteConfig->path !== ':memory:') {
             $directory = dirname($sqliteConfig->path);
-            if (! is_dir($directory) && ! mkdir($directory, 0775, true) && ! is_dir($directory)) {
+            try {
+                create_directory($directory, 0o775);
+            } catch (FilesystemException) {
                 throw new RuntimeException("Stashd cannot create database directory: {$directory}");
             }
         }

@@ -60,12 +60,9 @@ final class StashInputRepository
     public function findByStashAndProviderInput(StashId $stashId, string $providerKey, string $providerInputId): ?StashInputRecord
     {
         $input = StashInputRecord::select()
-            ->where(
-                'stashId = ? AND providerKey = ? AND providerInputId = ?',
-                $stashId->toString(),
-                $providerKey,
-                $providerInputId,
-            )
+            ->where('stashId', $stashId->toString())
+            ->where('providerKey', $providerKey)
+            ->where('providerInputId', $providerInputId)
             ->first();
 
         return $input instanceof StashInputRecord ? $input : null;
@@ -95,12 +92,7 @@ final class StashInputRepository
     public function listDueForAutomaticSync(DateTime $now): array
     {
         return StashInputRecord::select()
-            ->where(
-                'state = ? AND syncMode = ? AND (nextCheckAt IS NULL OR nextCheckAt <= ?)',
-                StashInputState::Ready,
-                SyncMode::Automatic,
-                $now,
-            )
+            ->where('state = ? AND syncMode = ? AND (nextCheckAt IS NULL OR nextCheckAt <= ?)', StashInputState::Ready, SyncMode::Automatic, $now)
             ->orderBy('nextCheckAt', Direction::ASC)
             ->all();
     }
@@ -109,7 +101,7 @@ final class StashInputRepository
     public function listForStash(StashId $stashId): array
     {
         return StashInputRecord::select()
-            ->where('stashId = ?', $stashId->toString())
+            ->where('stashId', $stashId->toString())
             ->orderBy('createdAt', Direction::ASC)
             ->all();
     }

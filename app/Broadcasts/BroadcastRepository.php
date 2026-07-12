@@ -59,6 +59,28 @@ final class BroadcastRepository
             ->get($id->toPrimaryKey());
     }
 
+    /**
+     * @param list<string> $ids
+     * @return array<string, BroadcastRecord> keyed by id
+     */
+    public function listByIds(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $broadcasts = [];
+
+        /** @var list<BroadcastRecord> $records */
+        $records = BroadcastRecord::select()->whereIn('id', $ids)->all();
+
+        foreach ($records as $broadcast) {
+            $broadcasts[(string) $broadcast->id] = $broadcast;
+        }
+
+        return $broadcasts;
+    }
+
     public function save(BroadcastRecord $record): BroadcastRecord
     {
         $record->updatedAt = DateTime::now(Timezone::UTC);
@@ -72,7 +94,7 @@ final class BroadcastRepository
     {
         return BroadcastRecord::select()
             ->include('tokenSecretId')
-            ->where('stashId = ?', $stashId->toString())
+            ->where('stashId', $stashId->toString())
             ->orderBy('createdAt', \Tempest\Database\Direction::ASC)
             ->all();
     }
@@ -80,7 +102,8 @@ final class BroadcastRepository
     public function findByStashAndSlug(StashId $stashId, string $slug): ?BroadcastRecord
     {
         return BroadcastRecord::select()
-            ->where('stashId = ? AND slug = ?', $stashId->toString(), $slug)
+            ->where('stashId', $stashId->toString())
+            ->where('slug', $slug)
             ->first();
     }
 
@@ -88,7 +111,8 @@ final class BroadcastRepository
     {
         $broadcast = BroadcastRecord::select()
             ->include('tokenSecretId')
-            ->where('type = ? AND tokenSecretId = ?', 'podcast', $secretId)
+            ->where('type', 'podcast')
+            ->where('tokenSecretId', $secretId)
             ->first();
 
         return $broadcast instanceof BroadcastRecord ? $broadcast : null;

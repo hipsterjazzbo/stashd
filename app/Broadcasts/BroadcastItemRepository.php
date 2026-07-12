@@ -68,7 +68,7 @@ final class BroadcastItemRepository
     {
         return BroadcastItemRecord::select()
             ->include('tokenSecretId')
-            ->where('broadcastId = ?', $broadcastId->toString())
+            ->where('broadcastId', $broadcastId->toString())
             ->orderBy('createdAt', \Tempest\Database\Direction::ASC)
             ->all();
     }
@@ -79,7 +79,8 @@ final class BroadcastItemRepository
     ): ?BroadcastItemRecord {
         return BroadcastItemRecord::select()
             ->include('tokenSecretId')
-            ->where('broadcastId = ? AND stashItemId = ?', $broadcastId->toString(), $stashItemId->toString())
+            ->where('broadcastId', $broadcastId->toString())
+            ->where('stashItemId', $stashItemId->toString())
             ->first();
     }
 
@@ -87,7 +88,8 @@ final class BroadcastItemRepository
     {
         $item = BroadcastItemRecord::select()
             ->include('tokenSecretId')
-            ->where('broadcastId = ? AND tokenSecretId = ?', $broadcastId->toString(), $secretId)
+            ->where('broadcastId', $broadcastId->toString())
+            ->where('tokenSecretId', $secretId)
             ->first();
 
         return $item instanceof BroadcastItemRecord ? $item : null;
@@ -97,7 +99,8 @@ final class BroadcastItemRepository
     public function listForMediaItem(MediaItemId $mediaItemId): array
     {
         return BroadcastItemRecord::select()
-            ->where('mediaItemId = ?', $mediaItemId->toString())
+            ->with('broadcast')
+            ->where('mediaItemId', $mediaItemId->toString())
             ->all();
     }
 }

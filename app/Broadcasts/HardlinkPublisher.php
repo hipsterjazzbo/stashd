@@ -6,6 +6,9 @@ namespace App\Broadcasts;
 
 use App\Config\StashdConfig;
 use App\System\Storage\FilesystemProbe;
+use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
+
+use function Tempest\Support\Filesystem\create_directory;
 
 /** Hardlink-first publisher — never silently copies. */
 final readonly class HardlinkPublisher
@@ -83,7 +86,9 @@ final readonly class HardlinkPublisher
 
         $directory = dirname($targetPath);
 
-        if (! is_dir($directory) && ! mkdir($directory, 0775, true) && ! is_dir($directory)) {
+        try {
+            create_directory($directory, 0o775);
+        } catch (FilesystemException) {
             throw BroadcastException::withCode(
                 'broadcast_publish_failed',
                 'Could not create broadcast directory.',

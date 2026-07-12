@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Stashes;
 
+use Tempest\Database\BelongsTo;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
@@ -15,6 +16,9 @@ final class StashInputRecord
     use IsDatabaseModel;
 
     public PrimaryKey $id;
+
+    #[BelongsTo(ownerJoin: 'stashId')]
+    public StashRecord $stash;
 
     public function __construct(
         public StashId $stashId,

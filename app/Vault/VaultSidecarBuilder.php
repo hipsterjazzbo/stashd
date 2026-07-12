@@ -8,6 +8,8 @@ use App\Downloads\DownloadRequest;
 use App\Downloads\DownloadResult;
 use Tempest\DateTime\DateTime;
 
+use function Tempest\Support\Json\encode;
+
 /**
  * Builds deterministic Vault sidecar JSON (metadata.json, source.json).
  *
@@ -62,7 +64,7 @@ final class VaultSidecarBuilder
     /** @param array<string, mixed> $payload */
     private function encode(array $payload): string
     {
-        return json_encode($this->redactPayload($payload), JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        return encode($this->redactPayload($payload), pretty: true);
     }
 
     /** @param array<string, mixed> $payload

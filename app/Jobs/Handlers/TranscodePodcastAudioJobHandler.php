@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Jobs\Handlers;
 
 use App\Broadcasts\BroadcastItemRepository;
-use App\Broadcasts\BroadcastRepository;
 use App\Broadcasts\Podcasts\PodcastMediaKind;
 use App\Commands\CommandDispatchService;
 use App\Commands\CommandRecord;
@@ -40,7 +39,6 @@ final readonly class TranscodePodcastAudioJobHandler implements JobHandler
         private CommandRepository $commands,
         private JobRepository $jobs,
         private BroadcastItemRepository $broadcastItems,
-        private BroadcastRepository $broadcasts,
         private CommandDispatchService $dispatch,
         private StateTransitionService $transitions,
         private ActivityEventService $activity,
@@ -135,11 +133,10 @@ final readonly class TranscodePodcastAudioJobHandler implements JobHandler
         $broadcastIds = [];
 
         foreach ($this->broadcastItems->listForMediaItem(MediaItemId::parse($mediaItemId)) as $item) {
-            $broadcast = $this->broadcasts->find($item->broadcastId);
+            $broadcast = $item->broadcast;
 
             if (
-                $broadcast !== null
-                && $broadcast->type === 'podcast'
+                $broadcast->type === 'podcast'
                 && PodcastMediaKind::forBroadcast($broadcast) === PodcastMediaKind::Audio
             ) {
                 $broadcastIds[(string) $broadcast->id] = true;

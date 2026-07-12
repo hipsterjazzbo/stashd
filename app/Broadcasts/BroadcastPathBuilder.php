@@ -7,6 +7,9 @@ namespace App\Broadcasts;
 use App\Config\StashdConfig;
 use App\System\Storage\PathSanitizer;
 use InvalidArgumentException;
+use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
+
+use function Tempest\Support\Filesystem\create_directory;
 
 final readonly class BroadcastPathBuilder
 {
@@ -101,7 +104,9 @@ final readonly class BroadcastPathBuilder
         $root = $this->broadcastRoot($broadcast);
 
         if (! is_dir($root)) {
-            if (! mkdir($root, 0775, true) && ! is_dir($root)) {
+            try {
+                create_directory($root, 0o775);
+            } catch (FilesystemException) {
                 throw BroadcastException::withCode(
                     'broadcast_publish_failed',
                     'Could not create broadcast directory.',

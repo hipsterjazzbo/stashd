@@ -96,10 +96,10 @@ final readonly class StorageCapabilityChecker
         );
 
         $vault = StorageLocationRecord::select()
-            ->where('key = ?', StorageLocationKey::Vault)
+            ->where('key', StorageLocationKey::Vault)
             ->first();
         $broadcasts = StorageLocationRecord::select()
-            ->where('key = ?', StorageLocationKey::Broadcasts)
+            ->where('key', StorageLocationKey::Broadcasts)
             ->first();
 
         if ($vault !== null) {

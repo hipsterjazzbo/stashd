@@ -11,8 +11,10 @@ use App\Providers\ProviderException;
 use App\Providers\ProviderHttpClient;
 use App\Providers\ResolvedInput;
 use App\Providers\StashdUri;
+use Tempest\Support\Json\Exception\JsonCouldNotBeDecoded;
 
 use function Tempest\Support\Arr\chunk;
+use function Tempest\Support\Json\decode;
 
 final readonly class YouTubeDataApiDiscoveryStrategy implements DiscoveryStrategyHandler
 {
@@ -258,8 +260,8 @@ final readonly class YouTubeDataApiDiscoveryStrategy implements DiscoveryStrateg
 
         try {
             /** @var array<string, mixed> $payload */
-            $payload = json_decode($response->body, true, flags: JSON_THROW_ON_ERROR);
-        } catch (\JsonException $exception) {
+            $payload = decode($response->body);
+        } catch (JsonCouldNotBeDecoded $exception) {
             throw new ProviderException('YouTube Data API response was invalid JSON.', 'data_api_parse_failed', previous: $exception);
         }
 

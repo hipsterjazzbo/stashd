@@ -64,7 +64,8 @@ final class StashItemRepository
     public function findByStashAndMediaItem(StashId $stashId, MediaItemId $mediaItemId): ?StashItemRecord
     {
         return StashItemRecord::select()
-            ->where('stashId = ? AND mediaItemId = ?', $stashId->toString(), $mediaItemId->toString())
+            ->where('stashId', $stashId->toString())
+            ->where('mediaItemId', $mediaItemId->toString())
             ->first();
     }
 
@@ -110,9 +111,10 @@ final class StashItemRepository
 
     public function countIgnoredForStash(StashId $stashId): int
     {
-        return CountQueryBuilder::fromQueryBuilder(
-            StashItemRecord::select()->where('stashId = ? AND state = ?', $stashId->toString(), StashItemState::Ignored->value),
-        )->execute();
+        return StashItemRecord::count()
+            ->where('stashId', $stashId->toString())
+            ->where('state', StashItemState::Ignored)
+            ->execute();
     }
 
     public function countForStash(
@@ -171,25 +173,25 @@ final class StashItemRepository
         ?MediaItemState $status,
         bool $includeIgnored,
     ): SelectQueryBuilder {
-        $query = StashItemRecord::select()->where('stashId = ?', $stashId->toString());
+        $query = StashItemRecord::select()->where('stashId', $stashId->toString());
 
         if (! $includeIgnored) {
             // Qualified: stash_items.state and media_items.state both exist
             // once the mediaItem join is in play (added below by sort, or by
             // listForStash's ->with('mediaItem')) -- unqualified `state` is
             // ambiguous SQL as soon as either applies.
-            $query->where('stash_items.state != ?', StashItemState::Ignored->value);
+            $query->whereNot('state', StashItemState::Ignored);
         }
 
         if ($search !== null && $search !== '') {
             $query->whereHas('mediaItem', function (SelectQueryBuilder $mediaItemQuery) use ($search): void {
-                $mediaItemQuery->where('title LIKE ?', '%' . $search . '%');
+                $mediaItemQuery->whereLike('title', '%' . $search . '%');
             });
         }
 
         if ($status !== null) {
             $query->whereHas('mediaItem', function (SelectQueryBuilder $mediaItemQuery) use ($status): void {
-                $mediaItemQuery->where('state = ?', $status->value);
+                $mediaItemQuery->where('state', $status);
             });
         }
 
@@ -200,7 +202,7 @@ final class StashItemRepository
     public function listForMediaItem(MediaItemId $mediaItemId): array
     {
         return StashItemRecord::select()
-            ->where('mediaItemId = ?', $mediaItemId->toString())
+            ->where('mediaItemId', $mediaItemId->toString())
             ->all();
     }
 
@@ -216,7 +218,7 @@ final class StashItemRepository
 
         return StashItemRecord::select()
             ->whereIn('mediaItemId', $mediaItemIds)
-            ->where('stashId != ?', $excludingStashId->toString())
+            ->whereNot('stashId', $excludingStashId->toString())
             ->all();
     }
 }

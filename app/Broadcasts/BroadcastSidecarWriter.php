@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
+use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
+
+use function Tempest\Support\Filesystem\create_directory;
+
 /** Atomically writes generated broadcast sidecars (NFO, etc.). */
 final class BroadcastSidecarWriter
 {
@@ -11,7 +15,9 @@ final class BroadcastSidecarWriter
     {
         $directory = dirname($absolutePath);
 
-        if (! is_dir($directory) && ! mkdir($directory, 0775, true) && ! is_dir($directory)) {
+        try {
+            create_directory($directory, 0o775);
+        } catch (FilesystemException) {
             throw BroadcastException::withCode(
                 'broadcast_sidecar_write_failed',
                 'Could not create sidecar directory.',

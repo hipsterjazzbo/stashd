@@ -9,6 +9,8 @@ use Symfony\Component\Mercure\Update;
 use Tempest\Log\Logger;
 use Throwable;
 
+use function Tempest\Support\Json\encode;
+
 /**
  * Publishes to the single topic every Stashd client subscribes to (a
  * single-user homelab app has no need for per-entity topic fan-out). Used
@@ -38,7 +40,7 @@ final readonly class MercurePublisher
             // shadow it. `event` never collides with any current payload key.
             $this->hub->publish(new Update(
                 topics: self::TOPIC,
-                data: json_encode(['event' => $eventName, ...$payload], JSON_THROW_ON_ERROR),
+                data: encode(['event' => $eventName, ...$payload]),
                 private: true,
             ));
         } catch (Throwable $exception) {

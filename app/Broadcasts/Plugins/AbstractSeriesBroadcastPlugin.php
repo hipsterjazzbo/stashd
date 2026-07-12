@@ -436,7 +436,8 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
         string $sourcePath,
     ): void {
         $existing = \App\Vault\AssetRecord::select()
-            ->where('broadcastItemId = ? AND role = ?', $broadcastItemId, AssetRole::Hardlink)
+            ->where('broadcastItemId', $broadcastItemId)
+            ->where('role', AssetRole::Hardlink)
             ->first();
 
         $sizeBytes = is_file($sourcePath) ? filesize($sourcePath) : null;

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Jobs\Handlers;
 
 use App\Broadcasts\BroadcastItemRepository;
-use App\Broadcasts\BroadcastRepository;
 use App\Commands\CommandDispatchService;
 use App\Commands\CommandRepository;
 use App\Commands\CommandState;
@@ -21,7 +20,7 @@ use App\Vault\MediaItemId;
 
 final readonly class DownloadCaptionsJobHandler implements JobHandler
 {
-    public function __construct(private DownloadCaptions $captions, private CommandRepository $commands, private StateTransitionService $transitions, private BroadcastItemRepository $broadcastItems, private BroadcastRepository $broadcasts, private CommandDispatchService $dispatch)
+    public function __construct(private DownloadCaptions $captions, private CommandRepository $commands, private StateTransitionService $transitions, private BroadcastItemRepository $broadcastItems, private CommandDispatchService $dispatch)
     {
     }
     public function intent(): JobIntent
@@ -41,9 +40,8 @@ final readonly class DownloadCaptionsJobHandler implements JobHandler
         $this->captions->execute(MediaItemId::parse($mediaItemId), PrefixedUlid::parse((string) $job->id), $languages, ($payload['include_auto'] ?? false) === true);
         $this->transitions->transitionCommand($command, CommandState::Completed);
         foreach ($this->broadcastItems->listForMediaItem(MediaItemId::parse($mediaItemId)) as $item) {
-            $broadcast = $this->broadcasts->find($item->broadcastId);
-            if ($broadcast?->type === 'podcast') {
-                $this->dispatch->dispatch(CommandType::BroadcastRebuild, ['broadcast_id' => (string) $broadcast->id]);
+            if ($item->broadcast->type === 'podcast') {
+                $this->dispatch->dispatch(CommandType::BroadcastRebuild, ['broadcast_id' => (string) $item->broadcast->id]);
             }
         }
     }

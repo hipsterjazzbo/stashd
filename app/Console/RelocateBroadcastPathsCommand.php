@@ -16,6 +16,9 @@ use Tempest\Console\ConsoleCommand;
 use Tempest\Console\ExitCode;
 use Tempest\Console\HasConsole;
 use Tempest\Console\Middleware\CautionMiddleware;
+use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
+
+use function Tempest\Support\Filesystem\create_directory;
 
 /**
  * One-time operator step for upgrading to type-aware, name-keyed broadcast
@@ -43,7 +46,7 @@ final readonly class RelocateBroadcastPathsCommand
     )]
     public function __invoke(): ExitCode
     {
-        $broadcasts = BroadcastRecord::select()->all();
+        $broadcasts = BroadcastRecord::all();
         $relocated = 0;
         $skipped = 0;
 
@@ -76,7 +79,9 @@ final readonly class RelocateBroadcastPathsCommand
                 continue;
             }
 
-            if (! is_dir(dirname($newRoot)) && ! mkdir(dirname($newRoot), 0775, true) && ! is_dir(dirname($newRoot))) {
+            try {
+                create_directory(dirname($newRoot), 0o775);
+            } catch (FilesystemException) {
                 $this->console->error("Skipping {$broadcast->name} ({$broadcast->id}): could not create {$newRoot}'s parent directory.");
                 $skipped++;
 

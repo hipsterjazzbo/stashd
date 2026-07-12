@@ -36,7 +36,7 @@ final class StorageLocationRepository
     ): StorageLocationRecord {
         $now = DateTime::now(Timezone::UTC);
         $existing = StorageLocationRecord::select()
-            ->where('key = ?', $key)
+            ->where('key', $key)
             ->first();
 
         if ($existing !== null) {
@@ -87,13 +87,13 @@ final class StorageLocationRepository
     /** @return list<StorageLocationRecord> */
     public function all(): array
     {
-        return StorageLocationRecord::select()->all();
+        return StorageLocationRecord::all();
     }
 
     public function findByKey(StorageLocationKey $key): ?StorageLocationRecord
     {
         return StorageLocationRecord::select()
-            ->where('key = ?', $key)
+            ->where('key', $key)
             ->first();
     }
 }

@@ -22,7 +22,7 @@ final class UserRepository
 
     public function findByUsername(string $username): ?UserRecord
     {
-        return UserRecord::select()->where('username = ?', $username)->include('passwordHash')->first();
+        return UserRecord::select()->where('username', $username)->include('passwordHash')->first();
     }
 
     public function findById(UserId $id): ?UserRecord

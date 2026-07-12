@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth;
 
+use Tempest\Database\BelongsTo;
 use Tempest\Database\IsDatabaseModel;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Table;
@@ -16,6 +17,9 @@ final class ApiTokenRecord
     use IsDatabaseModel;
 
     public PrimaryKey $id;
+
+    #[BelongsTo(ownerJoin: 'userId')]
+    public UserRecord $user;
 
     public function __construct(
         public UserId $userId,
