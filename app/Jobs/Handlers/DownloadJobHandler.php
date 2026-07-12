@@ -10,6 +10,7 @@ use App\Commands\CommandState;
 use App\Config\YtdlpConfig;
 use App\Downloads\DownloadException;
 use App\Downloads\DownloadMediaItem;
+use App\Downloads\DownloadProgressSmoother;
 use App\Jobs\JobHandler;
 use App\Jobs\JobHandlerContext;
 use App\Jobs\JobIntent;
@@ -77,22 +78,15 @@ final readonly class DownloadJobHandler implements JobHandler
             }
 
             $lastForwardedAt = microtime(true);
-            $lastPercent = 0.0;
+            $progressSmoother = new DownloadProgressSmoother();
 
             $result = $this->executor->execute(
                 mediaItemId: $mediaItemId,
                 stashId: $stashId,
                 jobId: PrefixedUlid::parse((string) $job->id),
                 force: $force,
-                onProgress: function (DownloadProgress $progress) use ($job, $context, &$lastForwardedAt, &$lastPercent): void {
-                    // yt-dlp reports progress per stream (video and audio
-                    // download separately before merging), so percent isn't
-                    // monotonic across the whole download -- forwarded as-is,
-                    // not smoothed, same tradeoff as the ffmpeg transcode
-                    // path's throttling.
-                    $percent = $progress->percent ?? $lastPercent;
-                    $lastPercent = $percent;
-                    $isFinal = $percent >= 100.0;
+                onProgress: function (DownloadProgress $progress) use ($job, $context, &$lastForwardedAt, $progressSmoother): void {
+                    $isFinal = ($progress->percent ?? 0.0) >= 100.0;
                     $now = microtime(true);
 
                     if (! $isFinal && $now - $lastForwardedAt < 1.0) {
@@ -101,12 +95,7 @@ final readonly class DownloadJobHandler implements JobHandler
 
                     $lastForwardedAt = $now;
                     $context->heartbeat($job);
-                    $context->progress($job, JobProgressUpdate::ofPercent(
-                        percent: $percent,
-                        label: sprintf('Downloading via yt-dlp: %d%%', (int) $percent),
-                        etaSeconds: $progress->etaSeconds,
-                        rate: $progress->speedBytesPerSecond,
-                    ));
+                    $context->progress($job, $progressSmoother->update($progress));
                 },
             );
 
