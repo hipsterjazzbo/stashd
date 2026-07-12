@@ -377,7 +377,7 @@ create admin account
 create first stash
 ```
 
-RoadRunner handles HTTP and worker runtime.
+FrankenPHP/Caddy handles HTTP. Supervisord runs the job-worker lanes and scheduler; Mercure provides authenticated real-time updates.
 
 SQLite is the v1 database.
 

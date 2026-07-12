@@ -182,18 +182,18 @@ The framework is an interface layer, not the application itself. Business logic 
 
 ## Runtime
 
-Stashd uses **RoadRunner** as the application server and worker runtime.
+Stashd uses **FrankenPHP** in classic mode, with Caddy as the HTTP server.
 
 No PHP-FPM or Nginx should be required for the default deployment.
 
-RoadRunner is responsible for:
+Supervisord is responsible for:
 
 ```text
 HTTP workers
 background workers
 scheduler runtime
 long-running process supervision
-worker recycling
+worker process supervision
 ```
 
 ## Database
@@ -2436,7 +2436,7 @@ They must validate:
 
 ```text
 container starts
-RoadRunner starts
+FrankenPHP and supervisord start
 Tempest boots
 SQLite database is created/migrated
 storage roots are created
@@ -2534,7 +2534,7 @@ The image includes:
 ```text
 PHP 8.5+
 Tempest app
-RoadRunner
+FrankenPHP/Caddy
 SQLite extension
 yt-dlp
 FFmpeg
@@ -2555,8 +2555,8 @@ create required directories
 ensure Tempest app key exists/persisted
 run database migrations
 run storage capability checks
-start RoadRunner
-start scheduler/worker roles
+start FrankenPHP/Caddy
+start supervisord worker/scheduler roles
 ```
 
 Errors must be clear and actionable.
@@ -2626,7 +2626,7 @@ multi-arch build passes
 ```text
 PHP 8.5+
 Tempest
-RoadRunner
+FrankenPHP/Caddy
 SQLite only
 Docker-first deployment
 default port 8474

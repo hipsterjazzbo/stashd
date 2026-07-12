@@ -48,6 +48,6 @@ Add valid, invalid, revoked, and non-leakage tests.
 ```text
 Use /docker-smoke-triage.
 Target symptom: [symptom].
-Inspect Dockerfile, docker-compose.yml, .rr.yaml, docker/, and tests/docker only as needed.
+Inspect Dockerfile, docker-compose.yml, docker/Caddyfile, docker/, and tests/docker only as needed.
 Do not change domain code unless the failure proves it is necessary.
 ```

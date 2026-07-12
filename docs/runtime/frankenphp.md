@@ -46,6 +46,6 @@ Tempest's stock `GenericResponseSender` only knows how to stream a `Generator` b
 
 Replaced the RoadRunner-era SQLite-poll SSE endpoint with FrankenPHP's embedded Mercure hub (`docker/Caddyfile`'s `mercure` block). `App\System\Event\MercurePublisher` publishes the same five event types over HTTP to `/.well-known/mercure` (from both web requests and out-of-process worker/scheduler CLI roles, which can't use the `mercure_publish()` function). Subscribers need a JWT: `GET /api/v1/events/subscription` (behind `RequireAuthMiddleware`) mints one via `AuthService::issueMercureSubscriberToken()` and sets it as the `mercureAuthorization` cookie, scoped to `/.well-known/mercure`. The frontend consolidates what used to be five separate `/api/v1/events` connections into one shared `EventSource` against the hub (`src/main.entrypoint.ts`'s `subscribeToEvents`).
 
-## Not yet done
+## Podcast media
 
-Podcast episode file serving still uses the same hand-rolled range-request code that ran under RoadRunner (just no longer crashing under classic mode, per above) — porting it to FrankenPHP's X-Sendfile support is separate, later work.
+`PodcastEpisodeController` authorizes the tokenized request and returns an internal redirect. Caddy serves the selected Vault asset directly, including range requests, so episode bytes do not pass through PHP.
