@@ -31,6 +31,7 @@ jobs:
               git config --global --add safe.directory /var/www/html
               composer install --no-interaction --prefer-dist --no-progress
               npm ci
+              php tempest key:generate
               composer lint
               composer test:static
               npm run typecheck
