@@ -11,6 +11,8 @@ SKIP_BUILD="${STASHD_SMOKE_SKIP_BUILD:-0}"
 TIMEOUT="${STASHD_SMOKE_TIMEOUT:-180}"
 NAME="stashd-smoke-$$"
 TMP="$(mktemp -d)"
+PUID="$(id -u)"
+PGID="$(id -g)"
 
 if command -v docker >/dev/null 2>&1; then
     CONTAINER=docker
@@ -77,6 +79,8 @@ echo "Starting container..."
 $CONTAINER run -d --name "$NAME" \
     -e STASHD_DATA_PATH=/data \
     -e STASHD_MEDIA_PATH=/media \
+    -e PUID="$PUID" \
+    -e PGID="$PGID" \
     -v "$TMP/data:/data" \
     -v "$TMP/media:/media" \
     -p 18474:8474 \
@@ -253,6 +257,8 @@ $CONTAINER rm -f "$NAME" >/dev/null
 $CONTAINER run -d --name "$NAME" \
     -e STASHD_DATA_PATH=/data \
     -e STASHD_MEDIA_PATH=/media \
+    -e PUID="$PUID" \
+    -e PGID="$PGID" \
     -v "$TMP/data:/data" \
     -v "$TMP/media:/media" \
     -p 18474:8474 \
@@ -755,6 +761,8 @@ operator_mercure_secret="$(head -c32 /dev/urandom | base64)"
 $CONTAINER run -d --name "$override_name" \
     -e STASHD_DATA_PATH=/data \
     -e STASHD_MEDIA_PATH=/media \
+    -e PUID="$PUID" \
+    -e PGID="$PGID" \
     -e SIGNING_KEY="$operator_key" \
     -e MERCURE_JWT_SECRET="$operator_mercure_secret" \
     -v "$override_tmp/data:/data" \
