@@ -71,6 +71,10 @@ final readonly class PodcastFeedBuilder
             if ($episode->imageUrl !== null) {
                 $xml .= '      <itunes:image href="' . $this->escape($episode->imageUrl) . "\" />\n";
             }
+            if ($episode->transcriptUrl !== null && $episode->transcriptMimeType !== null) {
+                $xml .= '      <podcast:transcript url="' . $this->escape($episode->transcriptUrl) . '" type="' . $this->escape($episode->transcriptMimeType) . '"'
+                    . ($episode->transcriptLanguage === null ? '' : ' language="' . $this->escape($episode->transcriptLanguage) . '"') . " />\n";
+            }
             $xml .= "    </item>\n";
         }
 

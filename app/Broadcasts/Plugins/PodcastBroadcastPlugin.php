@@ -29,6 +29,8 @@ use App\Broadcasts\Podcasts\PodcastMediaKind;
 use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Broadcasts\StashdBroadcast;
 use App\Broadcasts\UiControl;
+use App\Commands\CommandDispatchService;
+use App\Commands\CommandType;
 use App\Stashes\StashItemId;
 use App\Stashes\StashItemState;
 use App\System\State\StateTransitionService;
@@ -57,6 +59,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         private StateTransitionService $transitions,
         private \App\Broadcasts\Podcasts\PodcastFundingLinkDetector $fundingDetector,
         private \App\Broadcasts\Podcasts\PodcastTranscodeFallback $transcodeFallback,
+        private CommandDispatchService $dispatch,
     ) {
     }
 
@@ -79,6 +82,8 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
             new UiControl('language', 'Language', 'text', 'en'),
             new UiControl('explicit', 'Explicit', 'select', 'false', ['false', 'true']),
             new UiControl('complete', 'Complete', 'select', 'false', ['false', 'true']),
+            new UiControl('captions', 'Captions', 'select', 'off', ['off', 'creator_only', 'creator_or_auto']),
+            new UiControl('caption_languages', 'Caption languages', 'text', 'en'),
             new UiControl('funding_url', 'Funding URL', 'text'),
             new UiControl('media_kind', 'Media Kind', 'select', null, ['audio', 'video']),
         ];
@@ -125,6 +130,15 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
                 $failed[] = (string) $stashItem->id;
 
                 continue;
+            }
+
+            $captionSettings = PodcastFeedSettings::fromArray($this->settings($context));
+            if ($captionSettings->captions !== 'off' && $this->assets->captionAsset($stashItem->mediaItemId) === null) {
+                $this->dispatch->dispatch(CommandType::AssetDownloadCaptions, [
+                    'media_item_id' => (string) $stashItem->mediaItemId,
+                    'languages' => $captionSettings->captionLanguages,
+                    'include_auto' => $captionSettings->captions === 'creator_or_auto',
+                ]);
             }
 
             $kind = $this->preferredMediaKind($context);
@@ -334,6 +348,11 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
             imageUrl: $this->assets->artworkAsset($stashItem->mediaItemId) === null
                 ? null
                 : $this->urls->artworkUrl($broadcastToken, $itemToken),
+            transcriptUrl: $this->assets->captionAsset($stashItem->mediaItemId) === null
+                ? null
+                : $this->urls->transcriptUrl($broadcastToken, $itemToken),
+            transcriptMimeType: $this->assets->captionAsset($stashItem->mediaItemId)?->mimeType,
+            transcriptLanguage: $this->assets->captionAsset($stashItem->mediaItemId)?->language,
         );
     }
 

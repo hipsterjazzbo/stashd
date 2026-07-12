@@ -59,6 +59,13 @@ final class JobRepository
         return JobRecord::findById($id->toPrimaryKey());
     }
 
+    public function hasPendingOrProcessing(JobIntent $intent, PrefixedUlid $entityId): bool
+    {
+        return JobRecord::select()
+            ->where('intent = ? AND entityId = ? AND state IN (?, ?)', $intent, $entityId->toString(), JobState::Pending, JobState::Processing)
+            ->first() !== null;
+    }
+
     public function save(JobRecord $record): JobRecord
     {
         $record->updatedAt = DateTime::now(Timezone::UTC);

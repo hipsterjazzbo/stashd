@@ -35,6 +35,7 @@ final class AssetRepository
         ?int $sizeBytes = null,
         ?string $checksum = null,
         ?int $durationSeconds = null,
+        ?string $language = null,
     ): AssetRecord {
         $id = $this->ids->generate('asset')->toString();
         $record = new AssetRecord(
@@ -49,6 +50,7 @@ final class AssetRepository
             sizeBytes: $sizeBytes,
             checksum: $checksum,
             durationSeconds: DurationSeconds::toDuration($durationSeconds),
+            language: $language,
         );
         $record->id = new PrimaryKey($id);
         $now = DateTime::now(Timezone::UTC);

@@ -10,6 +10,7 @@ use App\Commands\CommandHandlerRegistry;
 use App\Commands\CommandRepository;
 use App\Commands\CommandType;
 use App\Downloads\ItemDownloadCommandHandler;
+use App\Downloads\AssetDownloadCaptionsCommandHandler;
 use App\Jobs\JobRepository;
 use App\MediaServers\MediaServerCommandHandler;
 use App\MediaServers\MediaServerConnectionRepository;
@@ -37,6 +38,7 @@ final class CommandHandlerRegistryInitializer implements Initializer
             $container->get(StashAddInputCommandHandler::class),
             $container->get(StashRetryFailedCommandHandler::class),
             $container->get(ItemDownloadCommandHandler::class),
+            $container->get(AssetDownloadCaptionsCommandHandler::class),
             $container->get(SystemStorageCheckCommandHandler::class),
             $container->get(SystemVerifyVaultCommandHandler::class),
             $container->get(AssetVerifyCommandHandler::class),

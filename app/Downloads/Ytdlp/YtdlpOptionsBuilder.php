@@ -46,6 +46,24 @@ final readonly class YtdlpOptionsBuilder
         return $this->withCrossCutting(Options::create());
     }
 
+    public function captionOptions(string $languages, bool $includeAuto): Options
+    {
+        $options = $this->withRetries(
+            $this->withCrossCutting(
+                Options::create()
+                    ->output('stashd-caption.%(ext)s')
+                    ->subtitles($languages)
+                    ->subFormat('vtt')
+                    ->writeSubtitles()
+                    ->noPlaylist()
+                    ->noWarnings()
+                    ->option('--restrict-filenames'),
+            ),
+        );
+
+        return $includeAuto ? $options->writeAutoSubtitles() : $options;
+    }
+
     /**
      * Flat listing for channel/playlist discovery -- id/title/url per entry
      * without resolving each video individually, which for a large channel

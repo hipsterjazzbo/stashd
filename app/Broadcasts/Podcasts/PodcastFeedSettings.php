@@ -20,6 +20,8 @@ final readonly class PodcastFeedSettings
             language: self::string($settings, 'language') ?? 'en',
             explicit: self::boolean($settings, 'explicit'),
             complete: self::boolean($settings, 'complete'),
+            captions: self::string($settings, 'captions') ?? 'off',
+            captionLanguages: self::string($settings, 'caption_languages') ?? 'en',
         );
     }
 
@@ -33,6 +35,8 @@ final readonly class PodcastFeedSettings
         public string $language,
         public bool $explicit,
         public bool $complete,
+        public string $captions,
+        public string $captionLanguages,
     ) {
     }
 

@@ -23,4 +23,5 @@ enum CommandType: string
     case MediaServerTestConnection = 'media_server.test_connection';
     case MediaServerListLibraries = 'media_server.list_libraries';
     case AssetTranscodePodcastAudio = 'asset.transcode_podcast_audio';
+    case AssetDownloadCaptions = 'asset.download_captions';
 }
