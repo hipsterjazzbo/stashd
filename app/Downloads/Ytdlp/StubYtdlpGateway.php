@@ -94,6 +94,13 @@ final class StubYtdlpGateway implements YtdlpGateway
             );
         }
 
+        if (in_array('stashd-caption.%(ext)s', $options->toArray(), true)) {
+            $path = rtrim($workingDirectory, '/') . '/stashd-caption.en.vtt';
+            file_put_contents($path, "WEBVTT\n\n00:00.000 --> 00:01.000\nStub caption\n");
+
+            return new \Ytdlphp\DownloadResult(new ProcessResult(exitCode: 0, output: "Destination: {$path}\n", errorOutput: ''));
+        }
+
         $path = rtrim($workingDirectory, '/') . '/stashd-original.mp4';
         file_put_contents($path, "stub-ytdlp-media\nurl={$url}\n");
 
