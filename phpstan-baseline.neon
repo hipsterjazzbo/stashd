@@ -43,42 +43,6 @@ parameters:
 			path: app/Auth/UserRepository.php
 
 		-
-			message: '#^Cannot cast mixed to string\.$#'
-			identifier: cast.string
-			count: 1
-			path: app/Broadcasts/BroadcastCommandHandler.php
-
-		-
-			message: '#^Method App\\Broadcasts\\BroadcastCommandHandler\:\:broadcastIdFromOptions\(\) has parameter \$options with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Broadcasts/BroadcastCommandHandler.php
-
-		-
-			message: '#^Method App\\Broadcasts\\BroadcastCommandHandler\:\:extras\(\) has parameter \$options with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Broadcasts/BroadcastCommandHandler.php
-
-		-
-			message: '#^Method App\\Broadcasts\\BroadcastCommandHandler\:\:normalizedPayload\(\) has parameter \$options with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Broadcasts/BroadcastCommandHandler.php
-
-		-
-			message: '#^Parameter \#1 \$value of static method App\\Support\\PrefixedUlid\:\:parse\(\) expects string, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Broadcasts/BroadcastCommandHandler.php
-
-		-
-			message: '#^Property App\\Commands\\CommandRecord\:\:\$targetId \(string\|null\) does not accept mixed\.$#'
-			identifier: assign.propertyType
-			count: 1
-			path: app/Broadcasts/BroadcastCommandHandler.php
-
-		-
 			message: '#^Property App\\Broadcasts\\BroadcastContextFactory\:\:\$broadcasts is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
@@ -125,30 +89,6 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: app/Broadcasts/BroadcastItemRepository.php
-
-		-
-			message: '#^Method App\\Broadcasts\\BroadcastLifecycleResult\:\:__construct\(\) has parameter \$prune with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Broadcasts/BroadcastLifecycleService.php
-
-		-
-			message: '#^Method App\\Broadcasts\\BroadcastLifecycleResult\:\:__construct\(\) has parameter \$publish with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Broadcasts/BroadcastLifecycleService.php
-
-		-
-			message: '#^Method App\\Broadcasts\\BroadcastLifecycleResult\:\:__construct\(\) has parameter \$trigger with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Broadcasts/BroadcastLifecycleService.php
-
-		-
-			message: '#^Method App\\Broadcasts\\BroadcastLifecycleResult\:\:__construct\(\) has parameter \$verify with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Broadcasts/BroadcastLifecycleService.php
 
 		-
 			message: '#^Cannot access offset ''className'' on mixed\.$#'
@@ -653,36 +593,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: app/Jobs/Handlers/AddInputJobHandler.php
-
-		-
-			message: '#^Cannot cast mixed to string\.$#'
-			identifier: cast.string
-			count: 2
-			path: app/Jobs/Handlers/BroadcastJobHandler.php
-
-		-
-			message: '#^Parameter \#4 \$publish of method App\\System\\Activity\\ActivityEventService\:\:broadcastPublished\(\) expects array\<string, mixed\>, array given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Jobs/Handlers/BroadcastJobHandler.php
-
-		-
-			message: '#^Parameter \#4 \$trigger of method App\\Jobs\\Handlers\\BroadcastJobHandler\:\:recordTriggerActivity\(\) expects array\<string, mixed\>, array given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Jobs/Handlers/BroadcastJobHandler.php
-
-		-
-			message: '#^Parameter \#4 \$verify of method App\\System\\Activity\\ActivityEventService\:\:broadcastStale\(\) expects array\<string, mixed\>, array given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Jobs/Handlers/BroadcastJobHandler.php
-
-		-
-			message: '#^Parameter \#4 \$verify of method App\\System\\Activity\\ActivityEventService\:\:broadcastVerified\(\) expects array\<string, mixed\>, array given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Jobs/Handlers/BroadcastJobHandler.php
 
 		-
 			message: '#^Cannot cast mixed to string\.$#'
