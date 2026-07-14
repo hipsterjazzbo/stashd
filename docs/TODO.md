@@ -631,7 +631,7 @@ the live status tracker, so "what's left" never again needs a tour of `docs/plan
 
 ## Future companion apps (not started, not part of this v1 roadmap)
 
-- [ ] Browser extension — full draft spec at `docs/Stashd-Browser-Extension-Spec.md` ("click Stashd
-  → preflight/create against the same public API the web UI uses"); no code exists yet, no v1
-  roadmap phase assigned. Slice 6 confirmed the web UI deliberately dogfoods the same `/api/v1`
-  endpoints this spec calls for, so the API side is unintentionally ready whenever this gets picked up.
+- [ ] Browser extension — revised v1 spec at `docs/Stashd-Browser-Extension-Spec.md`: explicit
+  browser-to-web-app handoff into the existing create-stash flow; no extension code yet
+  roadmap phase assigned. First add the small `/stashes` fragment handoff described in the spec,
+  then package the Chromium popup.
