@@ -59,8 +59,11 @@ final readonly class YouTubeDataApiDiscoveryStrategy implements DiscoveryStrateg
     private function resolveUploadsPlaylistId(string $channelId): string
     {
         $payload = $this->fetchJson(YouTubeUris::dataApiChannelContentDetails($channelId, (string) $this->dataApiKey->key()));
+        $channel = $this->firstItem($payload);
+        $contentDetails = is_array($channel['contentDetails'] ?? null) ? $channel['contentDetails'] : [];
+        $relatedPlaylists = is_array($contentDetails['relatedPlaylists'] ?? null) ? $contentDetails['relatedPlaylists'] : [];
 
-        $playlistId = $payload['items'][0]['contentDetails']['relatedPlaylists']['uploads'] ?? null;
+        $playlistId = $relatedPlaylists['uploads'] ?? null;
 
         if (! is_string($playlistId) || $playlistId === '') {
             throw new ProviderException('YouTube channel uploads playlist was not found.', 'data_api_channel_not_found', 404);
@@ -96,7 +99,9 @@ final readonly class YouTubeDataApiDiscoveryStrategy implements DiscoveryStrateg
     private function playlistTitle(string $playlistId): ?string
     {
         $payload = $this->fetchJson(YouTubeUris::dataApiPlaylist($playlistId, (string) $this->dataApiKey->key()));
-        $title = $payload['items'][0]['snippet']['title'] ?? null;
+        $playlist = $this->firstItem($payload);
+        $snippet = is_array($playlist['snippet'] ?? null) ? $playlist['snippet'] : [];
+        $title = $snippet['title'] ?? null;
 
         return is_string($title) && trim($title) !== '' ? trim($title) : null;
     }
@@ -105,7 +110,7 @@ final readonly class YouTubeDataApiDiscoveryStrategy implements DiscoveryStrateg
     private function discoverVideo(string $videoId): array
     {
         $payload = $this->fetchJson(YouTubeUris::dataApiVideosBatch([$videoId], (string) $this->dataApiKey->key()));
-        $item = $payload['items'][0] ?? null;
+        $item = $this->firstItem($payload);
 
         if (! is_array($item)) {
             return [];
@@ -171,7 +176,7 @@ final readonly class YouTubeDataApiDiscoveryStrategy implements DiscoveryStrateg
         $classifications = $this->fetchClassifications($videoIds);
 
         return array_values(array_filter(array_map(
-            function (array $entry) use ($classifications): ?DiscoveredItem {
+            function (array $entry) use ($classifications, $inputTitle): ?DiscoveredItem {
                 $classification = $classifications[$entry['videoId']] ?? null;
 
                 if ($classification === null) {
@@ -257,6 +262,35 @@ final readonly class YouTubeDataApiDiscoveryStrategy implements DiscoveryStrateg
         }
 
         return null;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>|null
+     */
+    private function firstItem(array $payload): ?array
+    {
+        $items = $payload['items'] ?? null;
+
+        if (! is_array($items)) {
+            return null;
+        }
+
+        $item = $items[0] ?? null;
+
+        if (! is_array($item)) {
+            return null;
+        }
+
+        $normalized = [];
+
+        foreach ($item as $key => $value) {
+            if (is_string($key)) {
+                $normalized[$key] = $value;
+            }
+        }
+
+        return $normalized;
     }
 
     /** @return array<string, mixed> */

@@ -799,24 +799,6 @@ parameters:
 			path: app/Providers/YouTube/YouTubeDataApiDiscoveryStrategy.php
 
 		-
-			message: '#^Cannot access offset ''contentDetails'' on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: app/Providers/YouTube/YouTubeDataApiDiscoveryStrategy.php
-
-		-
-			message: '#^Cannot access offset ''relatedPlaylists'' on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: app/Providers/YouTube/YouTubeDataApiDiscoveryStrategy.php
-
-		-
-			message: '#^Cannot access offset ''uploads'' on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 1
-			path: app/Providers/YouTube/YouTubeDataApiDiscoveryStrategy.php
-
-		-
 			message: '#^Cannot access offset ''url'' on mixed\.$#'
 			identifier: offsetAccess.nonOffsetAccessible
 			count: 1
@@ -826,12 +808,6 @@ parameters:
 			message: '#^Cannot access offset ''videoId'' on mixed\.$#'
 			identifier: offsetAccess.nonOffsetAccessible
 			count: 1
-			path: app/Providers/YouTube/YouTubeDataApiDiscoveryStrategy.php
-
-		-
-			message: '#^Cannot access offset 0 on mixed\.$#'
-			identifier: offsetAccess.nonOffsetAccessible
-			count: 2
 			path: app/Providers/YouTube/YouTubeDataApiDiscoveryStrategy.php
 
 		-
