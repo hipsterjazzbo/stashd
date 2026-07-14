@@ -34,6 +34,11 @@ final class YouTubeRssParser
         $document->registerXPathNamespace('yt', 'http://www.youtube.com/xml/schemas/2015');
         $document->registerXPathNamespace('media', 'http://search.yahoo.com/mrss/');
 
+        $feedTitleNodes = $document->xpath('/atom:feed/atom:title');
+        $inputTitle = $feedKind === 'playlist' && isset($feedTitleNodes[0])
+            ? str((string) $feedTitleNodes[0])->trim()->toString()
+            : null;
+
         $entries = $document->xpath('//atom:entry') ?: [];
 
         if ($entries === []) {
@@ -89,6 +94,7 @@ final class YouTubeRssParser
                 rawMetadata: [
                     'feed_kind' => $feedKind,
                     'video_id' => $videoId,
+                    ...($inputTitle === null || $inputTitle === '' ? [] : ['input_title' => $inputTitle]),
                 ],
             );
         }

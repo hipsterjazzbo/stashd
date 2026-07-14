@@ -96,6 +96,15 @@ final class YouTubeUris
         return $pageToken !== null ? $uri->addQuery(pageToken: $pageToken) : $uri;
     }
 
+    public static function dataApiPlaylist(string $playlistId, string $apiKey): Uri
+    {
+        return Uri::from(self::DATA_API_ORIGIN . '/playlists')->withQuery(
+            id: $playlistId,
+            part: 'snippet',
+            key: $apiKey,
+        );
+    }
+
     /** @param list<string> $videoIds */
     public static function dataApiVideosBatch(array $videoIds, string $apiKey): Uri
     {

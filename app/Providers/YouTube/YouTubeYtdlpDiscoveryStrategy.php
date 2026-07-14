@@ -75,11 +75,11 @@ final readonly class YouTubeYtdlpDiscoveryStrategy implements DiscoveryStrategyH
     /** @return list<DiscoveredItem> */
     private function discoverPlaylist(ResolvedInput $input): array
     {
-        return $this->fetchFlatEntries(YouTubeUris::playlistPage($input->providerInputId));
+        return $this->fetchFlatEntries(YouTubeUris::playlistPage($input->providerInputId), includeInputTitle: true);
     }
 
     /** @return list<DiscoveredItem> */
-    private function fetchFlatEntries(Uri $url): array
+    private function fetchFlatEntries(Uri $url, bool $includeInputTitle = false): array
     {
         try {
             $playlist = $this->gateway->extractPlaylist(
@@ -108,7 +108,7 @@ final readonly class YouTubeYtdlpDiscoveryStrategy implements DiscoveryStrategyH
                 continue;
             }
 
-            $item = $this->mapEntry($entry);
+            $item = $this->mapEntry($entry, $includeInputTitle ? $playlist->title : null);
 
             if ($item !== null) {
                 $items[] = $item;
@@ -119,7 +119,7 @@ final readonly class YouTubeYtdlpDiscoveryStrategy implements DiscoveryStrategyH
     }
 
     /** @param array<mixed, mixed> $entry */
-    private function mapEntry(array $entry): ?DiscoveredItem
+    private function mapEntry(array $entry, ?string $inputTitle = null): ?DiscoveredItem
     {
         $rawId = $entry['id'] ?? null;
         $videoId = is_string($rawId) ? trim($rawId) : '';
@@ -143,7 +143,10 @@ final readonly class YouTubeYtdlpDiscoveryStrategy implements DiscoveryStrategyH
             durationSeconds: $durationSeconds,
             publishedAt: ProviderDates::tryParse(is_string($uploadDate) ? $uploadDate : null),
             thumbnailUri: $this->extractThumbnail($entry),
-            rawMetadata: ['flat_entry' => $entry],
+            rawMetadata: [
+                'flat_entry' => $entry,
+                ...($inputTitle === null || trim($inputTitle) === '' ? [] : ['input_title' => trim($inputTitle)]),
+            ],
         );
     }
 

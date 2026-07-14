@@ -42,7 +42,7 @@ final readonly class YouTubeDataApiDiscoveryStrategy implements DiscoveryStrateg
 
         return match ($input->inputType) {
             YouTubeInputType::Channel->value => $this->discoverChannel($input->providerInputId),
-            YouTubeInputType::Playlist->value => $this->discoverPlaylist($input->providerInputId),
+            YouTubeInputType::Playlist->value => $this->discoverPlaylist($input->providerInputId, $this->playlistTitle($input->providerInputId)),
             YouTubeInputType::Video->value => $this->discoverVideo($input->providerInputId),
             default => throw new ProviderException("Unsupported YouTube input type: {$input->inputType}", 'unsupported_input_type'),
         };
@@ -70,7 +70,7 @@ final readonly class YouTubeDataApiDiscoveryStrategy implements DiscoveryStrateg
     }
 
     /** @return list<DiscoveredItem> */
-    private function discoverPlaylist(string $playlistId): array
+    private function discoverPlaylist(string $playlistId, ?string $inputTitle = null): array
     {
         /** @var list<array{videoId: string, title: string, description: ?string, publishedAt: ?string, thumbnailUri: ?string}> $entries */
         $entries = [];
@@ -90,7 +90,15 @@ final readonly class YouTubeDataApiDiscoveryStrategy implements DiscoveryStrateg
             $pageToken = is_string($payload['nextPageToken'] ?? null) ? $payload['nextPageToken'] : null;
         } while ($pageToken !== null);
 
-        return $this->buildDiscoveredItems($entries);
+        return $this->buildDiscoveredItems($entries, $inputTitle);
+    }
+
+    private function playlistTitle(string $playlistId): ?string
+    {
+        $payload = $this->fetchJson(YouTubeUris::dataApiPlaylist($playlistId, (string) $this->dataApiKey->key()));
+        $title = $payload['items'][0]['snippet']['title'] ?? null;
+
+        return is_string($title) && trim($title) !== '' ? trim($title) : null;
     }
 
     /** @return list<DiscoveredItem> */
@@ -153,7 +161,7 @@ final readonly class YouTubeDataApiDiscoveryStrategy implements DiscoveryStrateg
      *
      * @return list<DiscoveredItem>
      */
-    private function buildDiscoveredItems(array $entries): array
+    private function buildDiscoveredItems(array $entries, ?string $inputTitle = null): array
     {
         if ($entries === []) {
             return [];
@@ -178,6 +186,7 @@ final readonly class YouTubeDataApiDiscoveryStrategy implements DiscoveryStrateg
                     durationSeconds: $classification['durationSeconds'],
                     publishedAt: ProviderDates::tryParse($entry['publishedAt']),
                     thumbnailUri: $entry['thumbnailUri'] !== null ? StashdUri::parse($entry['thumbnailUri']) : null,
+                    rawMetadata: $inputTitle === null ? null : ['input_title' => $inputTitle],
                     contentType: $classification['contentType'],
                 );
             },

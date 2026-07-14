@@ -70,6 +70,28 @@ test('youtube add input creates domain records without downloading', function ()
         ->and($media[0]->thumbnailUri)->not->toBeNull();
 });
 
+test('youtube playlist input uses the playlist title', function (): void {
+    $headers = $this->authHeaders();
+    $stash = $this->http->post('/api/v1/stashes', ['name' => 'Playlist Stash'], headers: $headers)->assertStatus(Status::CREATED);
+
+    $preflight = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.preflight',
+        'options' => ['source_uri' => 'https://www.youtube.com/playlist?list=PLStashdDemoPlaylist01'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $add = $this->http->post('/api/v1/stashes/' . $stash->body['stash']['id'] . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $input = \App\Stashes\StashInputRecord::findById(new \Tempest\Database\PrimaryKey(
+        $this->http->get('/api/v1/commands/' . $add->body['command_id'], headers: $headers)->body['command']['result']['stash_input_id'],
+    ));
+
+    expect($input?->title)->toBe('Stashd Demo Playlist');
+});
+
 test('youtube media items deduplicate across multiple stashes', function (): void {
     $headers = $this->authHeaders();
     $mediaItems = $this->container->get(\App\Vault\MediaItemRepository::class);

@@ -61,6 +61,24 @@ final readonly class DiscoverStashInput
         };
         $strategy = $this->strategySelector->select($provider, StrategyPurpose::Discovery, $selectionOptions);
         $discovered = $provider->discover($resolved, $strategy);
+
+        if ($sourceTitle === null && $resolved->inputType === 'playlist') {
+            $inputTitle = $this->playlistTitle($discovered);
+
+            if ($inputTitle !== null) {
+                $resolved = new ResolvedInput(
+                    providerKey: $resolved->providerKey,
+                    inputType: $resolved->inputType,
+                    sourceUri: $resolved->sourceUri,
+                    providerInputId: $resolved->providerInputId,
+                    title: $inputTitle,
+                    sourceTitle: $resolved->sourceTitle,
+                    sourceAvatarUri: $resolved->sourceAvatarUri,
+                    estimatedItemCount: $resolved->estimatedItemCount,
+                );
+            }
+        }
+
         $discoveredItems = DiscoveredItem::manyToArray($discovered);
 
         $estimatedItemCount = count($discovered);
@@ -80,5 +98,19 @@ final readonly class DiscoverStashInput
             discoveredItems: $discoveredItems,
             inputOptions: $provider->inputOptions($resolved),
         );
+    }
+
+    /** @param list<DiscoveredItem> $items */
+    private function playlistTitle(array $items): ?string
+    {
+        foreach ($items as $item) {
+            $title = $item->rawMetadata['input_title'] ?? null;
+
+            if (is_string($title) && str($title)->trim()->isNotEmpty()) {
+                return str($title)->trim()->toString();
+            }
+        }
+
+        return null;
     }
 }
