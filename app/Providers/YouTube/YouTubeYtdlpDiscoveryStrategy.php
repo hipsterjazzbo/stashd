@@ -9,6 +9,7 @@ use App\Downloads\Ytdlp\YtdlpGateway;
 use App\Downloads\Ytdlp\YtdlpOptionsBuilder;
 use App\Providers\Core\DiscoveredItem;
 use App\Providers\DiscoveryStrategyHandler;
+use App\Providers\ProviderDates;
 use App\Providers\ProviderException;
 use App\Providers\ResolvedInput;
 use App\Providers\StashdUri;
@@ -133,11 +134,14 @@ final readonly class YouTubeYtdlpDiscoveryStrategy implements DiscoveryStrategyH
         $rawDuration = $entry['duration'] ?? null;
         $durationSeconds = is_numeric($rawDuration) ? (int) round((float) $rawDuration) : null;
 
+        $uploadDate = $entry['upload_date'] ?? null;
+
         return new DiscoveredItem(
             providerItemId: $videoId,
             canonicalUri: YouTubeUris::watch($videoId),
             title: $title,
             durationSeconds: $durationSeconds,
+            publishedAt: ProviderDates::tryParse(is_string($uploadDate) ? $uploadDate : null),
             thumbnailUri: $this->extractThumbnail($entry),
             rawMetadata: ['flat_entry' => $entry],
         );
