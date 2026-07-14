@@ -68,6 +68,14 @@ final class JobRepository
             ->first() !== null;
     }
 
+    public function hasPendingOrProcessingIntent(JobIntent $intent): bool
+    {
+        return JobRecord::select()
+            ->where('intent', $intent)
+            ->whereIn('state', [JobState::Pending, JobState::Processing])
+            ->first() !== null;
+    }
+
     public function save(JobRecord $record): JobRecord
     {
         $record->updatedAt = DateTime::now(Timezone::UTC);

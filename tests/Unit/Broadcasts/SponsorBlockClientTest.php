@@ -13,8 +13,12 @@ use Tempest\Support\Uri\Uri;
 
 test('SponsorBlock client returns valid segments and ignores invalid ones', function (): void {
     $http = new class () implements ProviderHttpClient {
+        public string $url;
+
         public function get(Uri|string|Stringable $url): ProviderHttpResponse
         {
+            $this->url = (string) $url;
+
             return new ProviderHttpResponse(200, json_encode([
                 ['UUID' => 'segment-1', 'category' => 'sponsor', 'segment' => [5, 16.5], 'description' => 'Ad read'],
                 ['UUID' => 'bad', 'category' => 'intro', 'segment' => [10, 2]],
@@ -22,11 +26,12 @@ test('SponsorBlock client returns valid segments and ignores invalid ones', func
         }
     };
 
-    $segments = (new SponsorBlockClient($http))->fetch('video-id');
+    $segments = (new SponsorBlockClient($http))->fetch('video-id', [TimelineEntryCategory::Sponsor]);
 
     expect($segments)->toHaveCount(1)
         ->and($segments[0]->externalId)->toBe('segment-1')
         ->and($segments[0]->category)->toBe(TimelineEntryCategory::Sponsor)
         ->and($segments[0]->startSeconds)->toBe(5.0)
-        ->and($segments[0]->endSeconds)->toBe(16.5);
+        ->and($segments[0]->endSeconds)->toBe(16.5)
+        ->and($http->url)->toContain('categories=%5B%22sponsor%22%5D');
 });

@@ -282,8 +282,9 @@ item-scoped publication before advertising it.
 SponsorBlock remains opt-in and does not alter Vault media. At broadcast creation, set
 `settings.sponsorblock_enabled: true` and a non-empty
 `settings.sponsorblock_categories` list. Only YouTube items receive an immediate refresh record;
-the record expires after seven days. Fetching, derived remuxes, and timeline rendering are not
-implemented yet.
+the record is checked hourly for seven days. Each refresh stores SponsorBlock segments alongside
+provider/yt-dlp chapters, and queues only the changed broadcast item for rebuild. Refreshes never
+alter Vault media. Derived remuxes and merged timeline rendering are not implemented yet.
 
 Media server connections: see `docs/media-servers/README.md`.
 

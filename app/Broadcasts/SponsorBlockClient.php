@@ -20,12 +20,16 @@ final readonly class SponsorBlockClient
     {
     }
 
-    /** @return list<SponsorBlockSegment> */
-    public function fetch(string $videoId): array
+    /** @param list<TimelineEntryCategory> $categories
+     *  @return list<SponsorBlockSegment> */
+    public function fetch(string $videoId, array $categories = []): array
     {
+        $categories = $categories === []
+            ? self::CATEGORIES
+            : array_map(static fn (TimelineEntryCategory $category): string => $category->value, $categories);
         $query = http_build_query([
             'videoID' => $videoId,
-            'categories' => json_encode(self::CATEGORIES, JSON_THROW_ON_ERROR),
+            'categories' => json_encode($categories, JSON_THROW_ON_ERROR),
         ], encoding_type: PHP_QUERY_RFC3986);
         $response = $this->http->get('https://sponsor.ajay.app/api/skipSegments?' . $query);
 
@@ -72,7 +76,22 @@ final readonly class SponsorBlockClient
             startSeconds: (float) $start,
             endSeconds: (float) $end,
             title: is_string($raw['description'] ?? null) && $raw['description'] !== '' ? $raw['description'] : null,
-            raw: $raw,
+            raw: $this->provenance($raw),
         );
+    }
+
+    /**
+     * @param array<mixed> $raw
+     * @return array<string, mixed>
+     */
+    private function provenance(array $raw): array
+    {
+        $provenance = [];
+
+        foreach ($raw as $key => $value) {
+            $provenance[(string) $key] = $value;
+        }
+
+        return $provenance;
     }
 }

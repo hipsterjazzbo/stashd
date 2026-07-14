@@ -8,7 +8,7 @@ use App\Timeline\TimelineEntryCategory;
 
 final readonly class SponsorBlockSegment
 {
-    /** @param array<mixed> $raw */
+    /** @param array<string, mixed> $raw */
     public function __construct(
         public string $externalId,
         public TimelineEntryCategory $category,

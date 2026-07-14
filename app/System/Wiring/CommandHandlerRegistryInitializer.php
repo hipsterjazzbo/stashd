@@ -7,6 +7,7 @@ namespace App\System\Wiring;
 use App\Broadcasts\BroadcastCommandHandler;
 use App\Broadcasts\BroadcastItemRepository;
 use App\Broadcasts\BroadcastRepository;
+use App\Broadcasts\SponsorBlockRefreshCommandHandler;
 use App\Commands\CommandHandlerRegistry;
 use App\Commands\CommandRepository;
 use App\Commands\CommandType;
@@ -42,6 +43,7 @@ final class CommandHandlerRegistryInitializer implements Initializer
             $container->get(ItemDownloadCommandHandler::class),
             $container->get(AssetDownloadCaptionsCommandHandler::class),
             $container->get(SystemStorageCheckCommandHandler::class),
+            $container->get(SponsorBlockRefreshCommandHandler::class),
             $container->get(SystemVerifyVaultCommandHandler::class),
             $container->get(AssetVerifyCommandHandler::class),
             $container->get(AssetTranscodePodcastAudioCommandHandler::class),

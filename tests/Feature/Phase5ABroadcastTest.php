@@ -11,10 +11,17 @@ use App\Broadcasts\BroadcastPathBuilder;
 use App\Broadcasts\BroadcastRepository;
 use App\Broadcasts\HardlinkPublisher;
 use App\Broadcasts\SponsorBlockRefreshRepository;
+use App\Broadcasts\SponsorBlockSegment;
 use App\Config\StashdConfig;
 use App\Stashes\StashId;
 use App\Stashes\StashItemRecord;
 use App\System\Activity\ActivityEventRecord;
+use App\System\Scheduler\SponsorBlockRefreshScheduler;
+use App\Timeline\SponsorBlockTimelineSynchronizer;
+use App\Timeline\TimelineEntryCategory;
+use App\Timeline\TimelineEntryKind;
+use App\Timeline\TimelineEntryRepository;
+use App\Timeline\TimelineEntrySource;
 use App\Vault\AssetKind;
 use App\Vault\AssetRepository;
 use App\Vault\AssetRole;
@@ -379,6 +386,24 @@ test('broadcast publication schedules one delayed SponsorBlock refresh per item'
     $this->processAllJobs();
 
     expect($refreshes->listDue(\Tempest\DateTime\DateTime::now(\Tempest\DateTime\Timezone::UTC)))->toHaveCount(1);
+
+    expect($this->container->get(SponsorBlockRefreshScheduler::class)->scheduleDueRefresh())->toBeTrue()
+        ->and(\App\Jobs\JobRecord::select()->where('intent', \App\Jobs\JobIntent::SponsorBlockRefresh)->first())->not->toBeNull();
+});
+
+test('SponsorBlock synchronization preserves provider chapters and ignores unchanged segments', function (): void {
+    [, , $mediaItemId] = $this->bootstrapFakeDownloadBroadcast('broadcast-sponsorblock-timeline');
+    $mediaItem = MediaItemId::parse($mediaItemId);
+    $entries = $this->container->get(TimelineEntryRepository::class);
+    $entries->create($mediaItem, TimelineEntrySource::Provider, TimelineEntryKind::Chapter, TimelineEntryCategory::Chapter, 0.0, 60.0, 'Provider chapter');
+    $segments = [new SponsorBlockSegment('segment-1', TimelineEntryCategory::Sponsor, 15.0, 30.0, 'Ad read', ['UUID' => 'segment-1'])];
+    $synchronizer = $this->container->get(SponsorBlockTimelineSynchronizer::class);
+
+    expect($synchronizer->sync($mediaItem, $segments))->toBeTrue()
+        ->and($synchronizer->sync($mediaItem, $segments))->toBeFalse()
+        ->and($entries->listForMediaItem($mediaItem))->toHaveCount(2)
+        ->and($entries->listForMediaItem($mediaItem)[0]->source)->toBe(TimelineEntrySource::Provider)
+        ->and($entries->listForMediaItem($mediaItem)[1]->source)->toBe(TimelineEntrySource::SponsorBlock);
 });
 
 test('SponsorBlock polling ignores unsupported provider items', function (): void {

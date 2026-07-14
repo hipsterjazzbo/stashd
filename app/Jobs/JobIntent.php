@@ -14,6 +14,7 @@ enum JobIntent: string
     case Enrich = 'enrich';
     case Broadcast = 'broadcast';
     case StorageCheck = 'storage_check';
+    case SponsorBlockRefresh = 'sponsorblock_refresh';
     case Preflight = 'preflight';
     case AddInput = 'add_input';
     case RetryFailedDownloads = 'retry_failed_downloads';
@@ -26,7 +27,7 @@ enum JobIntent: string
     public function lane(): JobLane
     {
         return match ($this) {
-            self::Download, self::Broadcast, self::TranscodePodcastAudio, self::DownloadCaptions => JobLane::Bulk,
+            self::Download, self::Broadcast, self::TranscodePodcastAudio, self::DownloadCaptions, self::SponsorBlockRefresh => JobLane::Bulk,
             self::InitialBackfill => JobLane::Discovery,
             default => JobLane::Interactive,
         };

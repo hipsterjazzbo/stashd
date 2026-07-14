@@ -58,4 +58,20 @@ final class SponsorBlockRefreshRepository
         $record->updatedAt = $record->completedAt;
         $record->save();
     }
+
+    public function reschedule(SponsorBlockRefreshRecord $record, DateTime $now, ?string $error = null): void
+    {
+        $record->lastCheckedAt = $now;
+        $record->lastError = $error;
+        $nextCheckAt = $now->plusHours(1);
+
+        if ($nextCheckAt->isAfter($record->expiresAt)) {
+            $record->completedAt = $now;
+        } else {
+            $record->nextCheckAt = $nextCheckAt;
+        }
+
+        $record->updatedAt = $now;
+        $record->save();
+    }
 }
