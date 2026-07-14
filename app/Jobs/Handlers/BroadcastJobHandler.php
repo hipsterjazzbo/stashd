@@ -6,6 +6,7 @@ namespace App\Jobs\Handlers;
 
 use App\Broadcasts\BroadcastException;
 use App\Broadcasts\BroadcastId;
+use App\Broadcasts\BroadcastItemId;
 use App\Broadcasts\BroadcastLifecycleService;
 use App\Broadcasts\BroadcastRepository;
 use App\Broadcasts\BroadcastState;
@@ -58,7 +59,7 @@ final readonly class BroadcastJobHandler implements JobHandler
 
         $job->progressTotal = match ($action) {
             'plan', 'verify', 'prune', 'trigger', 'rotate_token' => 2,
-            'rebuild' => null,
+            'rebuild', 'rebuild_item' => null,
             default => 1,
         };
         $this->jobs->save($job);
@@ -67,6 +68,7 @@ final readonly class BroadcastJobHandler implements JobHandler
             $result = match ($action) {
                 'plan' => $this->handlePlan($command, $job, $context, $broadcastId),
                 'rebuild' => $this->handleRebuild($command, $job, $context, $broadcastId),
+                'rebuild_item' => $this->handleRebuildItem($command, $job, $context, $broadcastId, BroadcastItemId::parse((string) ($payload['broadcast_item_id'] ?? ''))),
                 'verify' => $this->handleVerify($command, $job, $context, $broadcastId),
                 'prune' => $this->handlePrune($command, $job, $context, $broadcastId),
                 'trigger' => $this->handleTrigger($command, $job, $context, $broadcastId),
@@ -148,6 +150,24 @@ final readonly class BroadcastJobHandler implements JobHandler
         if ($result->trigger !== null) {
             $this->recordTriggerActivity($command, $job, $broadcastId, $result->trigger);
         }
+
+        return $result->toArray();
+    }
+
+    /** @return array<string, mixed> */
+    private function handleRebuildItem(
+        CommandRecord $command,
+        JobRecord $job,
+        JobHandlerContext $context,
+        BroadcastId $broadcastId,
+        BroadcastItemId $broadcastItemId,
+    ): array {
+        $this->activity->broadcastRebuildStarted($command, $job, $broadcastId);
+        $result = $this->lifecycle->rebuildItem(
+            $broadcastItemId,
+            fn (string $label) => $context->progress($job, JobProgressUpdate::indeterminate($label)),
+        );
+        $this->activity->broadcastPublished($command, $job, $broadcastId, $result->publish ?? []);
 
         return $result->toArray();
     }

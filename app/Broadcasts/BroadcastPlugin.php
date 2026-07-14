@@ -38,6 +38,14 @@ interface BroadcastPlugin
     public function uiControls(): array;
 
     /**
+     * Whether this format can safely regenerate one existing broadcast item.
+     *
+     * New formats must opt in explicitly; not every generated view has
+     * item-scoped publication semantics.
+     */
+    public function supportsItemRebuild(): bool;
+
+    /**
      * Plan a broadcast for the given stash items.
      */
     public function plan(BroadcastContext $context): BroadcastPlan;

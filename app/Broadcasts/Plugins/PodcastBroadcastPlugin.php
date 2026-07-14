@@ -77,6 +77,11 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         return [FileKind::Audio, FileKind::Video];
     }
 
+    public function supportsItemRebuild(): bool
+    {
+        return true;
+    }
+
     public function uiControls(): array
     {
         return [

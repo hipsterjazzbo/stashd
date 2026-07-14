@@ -80,6 +80,11 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
         return [FileKind::Video];
     }
 
+    public function supportsItemRebuild(): bool
+    {
+        return true;
+    }
+
     public function uiControls(): array
     {
         return [];

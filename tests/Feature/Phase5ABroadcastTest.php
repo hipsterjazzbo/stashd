@@ -339,6 +339,47 @@ test('broadcast.rebuild publishes hardlinks from vault originals', function (): 
     }
 });
 
+test('broadcast.rebuild_item republishes only the selected broadcast item', function (): void {
+    [$headers, $stashId, $mediaItemId, $broadcastId] = $this->bootstrapFakeDownloadBroadcast('broadcast-rebuild-item');
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'item.download',
+        'options' => [
+            'media_item_id' => $mediaItemId,
+            'stash_id' => $stashId,
+        ],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild',
+        'options' => ['broadcast_id' => $broadcastId],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $item = $this->http->get('/api/v1/broadcasts/' . $broadcastId . '/items', headers: $headers)
+        ->assertOk()
+        ->body['items'][0];
+    unlink($item['published_path']);
+
+    $rebuild = $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild_item',
+        'options' => ['broadcast_item_id' => $item['id']],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $command = $this->http->get('/api/v1/commands/' . $rebuild->body['command_id'], headers: $headers)
+        ->assertOk()
+        ->body['command'];
+
+    expect($command['state'])->toBe('completed')
+        ->and($command['target_type'])->toBe('broadcast_item')
+        ->and($command['target_id'])->toBe($item['id'])
+        ->and($command['result']['plan']['file_count'])->toBe(1)
+        ->and($command['result']['verify']['ok'])->toBeTrue()
+        ->and(is_file($item['published_path']))->toBeTrue();
+});
+
 test('broadcast rebuild reports truthful lifecycle phases', function (): void {
     [$headers, $stashId, $mediaItemId, $broadcastId] = $this->bootstrapFakeDownloadBroadcast('broadcast-progress-phases');
 

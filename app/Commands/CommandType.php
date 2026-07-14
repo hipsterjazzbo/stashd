@@ -8,6 +8,7 @@ enum CommandType: string
 {
     case BroadcastPlan = 'broadcast.plan';
     case BroadcastRebuild = 'broadcast.rebuild';
+    case BroadcastRebuildItem = 'broadcast.rebuild_item';
     case BroadcastVerify = 'broadcast.verify';
     case BroadcastPrune = 'broadcast.prune';
     case BroadcastTrigger = 'broadcast.trigger';
