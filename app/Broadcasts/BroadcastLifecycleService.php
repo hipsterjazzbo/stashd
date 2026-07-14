@@ -15,7 +15,13 @@ use Tempest\DateTime\Timezone;
 
 final readonly class BroadcastLifecycleResult
 {
-    /** @param array<string, mixed> $plan */
+    /**
+     * @param array<string, mixed>|null $plan
+     * @param array<string, mixed>|null $publish
+     * @param array<string, mixed>|null $verify
+     * @param array<string, mixed>|null $prune
+     * @param array<string, mixed>|null $trigger
+     */
     public function __construct(
         public ?array $plan = null,
         public ?array $publish = null,

@@ -52,8 +52,8 @@ final readonly class BroadcastJobHandler implements JobHandler
 
         $payload = $job->payload ?? [];
 
-        $broadcastId = BroadcastId::parse((string) ($payload['broadcast_id'] ?? ''));
-        $action = (string) ($payload['action'] ?? 'rebuild');
+        $broadcastId = BroadcastId::parse($this->requiredPayloadString($payload, 'broadcast_id'));
+        $action = $this->requiredPayloadString($payload, 'action');
 
         $broadcast = $this->broadcasts->find($broadcastId);
 
@@ -68,7 +68,7 @@ final readonly class BroadcastJobHandler implements JobHandler
             $result = match ($action) {
                 'plan' => $this->handlePlan($command, $job, $context, $broadcastId),
                 'rebuild' => $this->handleRebuild($command, $job, $context, $broadcastId),
-                'rebuild_item' => $this->handleRebuildItem($command, $job, $context, $broadcastId, BroadcastItemId::parse((string) ($payload['broadcast_item_id'] ?? ''))),
+                'rebuild_item' => $this->handleRebuildItem($command, $job, $context, $broadcastId, BroadcastItemId::parse($this->requiredPayloadString($payload, 'broadcast_item_id'))),
                 'verify' => $this->handleVerify($command, $job, $context, $broadcastId),
                 'prune' => $this->handlePrune($command, $job, $context, $broadcastId),
                 'trigger' => $this->handleTrigger($command, $job, $context, $broadcastId),
@@ -259,5 +259,17 @@ final readonly class BroadcastJobHandler implements JobHandler
 
         return $this->commands->find($job->commandId)
             ?? throw new \RuntimeException('Broadcast command not found.');
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function requiredPayloadString(array $payload, string $key): string
+    {
+        $value = $payload[$key] ?? null;
+
+        if (! is_string($value) || $value === '') {
+            throw BroadcastException::withCode('broadcast_payload_invalid', 'Broadcast job payload is invalid.');
+        }
+
+        return $value;
     }
 }
