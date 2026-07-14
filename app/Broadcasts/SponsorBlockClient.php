@@ -64,9 +64,11 @@ final readonly class SponsorBlockClient
             return null;
         }
 
+        $category = $raw['category'] ?? null;
+
         return new SponsorBlockSegment(
             externalId: $id,
-            category: TimelineEntryCategory::tryFrom((string) ($raw['category'] ?? '')) ?? TimelineEntryCategory::Other,
+            category: is_string($category) ? TimelineEntryCategory::tryFrom($category) ?? TimelineEntryCategory::Other : TimelineEntryCategory::Other,
             startSeconds: (float) $start,
             endSeconds: (float) $end,
             title: is_string($raw['description'] ?? null) && $raw['description'] !== '' ? $raw['description'] : null,
