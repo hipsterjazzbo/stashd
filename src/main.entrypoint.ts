@@ -1532,7 +1532,7 @@ function stashDetailComponent(stashId: string) {
 		broadcastStatus(broadcast: BroadcastSummary): string {
 			const job = this.broadcastJobFor(broadcast.id)
 			if (job?.state === 'pending') return 'Queued — waiting for downloads and a worker'
-			if (job?.state === 'processing') return job.progress_label ?? 'Building broadcast'
+			if (job?.state === 'processing') return 'Building broadcast'
 
 			const transcodes = this.broadcastTranscodeJobs(broadcast)
 			if (transcodes.length > 0) return `${transcodes.length} audio transcode${transcodes.length === 1 ? '' : 's'} in progress — this will update automatically`

@@ -33,3 +33,12 @@ test('ofPercent leaves current/total null and carries an explicit percent/eta', 
         ->and($update->etaSeconds)->toBe(240)
         ->and($update->rate)->toBeNull();
 });
+
+test('indeterminate progress has a label but no made-up percentage', function (): void {
+    $update = JobProgressUpdate::indeterminate('Publishing broadcast');
+
+    expect($update->current)->toBeNull()
+        ->and($update->total)->toBeNull()
+        ->and($update->percent)->toBeNull()
+        ->and($update->label)->toBe('Publishing broadcast');
+});

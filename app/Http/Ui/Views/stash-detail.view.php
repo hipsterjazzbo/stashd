@@ -152,10 +152,19 @@
 									<div class="mt-2 flex items-center gap-2">
 										<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber pulse-dot"></span>
 										<span class="shrink-0 text-[11px] text-muted" x-text="broadcastJobFor(broadcast.id)?.progress_label ?? 'Building'"></span>
-										<div class="h-1.5 flex-1 rounded-full bg-espresso">
-											<div class="h-1.5 rounded-full bg-amber transition-[width] duration-200" x-bind:style="'width: ' + (broadcastJobFor(broadcast.id)?.progress_percent ?? 0) + '%'"></div>
-										</div>
-										<span class="shrink-0 text-[11px] text-muted" x-text="Math.round(broadcastJobFor(broadcast.id)?.progress_percent ?? 0) + '%'"></span>
+										<template x-if="broadcastJobFor(broadcast.id)?.progress_percent === null">
+											<div class="h-1.5 flex-1 overflow-hidden rounded-full bg-espresso">
+												<div class="h-full w-1/3 rounded-full bg-amber animate-pulse"></div>
+											</div>
+										</template>
+										<template x-if="broadcastJobFor(broadcast.id)?.progress_percent !== null">
+											<div class="contents">
+												<div class="h-1.5 flex-1 rounded-full bg-espresso">
+													<div class="h-1.5 rounded-full bg-amber transition-[width] duration-200" x-bind:style="'width: ' + broadcastJobFor(broadcast.id).progress_percent + '%'"></div>
+												</div>
+												<span class="shrink-0 text-[11px] text-muted" x-text="Math.round(broadcastJobFor(broadcast.id).progress_percent) + '%'"></span>
+											</div>
+										</template>
 									</div>
 									</template>
 								</div>
