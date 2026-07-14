@@ -127,6 +127,24 @@ test('previewing a jellyfin broadcast reports eligible items and their vault siz
         ->and($preview['transcode_item_count'])->toBe(0);
 });
 
+test('previewing SponsorBlock chapters reports potential derived media storage', function (): void {
+    [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('broadcast-preview-sponsorblock');
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'item.download',
+        'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $preview = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts/preview', [
+        'type' => 'jellyfin',
+        'sponsorblock_enabled' => true,
+    ], headers: $headers)->assertOk()->body['preview'];
+
+    expect($preview['derived_media_item_count'])->toBe(1)
+        ->and($preview['derived_media_bytes'])->toBeGreaterThan(0);
+});
+
 test('previewing an audio podcast counts video-sourced episodes as needing transcode', function (): void {
     [$headers, $stashId, $mediaItemId] = $this->bootstrapFakeDownloadStash('broadcast-preview-podcast');
 
@@ -404,6 +422,45 @@ test('SponsorBlock synchronization preserves provider chapters and ignores uncha
         ->and($entries->listForMediaItem($mediaItem))->toHaveCount(2)
         ->and($entries->listForMediaItem($mediaItem)[0]->source)->toBe(TimelineEntrySource::Provider)
         ->and($entries->listForMediaItem($mediaItem)[1]->source)->toBe(TimelineEntrySource::SponsorBlock);
+});
+
+test('SponsorBlock chapters produce a broadcast-local remux without changing the Vault asset', function (): void {
+    [$headers, $stashId, $mediaItemId, $broadcastId] = $this->bootstrapFakeDownloadBroadcast('broadcast-sponsorblock-remux');
+    $this->http->post('/api/v1/commands', [
+        'type' => 'item.download',
+        'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $broadcast = $this->container->get(BroadcastRepository::class)->find(BroadcastId::parse($broadcastId));
+    $broadcast->settings = ['sponsorblock_enabled' => true, 'sponsorblock_categories' => ['sponsor']];
+    $this->container->get(BroadcastRepository::class)->save($broadcast);
+    $mediaItem = MediaItemId::parse($mediaItemId);
+    $assets = $this->container->get(AssetRepository::class);
+    $vault = $assets->readyVaultOriginalsByMediaItem([$mediaItemId])[$mediaItemId];
+    $mp4Path = $vault->path . '.mp4';
+    rename($vault->path, $mp4Path);
+    $vault->path = $mp4Path;
+    $assets->save($vault);
+    $this->container->get(SponsorBlockTimelineSynchronizer::class)->sync(
+        $mediaItem,
+        [new SponsorBlockSegment('segment-1', TimelineEntryCategory::Sponsor, 15.0, 30.0, 'Ad read', ['UUID' => 'segment-1'])],
+    );
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild',
+        'options' => ['broadcast_id' => $broadcastId],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $publishedPath = $this->http->get('/api/v1/broadcasts/' . $broadcastId . '/items', headers: $headers)
+        ->assertOk()
+        ->body['items'][0]['published_path'];
+    $vaultPath = $assets->readyVaultOriginalsByMediaItem([$mediaItemId])[$mediaItemId]->path;
+
+    expect(HardlinkPublisher::sameFile($vaultPath, $publishedPath))->toBeFalse()
+        ->and(file_get_contents($publishedPath))->toContain('stub-ffmpeg-remux')
+        ->and(file_get_contents($vaultPath))->not->toContain('stub-ffmpeg-remux');
 });
 
 test('SponsorBlock polling ignores unsupported provider items', function (): void {

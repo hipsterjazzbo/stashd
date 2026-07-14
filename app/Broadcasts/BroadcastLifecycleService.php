@@ -77,7 +77,7 @@ final readonly class BroadcastLifecycleService
      * PodcastTranscodeFallback). Transcoded output size isn't known ahead of
      * time, so those items are reported as a count, not a byte estimate.
      */
-    public function preview(StashId $stashId, string $type, ?string $mediaKind): BroadcastCreationPreview
+    public function preview(StashId $stashId, string $type, ?string $mediaKind, bool $sponsorBlockEnabled = false): BroadcastCreationPreview
     {
         $draftBroadcast = new BroadcastRecord(
             stashId: $stashId,
@@ -85,7 +85,11 @@ final readonly class BroadcastLifecycleService
             name: '',
             slug: '',
             state: BroadcastState::Pending,
-            settings: $mediaKind === null ? null : ['media_kind' => $mediaKind],
+            settings: array_filter([
+                'media_kind' => $mediaKind,
+                'sponsorblock_enabled' => $sponsorBlockEnabled ?: null,
+                'sponsorblock_categories' => $sponsorBlockEnabled ? ['sponsor'] : null,
+            ], static fn (mixed $value): bool => $value !== null),
         );
 
         return $this->impactFor($draftBroadcast);
@@ -111,6 +115,7 @@ final readonly class BroadcastLifecycleService
         $eligible = $this->contextFactory->publishableStashItems($context);
 
         $needsAudioTranscode = $broadcast->type === 'podcast' && PodcastMediaKind::forBroadcast($broadcast) === PodcastMediaKind::Audio;
+        $needsChapterRemux = $broadcast->type !== 'podcast' && SponsorBlockSettings::fromBroadcastSettings($broadcast->settings ?? [])->enabled;
 
         $vaultSizeBytes = 0;
         $transcodeItemCount = 0;
@@ -130,6 +135,8 @@ final readonly class BroadcastLifecycleService
             vaultSizeBytes: $vaultSizeBytes,
             hardlinkedItemCount: count($eligible) - $transcodeItemCount,
             transcodeItemCount: $transcodeItemCount,
+            derivedMediaItemCount: $needsChapterRemux ? count($eligible) : 0,
+            derivedMediaBytes: $needsChapterRemux ? $vaultSizeBytes : 0,
         );
     }
 

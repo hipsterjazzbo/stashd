@@ -284,7 +284,10 @@ SponsorBlock remains opt-in and does not alter Vault media. At broadcast creatio
 `settings.sponsorblock_categories` list. Only YouTube items receive an immediate refresh record;
 the record is checked hourly for seven days. Each refresh stores SponsorBlock segments alongside
 provider/yt-dlp chapters, and queues only the changed broadcast item for rebuild. Refreshes never
-alter Vault media. Derived remuxes and merged timeline rendering are not implemented yet.
+alter Vault media. For Jellyfin/Plex, items with fetched SponsorBlock segments are stream-copy
+remuxed locally with the merged timeline; the original stays hardlinked until segments exist.
+The broadcast preview reports the potential derived-media item count and byte impact before
+`sponsorblock_enabled` is selected. Podcast chapter remuxes remain future work.
 
 Media server connections: see `docs/media-servers/README.md`.
 

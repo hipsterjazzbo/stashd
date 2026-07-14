@@ -106,7 +106,12 @@ final readonly class BroadcastController
         }
 
         $mediaKind = isset($body['mediaKind']) ? trim((string) $body['mediaKind']) : null;
-        $preview = $this->lifecycle->preview(StashId::parse($stashId), $typeRaw, $mediaKind);
+        $preview = $this->lifecycle->preview(
+            StashId::parse($stashId),
+            $typeRaw,
+            $mediaKind,
+            ($body['sponsorblockEnabled'] ?? false) === true,
+        );
 
         return new Json(['preview' => ApiJson::encode($preview->toArray())]);
     }
