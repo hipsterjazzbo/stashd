@@ -92,7 +92,6 @@ final readonly class StashController
 
         $stash = $this->stashes->create(
             name: $name,
-            slug: $this->stashes->nextAvailableSlug($this->stashes->slugify($name)),
             syncMode: $syncMode,
             downloadPolicy: $downloadPolicy,
             organizationMode: $organizationMode,

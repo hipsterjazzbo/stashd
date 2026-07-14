@@ -24,7 +24,6 @@
 					<thead>
 						<tr class="text-[11px] uppercase tracking-wide text-muted">
 							<th class="px-4 py-2 font-normal">Name</th>
-							<th class="px-4 py-2 font-normal">Slug</th>
 							<th class="px-4 py-2 font-normal">State</th>
 							<th class="px-4 py-2 font-normal">Sync</th>
 							<th class="px-4 py-2 font-normal">Download</th>
@@ -42,7 +41,6 @@
 										<a class="text-cream transition-colors hover:text-amber" x-bind:href="'/stashes/' + stash.id" x-text="stash.name"></a>
 									</div>
 								</td>
-								<td class="px-4 py-2 font-mono text-muted" x-text="stash.slug"></td>
 								<td class="px-4 py-2">
 									<span class="inline-flex items-center gap-1.5" x-bind:class="statusBadge(stash.state).text">
 										<span class="h-1.5 w-1.5 rounded-full" x-bind:class="[statusBadge(stash.state).dot, statusBadge(stash.state).pulse ? 'pulse-dot' : '']"></span>

@@ -22,7 +22,7 @@ test('BroadcastItemRecord::broadcastId/stashItemId/mediaItemId round-trip as typ
     $stashItems = $this->container->get(StashItemRepository::class);
     $broadcastItems = $this->container->get(BroadcastItemRepository::class);
 
-    $stash = $stashes->create('Broadcast Typed ID Stash', 'broadcast-typed-id-stash-' . bin2hex(random_bytes(3)));
+    $stash = $stashes->create('Broadcast Typed ID Stash');
     $stashId = StashId::parse((string) $stash->id);
     $mediaItem = $mediaItems->create(
         providerKey: 'fake',

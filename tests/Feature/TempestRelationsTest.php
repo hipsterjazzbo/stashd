@@ -24,7 +24,7 @@ beforeEach(function (): void {
     $items = $this->container->get(StashItemRepository::class);
     $media = $this->container->get(MediaItemRepository::class);
 
-    $this->stash = $stashes->create(name: 'Relations Spike', slug: 'relations-spike');
+    $this->stash = $stashes->create(name: 'Relations Spike');
     $this->stashId = StashId::fromPrimaryKey($this->stash->id);
 
     foreach (['one', 'two'] as $key) {
@@ -62,7 +62,7 @@ test('BelongsTo eager-loads the owning stash from an item', function (): void {
 
     expect($item)->not->toBeNull()
         ->and($item->stash)->toBeInstanceOf(StashRecord::class)
-        ->and($item->stash->slug)->toBe('relations-spike');
+        ->and($item->stash->name)->toBe('Relations Spike');
 });
 
 test('whereHas filters stashes by related items', function (): void {

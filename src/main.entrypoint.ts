@@ -55,13 +55,48 @@ function wireLogout(): void {
 /** Thrown by apiFetch on 401/403, after it has already redirected to /login. */
 class UnauthenticatedError extends Error {}
 
+const SLOW_API_REQUEST_MILLISECONDS = 500
+
+function apiDiagnosticPath(path: string): string {
+	try {
+		return new URL(path, window.location.origin).pathname
+	} catch {
+		return '/api/v1/[invalid-path]'
+	}
+}
+
 /**
  * Shared fetch wrapper for every /api/v1 call made from the dashboard shell.
  * Sends the session cookie, and treats 401/403 as "bounce to /login" rather
  * than something each call site needs to check for itself.
  */
 async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-	const response = await fetch(path, { ...init, credentials: 'same-origin' })
+	const startedAt = performance.now()
+	const diagnosticPath = apiDiagnosticPath(path)
+	let response: Response
+
+	try {
+		response = await fetch(path, { ...init, credentials: 'same-origin' })
+	} catch (cause) {
+		console.warn('Stashd API request failed before receiving a response.', {
+			method: init.method ?? 'GET',
+			path: diagnosticPath,
+			duration_ms: Math.round(performance.now() - startedAt),
+		})
+		throw cause
+	}
+
+	const duration = performance.now() - startedAt
+	if (duration >= SLOW_API_REQUEST_MILLISECONDS || response.status >= 500) {
+		console.warn('Stashd API request diagnostic.', {
+			method: init.method ?? 'GET',
+			path: diagnosticPath,
+			status: response.status,
+			duration_ms: Math.round(duration),
+			server_timing: response.headers.get('Server-Timing'),
+			request_id: response.headers.get('X-Stashd-Request-Id'),
+		})
+	}
 
 	if (response.status === 401 || response.status === 403) {
 		window.location.assign('/login')
@@ -693,7 +728,6 @@ interface CommandShowResponse {
 interface StashSummary {
 	id: string
 	name: string
-	slug: string
 	description: string | null
 	sync_mode: string
 	download_policy: string
@@ -915,11 +949,14 @@ interface LibrarySummary {
 }
 
 async function describeFailedResponse(response: Response): Promise<string> {
+	const requestId = response.headers.get('X-Stashd-Request-Id')
+	const reference = requestId ? ` [request ${requestId}]` : ''
+
 	try {
 		const body = (await response.json()) as { error?: { message?: string } }
-		return body.error?.message ?? `HTTP ${response.status}`
+		return `${body.error?.message ?? `HTTP ${response.status}`}${reference}`
 	} catch {
-		return `HTTP ${response.status}`
+		return `HTTP ${response.status}${reference}`
 	}
 }
 
@@ -1490,6 +1527,7 @@ function stashDetailComponent(stashId: string) {
 				const response = await apiFetch('/api/v1/broadcast-plugins')
 				const body = await response.json()
 				this.broadcastPlugins = body.plugins ?? this.broadcastPlugins
+				this.newBroadcastType = this.broadcastPlugins[0]?.key ?? this.newBroadcastType
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
 				this.error = 'Could not reach the server.'

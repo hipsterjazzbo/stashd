@@ -48,9 +48,12 @@ test('domain schema migration creates all v1 tables on a fresh database', functi
 
     $jobsInfo = $database->fetch(new Query('PRAGMA table_info(jobs)'));
     $jobColumns = array_column($jobsInfo ?? [], 'name');
+    $stashInfo = $database->fetch(new Query('PRAGMA table_info(stashes)'));
+    $stashColumns = array_column($stashInfo ?? [], 'name');
 
     expect($jobColumns)->toContain('progressRate')
-        ->and($jobColumns)->toContain('progressEtaSeconds');
+        ->and($jobColumns)->toContain('progressEtaSeconds')
+        ->and($stashColumns)->not->toContain('slug');
 });
 
 test('media item provider identity is unique', function (): void {
@@ -76,7 +79,7 @@ test('stash item enforces stash and media item relationship uniqueness', functio
     $media = $this->container->get(\App\Vault\MediaItemRepository::class);
     $items = $this->container->get(\App\Stashes\StashItemRepository::class);
 
-    $stash = $stashes->create('Test Stash', 'test-stash');
+    $stash = $stashes->create('Test Stash');
     $mediaItem = $media->create('fake', 'rel-item', 'fake://item/rel-item', 'Rel Item');
 
     $items->create(
@@ -146,7 +149,7 @@ test('broadcast belongs to stash via foreign key', function (): void {
     $stashes = $this->container->get(\App\Stashes\StashRepository::class);
     $broadcasts = $this->container->get(\App\Broadcasts\BroadcastRepository::class);
 
-    $stash = $stashes->create('Broadcast Stash', 'broadcast-stash');
+    $stash = $stashes->create('Broadcast Stash');
     $broadcast = $broadcasts->create(
         stashId: \App\Stashes\StashId::parse((string) $stash->id),
         type: 'podcast',
@@ -171,7 +174,7 @@ test('repository smoke creates stash with input media item stash item and broadc
     $items = $this->container->get(\App\Stashes\StashItemRepository::class);
     $broadcasts = $this->container->get(\App\Broadcasts\BroadcastRepository::class);
 
-    $stash = $stashes->create('Demo', 'demo-stash');
+    $stash = $stashes->create('Demo');
     $stashId = \App\Stashes\StashId::parse((string) $stash->id);
 
     $input = $inputs->create(

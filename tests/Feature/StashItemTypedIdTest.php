@@ -15,7 +15,7 @@ test('StashItemRecord::stashId/mediaItemId round-trip as typed IDs through inser
     $mediaItems = $this->container->get(MediaItemRepository::class);
     $stashItems = $this->container->get(StashItemRepository::class);
 
-    $stash = $stashes->create('Typed ID Stash', 'typed-id-stash-' . bin2hex(random_bytes(3)));
+    $stash = $stashes->create('Typed ID Stash');
     $mediaItem = $mediaItems->create(
         providerKey: 'fake',
         providerItemId: 'typed-id-item',

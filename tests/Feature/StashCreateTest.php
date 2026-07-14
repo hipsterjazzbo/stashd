@@ -15,7 +15,6 @@ test('POST stash creates an empty stash with a placeholder name when title is om
 
     $response->assertStatus(Status::CREATED);
     expect($response->body['stash']['name'])->toBe('New Stash')
-        ->and($response->body['stash']['slug'])->not->toBeEmpty()
         ->and($response->body['stash']['sync_mode'])->toBe('automatic')
         ->and($response->body['stash']['download_policy'])->toBe('video')
         ->and($response->body['stash']['organization_mode'])->toBe('flat');
@@ -25,7 +24,7 @@ test('POST stash creates an empty stash with a placeholder name when title is om
         ->and($stash->name)->toBe('New Stash');
 });
 
-test('POST stash uses the provided title as the name and slugifies it', function (): void {
+test('POST stash uses the provided title as the name', function (): void {
     $headers = $this->authHeaders();
 
     $response = $this->http->post('/api/v1/stashes', [
@@ -33,11 +32,10 @@ test('POST stash uses the provided title as the name and slugifies it', function
     ], headers: $headers);
 
     $response->assertStatus(Status::CREATED);
-    expect($response->body['stash']['name'])->toBe('My Favourite Channel!')
-        ->and($response->body['stash']['slug'])->toBe('my-favourite-channel');
+    expect($response->body['stash']['name'])->toBe('My Favourite Channel!');
 });
 
-test('POST stash assigns an ordinal-suffixed slug when the base slug collides', function (): void {
+test('POST stash allows duplicate names because identity comes from the stash id', function (): void {
     $headers = $this->authHeaders();
 
     $first = $this->http->post('/api/v1/stashes', ['name' => 'Duplicate'], headers: $headers);
@@ -46,8 +44,9 @@ test('POST stash assigns an ordinal-suffixed slug when the base slug collides', 
     $second = $this->http->post('/api/v1/stashes', ['name' => 'Duplicate'], headers: $headers);
     $second->assertStatus(Status::CREATED);
 
-    expect($first->body['stash']['slug'])->toBe('duplicate')
-        ->and($second->body['stash']['slug'])->toBe('duplicate-1');
+    expect($first->body['stash']['id'])->not->toBe($second->body['stash']['id'])
+        ->and($first->body['stash']['name'])->toBe('Duplicate')
+        ->and($second->body['stash']['name'])->toBe('Duplicate');
 });
 
 test('POST stash rejects an unsupported sync_mode', function (): void {

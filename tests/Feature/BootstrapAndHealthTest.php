@@ -184,7 +184,10 @@ test('detailed health reports vault broadcast hardlink status', function (): voi
 
     $response = $this->http->get('/api/v1/system/health', headers: $this->authHeaders());
 
-    $response->assertOk();
+    $response
+        ->assertOk()
+        ->assertHeaderMatches('Server-Timing', 'app;dur=%f')
+        ->assertHeaderMatches('X-Stashd-Request-Id', '%s');
     expect($response->body['storage']['vault_broadcast_hardlink'])->toBeTrue()
         ->and($response->body['status'])->toBe('ok');
 

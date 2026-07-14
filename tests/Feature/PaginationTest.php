@@ -17,7 +17,7 @@ test('GET /api/v1/stashes/{id}/items paginates with limit/offset and reports tot
     $mediaItems = $this->container->get(MediaItemRepository::class);
     $stashItems = $this->container->get(StashItemRepository::class);
 
-    $stash = $stashes->create('Pagination Stash', 'pagination-stash-' . bin2hex(random_bytes(3)));
+    $stash = $stashes->create('Pagination Stash');
     $stashId = StashId::parse((string) $stash->id);
 
     for ($i = 1; $i <= 5; $i++) {
@@ -61,7 +61,7 @@ test('GET /api/v1/stashes/{id}/items paginates with limit/offset and reports tot
 test('GET /api/v1/stashes/{id}/items caps limit at 200', function (): void {
     $headers = $this->authHeaders();
     $stashes = $this->container->get(StashRepository::class);
-    $stash = $stashes->create('Pagination Cap Stash', 'pagination-cap-stash-' . bin2hex(random_bytes(3)));
+    $stash = $stashes->create('Pagination Cap Stash');
 
     $response = $this->http->get('/api/v1/stashes/' . $stash->id . '/items?limit=999', headers: $headers)
         ->assertStatus(Status::OK);

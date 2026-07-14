@@ -668,7 +668,6 @@ Using prefixed ULIDs directly as primary keys is acceptable.
 ```text
 id
 name
-slug
 description
 sync_mode             automatic | manual
 download_policy       video | audio_only | metadata_only | manual_download

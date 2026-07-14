@@ -373,21 +373,6 @@ test('add input commits a second input from a different source into the same sta
         ->and(StashItemRecord::select()->where('stashId = ?', $stashId)->all())->toHaveCount(3 + 20);
 });
 
-test('next available slug fills gaps and accounts for literal ordinal-suffixed slugs', function (): void {
-    $stashes = $this->container->get(\App\Stashes\StashRepository::class);
-
-    expect($stashes->nextAvailableSlug('gap-test'))->toBe('gap-test');
-
-    $stashes->create(name: 'Gap Test', slug: 'gap-test');
-    $stashes->create(name: 'Gap Test', slug: 'gap-test-2');
-
-    expect($stashes->nextAvailableSlug('gap-test'))->toBe('gap-test-1');
-
-    $stashes->create(name: 'Gap Test', slug: 'gap-test-1');
-
-    expect($stashes->nextAvailableSlug('gap-test'))->toBe('gap-test-3');
-});
-
 test('preflight review exposes discovered items for commit flow', function (): void {
     $headers = $this->authHeaders();
 

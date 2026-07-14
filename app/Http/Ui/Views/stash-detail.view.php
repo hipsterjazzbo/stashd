@@ -35,7 +35,6 @@
 								class="rounded border border-line px-2 py-1 text-[12px] text-error transition-colors hover:bg-error/10">Delete</button>
 						</div>
 					</div>
-					<p class="mt-1 font-mono text-[12px] text-muted" x-text="stash?.slug"></p>
 					<p class="mt-2 text-[13px] text-muted">
 						<span x-text="stash?.sync_mode"></span>
 						·

@@ -27,7 +27,6 @@ test('GET /api/v1/stashes lists stashes', function (): void {
         ->and($response->body['stashes'][0])->toHaveKeys([
             'id',
             'name',
-            'slug',
             'sync_mode',
             'download_policy',
             'organization_mode',

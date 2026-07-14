@@ -1430,7 +1430,6 @@ components:
       properties:
         id: { type: string }
         name: { type: string }
-        slug: { type: string }
         description: { type: string, nullable: true }
         sync_mode: { $ref: "#/components/schemas/SyncMode" }
         download_policy: { $ref: "#/components/schemas/DownloadPolicy" }

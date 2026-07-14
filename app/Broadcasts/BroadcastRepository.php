@@ -120,9 +120,8 @@ final class BroadcastRepository
 
     /**
      * Returns `$base` if it is free within this stash, otherwise the lowest
-     * unused `$base-N` (N starts at 2) -- mirrors StashRepository's slug
-     * dedup so an auto-generated broadcast name doesn't collide the second
-     * time a user adds the same broadcast type to a stash.
+     * unused `$base-N` (N starts at 2), so an auto-generated broadcast name
+     * doesn't collide the second time a user adds the same type to a stash.
      */
     public function nextAvailableSlug(StashId $stashId, string $base): string
     {
