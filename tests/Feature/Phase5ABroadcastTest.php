@@ -339,6 +339,33 @@ test('broadcast.rebuild publishes hardlinks from vault originals', function (): 
     }
 });
 
+test('broadcast rebuild reports truthful lifecycle phases', function (): void {
+    [$headers, $stashId, $mediaItemId, $broadcastId] = $this->bootstrapFakeDownloadBroadcast('broadcast-progress-phases');
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'item.download',
+        'options' => [
+            'media_item_id' => $mediaItemId,
+            'stash_id' => $stashId,
+        ],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $phases = [];
+    $this->container->get(BroadcastLifecycleService::class)->rebuild(
+        BroadcastId::parse($broadcastId),
+        static function (string $phase) use (&$phases): void {
+            $phases[] = $phase;
+        },
+    );
+
+    expect($phases)->toBe([
+        'Planning broadcast rebuild',
+        'Publishing broadcast',
+        'Verifying broadcast',
+    ]);
+});
+
 test('a broadcast\'s show/index response embeds live items and impact, not just the create-time preview', function (): void {
     [$headers, $stashId, $mediaItemId, $broadcastId] = $this->bootstrapFakeDownloadBroadcast('broadcast-impact');
 

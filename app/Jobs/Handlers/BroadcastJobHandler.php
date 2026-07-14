@@ -6,7 +6,6 @@ namespace App\Jobs\Handlers;
 
 use App\Broadcasts\BroadcastException;
 use App\Broadcasts\BroadcastId;
-use App\Broadcasts\BroadcastItemRepository;
 use App\Broadcasts\BroadcastLifecycleService;
 use App\Broadcasts\BroadcastRepository;
 use App\Broadcasts\BroadcastState;
@@ -31,7 +30,6 @@ final readonly class BroadcastJobHandler implements JobHandler
     public function __construct(
         private BroadcastLifecycleService $lifecycle,
         private BroadcastRepository $broadcasts,
-        private BroadcastItemRepository $broadcastItems,
         private CommandRepository $commands,
         private JobRepository $jobs,
         private StateTransitionService $transitions,
@@ -60,7 +58,7 @@ final readonly class BroadcastJobHandler implements JobHandler
 
         $job->progressTotal = match ($action) {
             'plan', 'verify', 'prune', 'trigger', 'rotate_token' => 2,
-            'rebuild' => 4,
+            'rebuild' => null,
             default => 1,
         };
         $this->jobs->save($job);
@@ -84,7 +82,12 @@ final readonly class BroadcastJobHandler implements JobHandler
             $job->progressLabel = 'Broadcast ' . $action . ' complete';
             $job->finishedAt = DateTime::now(Timezone::UTC);
             $this->jobs->save($job);
-            $context->progress($job, JobProgressUpdate::ofSteps($job->progressTotal, $job->progressTotal, $job->progressLabel));
+            $context->progress(
+                $job,
+                $job->progressTotal === null
+                    ? JobProgressUpdate::ofPercent(100.0, $job->progressLabel)
+                    : JobProgressUpdate::ofSteps($job->progressTotal, $job->progressTotal, $job->progressLabel),
+            );
 
             $this->transitions->transitionJob($job, JobState::Ready);
             $this->transitions->transitionCommand($command, CommandState::Completed);
@@ -128,20 +131,14 @@ final readonly class BroadcastJobHandler implements JobHandler
         JobHandlerContext $context,
         BroadcastId $broadcastId,
     ): array {
-        $context->progress($job, JobProgressUpdate::ofSteps(1, 4, 'Planning broadcast rebuild'));
         $this->activity->broadcastRebuildStarted($command, $job, $broadcastId);
 
-        $result = $this->lifecycle->rebuild($broadcastId);
-        $pendingTranscodeCount = $this->countPendingTranscodeItems($broadcastId);
-
-        $context->progress($job, JobProgressUpdate::ofSteps(3, 4, $pendingTranscodeCount > 0
-            ? "Audio not ready for {$pendingTranscodeCount} item(s) — transcoding in background"
-            : 'Broadcast published'));
+        $result = $this->lifecycle->rebuild(
+            $broadcastId,
+            fn (string $label) => $context->progress($job, JobProgressUpdate::indeterminate($label)),
+        );
         $this->activity->broadcastPublished($command, $job, $broadcastId, $result->publish ?? []);
 
-        $context->progress($job, JobProgressUpdate::ofSteps(4, 4, $pendingTranscodeCount > 0
-            ? 'Broadcast will auto-update once transcoding finishes'
-            : 'Broadcast verified'));
         $this->activity->broadcastVerified($command, $job, $broadcastId, $result->verify ?? []);
 
         if (($result->verify['stale_count'] ?? 0) > 0) {
@@ -153,15 +150,6 @@ final readonly class BroadcastJobHandler implements JobHandler
         }
 
         return $result->toArray();
-    }
-
-    /** Only podcast broadcasts ever set this error code; a no-op count for other broadcast types. */
-    private function countPendingTranscodeItems(BroadcastId $broadcastId): int
-    {
-        return count(array_filter(
-            $this->broadcastItems->listForBroadcast($broadcastId),
-            static fn ($item): bool => $item->lastError === 'podcast_audio_transcode_pending',
-        ));
     }
 
     /** @return array<string, mixed> */

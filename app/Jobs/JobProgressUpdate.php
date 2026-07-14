@@ -9,7 +9,7 @@ final readonly class JobProgressUpdate
     private function __construct(
         public ?int $current,
         public ?int $total,
-        public float $percent,
+        public ?float $percent,
         public string $label,
         public ?int $etaSeconds = null,
         public ?float $rate = null,
@@ -35,6 +35,16 @@ final readonly class JobProgressUpdate
             label: $label,
             etaSeconds: $etaSeconds,
             rate: $rate,
+        );
+    }
+
+    public static function indeterminate(string $label): self
+    {
+        return new self(
+            current: null,
+            total: null,
+            percent: null,
+            label: $label,
         );
     }
 }

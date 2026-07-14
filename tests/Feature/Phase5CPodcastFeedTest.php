@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastItemRecord;
 use App\Broadcasts\BroadcastPathBuilder;
 use App\Broadcasts\BroadcastPluginRegistry;
@@ -327,45 +326,6 @@ test('a failed transcode is not retried immediately, but is retried once the coo
     expect($gateway->transcodeCalls - $callsBefore)->toBe(2)
         ->and($retried?->state)->toBe(AssetState::Ready)
         ->and($item->lastError)->toBeNull();
-});
-
-test('rebuild job handler counts items pending a transcode fallback for the honest progress label', function (): void {
-    [$headers, $stashId, $mediaItemId] = podcastFeedReadyStash($this, 'podcast-audio-progress-label');
-    podcastFeedCreateAsset(
-        $this->container->get(StashdConfig::class),
-        $this->container->get(AssetRepository::class),
-        $mediaItemId,
-        AssetKind::Video,
-        'original.mp4',
-        'video/mp4',
-        'video-bytes',
-    );
-
-    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'podcast',
-        'name' => 'Audio Progress Label',
-        'slug' => 'audio-progress-label-' . bin2hex(random_bytes(3)),
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $broadcastId = BroadcastId::parse((string) $broadcast->body['broadcast']['id']);
-
-    // No fallback triggered yet -- count is zero.
-    $handler = $this->container->get(\App\Jobs\Handlers\BroadcastJobHandler::class);
-    $countMethod = new \ReflectionMethod($handler, 'countPendingTranscodeItems');
-    expect($countMethod->invoke($handler, $broadcastId))->toBe(0);
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => (string) $broadcastId],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-
-    // Same single-job-processing rationale as the fallback test above --
-    // draining the whole queue would race past the pending state this
-    // test observes: the rest of the queue would run the transcode job
-    // and its auto-retriggered rebuild, clearing lastError again.
-    $worker = $this->container->get(\App\Jobs\JobWorkerService::class);
-    $worker->processNextJob();
-
-    expect($countMethod->invoke($handler, $broadcastId))->toBe(1);
 });
 
 test('video podcast records stable error for unsuitable video asset', function (): void {

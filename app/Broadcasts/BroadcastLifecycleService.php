@@ -133,22 +133,31 @@ final readonly class BroadcastLifecycleService
         );
     }
 
-    public function rebuild(BroadcastId $broadcastId): BroadcastLifecycleResult
+    public function rebuild(BroadcastId $broadcastId, ?callable $onProgress = null): BroadcastLifecycleResult
     {
         $broadcast = $this->broadcasts->find($broadcastId)
             ?? throw \App\Broadcasts\BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
 
         $this->transitionToProcessing($broadcast);
 
+        if ($onProgress !== null) {
+            $onProgress('Planning broadcast rebuild');
+        }
         $plan = $this->planOnly($broadcast);
         $broadcast->lastPlannedAt = DateTime::now(Timezone::UTC);
         $this->broadcasts->save($broadcast);
 
+        if ($onProgress !== null) {
+            $onProgress('Publishing broadcast');
+        }
         $publish = $this->publishOnly($broadcast, $plan);
         $broadcast->lastBuiltAt = DateTime::now(Timezone::UTC);
         $broadcast->lastError = null;
         $this->broadcasts->save($broadcast);
 
+        if ($onProgress !== null) {
+            $onProgress('Verifying broadcast');
+        }
         $verify = $this->verifyOnly($broadcast);
         $broadcast->lastVerifiedAt = DateTime::now(Timezone::UTC);
         $this->applyVerifyState($broadcast, $verify);
@@ -157,6 +166,9 @@ final readonly class BroadcastLifecycleService
         $trigger = null;
 
         if ($verify->ok && $this->shouldAutoTrigger($broadcast)) {
+            if ($onProgress !== null) {
+                $onProgress('Triggering media server scan');
+            }
             $trigger = $this->triggers->execute($broadcast, 'post_rebuild')->toArray();
         }
 
