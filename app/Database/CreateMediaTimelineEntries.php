@@ -11,7 +11,6 @@ use App\Timeline\TimelineEntryState;
 use Tempest\Database\MigratesUp;
 use Tempest\Database\QueryStatement;
 use Tempest\Database\QueryStatements\CompoundStatement;
-use Tempest\Database\QueryStatements\CreateTableStatement;
 use Tempest\Database\QueryStatements\OnDelete;
 
 final class CreateMediaTimelineEntries implements MigratesUp
