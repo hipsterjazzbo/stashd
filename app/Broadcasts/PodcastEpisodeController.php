@@ -23,8 +23,8 @@ use Tempest\Router\Get;
  * Mirrors {@see PodcastFeedController}: the broadcast and item path tokens
  * are the only credential, so an unknown, mismatched, or revoked token must
  * be indistinguishable from an episode that never existed. This controller
- * serves only the Vault asset already selected by {@see PodcastAssetSelector}
- * for the matched broadcast item — it never resolves a filesystem path from
+ * serves only the selected Vault or broadcast-local remux asset for the
+ * matched broadcast item — it never resolves a filesystem path from
  * request input and never transcodes, remuxes, or extracts media.
  *
  * The router binds one path segment to one parameter, so the final
@@ -72,10 +72,10 @@ final readonly class PodcastEpisodeController
             return $this->notRevealed();
         }
 
-        $mediaItemId = $item->mediaItemId;
-        $selection = match (PodcastMediaKind::forBroadcast($broadcast)) {
-            PodcastMediaKind::Audio => $this->assets->audioAsset($mediaItemId),
-            PodcastMediaKind::Video => $this->assets->videoAsset($mediaItemId),
+        $kind = PodcastMediaKind::forBroadcast($broadcast);
+        $selection = $this->assets->assetForBroadcastItem($item, $kind) ?? match ($kind) {
+            PodcastMediaKind::Audio => $this->assets->audioAsset($item->mediaItemId),
+            PodcastMediaKind::Video => $this->assets->videoAsset($item->mediaItemId),
         };
 
         // `{ext}` is a presentation hint only; the selected asset's own
@@ -114,26 +114,30 @@ final readonly class PodcastEpisodeController
 
     /**
      * Caddy's intercept block (`docker/Caddyfile`) roots the rewritten
-     * request at `StashdConfig::vaultPath()`, so this must be a URL path
-     * relative to that directory — never an absolute filesystem path, which
+     * request at `StashdConfig::mediaPath`, so this must be a URL path
+     * relative to a managed media directory — never an absolute filesystem path, which
      * would leak host layout to the client if the strip-header step were
      * ever misconfigured. Rejects (rather than guesses) any asset path
-     * outside the Vault root; every asset {@see PodcastAssetSelector}
-     * returns should live there, so this only fires if that invariant is
-     * ever broken.
+     * outside the Vault/broadcast roots.
      */
     private function accelRedirectPath(string $absolutePath): ?string
     {
-        $vaultRoot = rtrim($this->config->vaultPath(), '/') . '/';
+        $root = rtrim($this->config->vaultPath(), '/') . '/';
+        $prefix = 'vault';
 
-        if (! str_starts_with($absolutePath, $vaultRoot)) {
-            return null;
+        if (! str_starts_with($absolutePath, $root)) {
+            $root = rtrim($this->config->broadcastsPath(), '/') . '/';
+            $prefix = 'broadcasts';
+
+            if (! str_starts_with($absolutePath, $root)) {
+                return null;
+            }
         }
 
-        $relative = substr($absolutePath, strlen($vaultRoot));
+        $relative = substr($absolutePath, strlen($root));
         $segments = array_map(rawurlencode(...), explode('/', $relative));
 
-        return '/' . implode('/', $segments);
+        return '/' . $prefix . '/' . implode('/', $segments);
     }
 
     /**

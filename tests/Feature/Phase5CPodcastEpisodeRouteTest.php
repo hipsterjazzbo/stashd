@@ -60,7 +60,7 @@ test('valid audio podcast episode token returns an X-Accel-Redirect to the Vault
 
     $response->assertStatus(Status::OK)
         ->assertHeaderContains('Content-Type', 'audio/mpeg')
-        ->assertHeaderContains('X-Accel-Redirect', podcastEpisodeExpectedAccelPath($mediaItemId, 'original.mp3'));
+        ->assertHeaderContains('X-Accel-Redirect', '/vault' . podcastEpisodeExpectedAccelPath($mediaItemId, 'original.mp3'));
 
     expect($response->body)->toBeNull();
 });
@@ -132,7 +132,7 @@ test('valid video podcast episode token returns an X-Accel-Redirect to the Vault
 
     $response->assertStatus(Status::OK)
         ->assertHeaderContains('Content-Type', 'video/mp4')
-        ->assertHeaderContains('X-Accel-Redirect', podcastEpisodeExpectedAccelPath($mediaItemId, 'original.mp4'));
+        ->assertHeaderContains('X-Accel-Redirect', '/vault' . podcastEpisodeExpectedAccelPath($mediaItemId, 'original.mp4'));
 
     expect($response->body)->toBeNull();
 });

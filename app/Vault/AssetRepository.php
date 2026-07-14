@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Vault;
 
 use App\Broadcasts\BroadcastId;
+use App\Broadcasts\BroadcastItemId;
 use App\Support\DurationSeconds;
 use App\Support\PrefixedUlidGenerator;
 use Tempest\Database\Direction;
@@ -80,6 +81,16 @@ final class AssetRepository
             ->where('mediaItemId', $mediaItemId->toString())
             ->where('role', $role)
             ->first();
+    }
+
+    public function findByBroadcastItemAndRole(BroadcastItemId $broadcastItemId, AssetRole $role): ?AssetRecord
+    {
+        $asset = AssetRecord::select()
+            ->where('broadcastItemId', $broadcastItemId->toString())
+            ->where('role', $role)
+            ->first();
+
+        return $asset instanceof AssetRecord ? $asset : null;
     }
 
     /**

@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Broadcasts\Plugins;
 
+use App\Broadcasts\BroadcastChapterRemuxer;
 use App\Broadcasts\BroadcastContext;
 use App\Broadcasts\BroadcastContextFactory;
 use App\Broadcasts\BroadcastException;
 use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastItemRecord;
+use App\Broadcasts\BroadcastItemId;
 use App\Broadcasts\BroadcastItemRepository;
 use App\Broadcasts\BroadcastItemState;
 use App\Broadcasts\BroadcastPathBuilder;
@@ -28,6 +30,7 @@ use App\Broadcasts\Podcasts\PodcastGuid;
 use App\Broadcasts\Podcasts\PodcastMediaKind;
 use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Broadcasts\SponsorBlockRefreshScheduler;
+use App\Broadcasts\SponsorBlockSettings;
 use App\Broadcasts\StashdBroadcast;
 use App\Broadcasts\UiControl;
 use App\Commands\CommandDispatchService;
@@ -35,6 +38,10 @@ use App\Commands\CommandType;
 use App\Stashes\StashItemId;
 use App\Stashes\StashItemState;
 use App\System\State\StateTransitionService;
+use App\Timeline\TimelineMetadataRenderer;
+use App\Vault\AssetRepository;
+use App\Vault\AssetRole;
+use App\Vault\AssetState;
 use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
 use Symfony\Component\Uid\Uuid;
@@ -66,6 +73,9 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         private \App\Broadcasts\Podcasts\PodcastTranscodeFallback $transcodeFallback,
         private CommandDispatchService $dispatch,
         private SponsorBlockRefreshScheduler $sponsorBlockRefreshes,
+        private BroadcastChapterRemuxer $chapterRemuxer,
+        private TimelineMetadataRenderer $timeline,
+        private AssetRepository $assetRecords,
     ) {
     }
 
@@ -175,6 +185,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
 
             $itemToken = $this->tokens->ensureItemToken($item);
             $this->markItemReady($context, $item, $mediaItem);
+            $selection = $this->remuxSelection($context, $item, $selection);
             $episodes[] = $this->episode($context, $stashItem, $mediaItem, $item, $selection, $broadcastToken, $itemToken);
             $includedDescriptions[] = $mediaItem->description;
             $included++;
@@ -483,6 +494,46 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
             PodcastMediaKind::Audio => $this->assets->audioAsset($mediaItemId),
             PodcastMediaKind::Video => $this->assets->videoAsset($mediaItemId),
         };
+    }
+
+    private function remuxSelection(
+        BroadcastContext $context,
+        BroadcastItemRecord $item,
+        \App\Broadcasts\Podcasts\PodcastAssetSelection $selection,
+    ): \App\Broadcasts\Podcasts\PodcastAssetSelection {
+        if (
+            ! SponsorBlockSettings::fromBroadcastSettings($this->settings($context))->enabled
+            || ! $this->timeline->hasSponsorBlockEntries($item->mediaItemId)
+            || isset($context->broadcast->settings['destination_path'])
+            || $selection->asset->path === null
+        ) {
+            return $selection;
+        }
+
+        $path = $this->paths->broadcastFile($context->broadcast, 'episodes', (string) $item->id . '.' . $selection->extension);
+        $broadcastItemId = BroadcastItemId::fromPrimaryKey($item->id);
+        $remux = $this->assetRecords->findByBroadcastItemAndRole($broadcastItemId, AssetRole::RemuxedVideo);
+
+        if ($remux === null || $remux->path !== $path || ! is_file($path)) {
+            $this->chapterRemuxer->remux($item->mediaItemId, $selection->asset->path, $path);
+            $remux ??= $this->assetRecords->create(
+                mediaItemId: $item->mediaItemId,
+                role: AssetRole::RemuxedVideo,
+                kind: $selection->asset->kind,
+                state: AssetState::Ready,
+                path: $path,
+                relativePath: $this->paths->relativeFile('episodes', (string) $item->id . '.' . $selection->extension),
+                mimeType: $selection->mimeType,
+                container: $selection->extension,
+                sizeBytes: is_int(filesize($path)) ? filesize($path) : null,
+            );
+            $remux->broadcastId = BroadcastId::fromPrimaryKey($context->broadcast->id);
+            $remux->broadcastItemId = $broadcastItemId;
+            $remux->derivedFromAssetId = \App\Vault\AssetId::fromPrimaryKey($selection->asset->id);
+            $this->assetRecords->save($remux);
+        }
+
+        return $this->assets->assetForBroadcastItem($item, $this->preferredMediaKind($context)) ?? $selection;
     }
 
     private function unavailableErrorCode(PodcastMediaKind $kind): string

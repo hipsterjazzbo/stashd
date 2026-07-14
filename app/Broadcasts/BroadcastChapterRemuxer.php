@@ -28,7 +28,7 @@ final readonly class BroadcastChapterRemuxer
 
         $extension = strtolower(pathinfo($destinationPath, PATHINFO_EXTENSION));
 
-        if (! in_array($extension, ['mkv', 'mp4', 'm4v', 'webm'], true)) {
+        if (! in_array($extension, ['mkv', 'mp3', 'mp4', 'm4v', 'webm'], true)) {
             throw BroadcastException::withCode('broadcast_chapters_unsupported', 'The broadcast container cannot carry chapters.');
         }
 
