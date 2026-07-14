@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Broadcasts\BroadcastChapterRemuxer;
+use App\Broadcasts\BroadcastException;
 use App\Broadcasts\BroadcastFilenameBuilder;
 use App\Broadcasts\BroadcastId;
 use App\Broadcasts\BroadcastLifecycleService;
@@ -461,6 +463,30 @@ test('SponsorBlock chapters produce a broadcast-local remux without changing the
     expect(HardlinkPublisher::sameFile($vaultPath, $publishedPath))->toBeFalse()
         ->and(file_get_contents($publishedPath))->toContain('stub-ffmpeg-remux')
         ->and(file_get_contents($vaultPath))->not->toContain('stub-ffmpeg-remux');
+});
+
+test('chapter remux rejects a broadcast container that cannot carry chapters', function (): void {
+    [, , $mediaItemId] = $this->bootstrapFakeDownloadBroadcast('broadcast-chapters-unsupported');
+    $mediaItem = MediaItemId::parse($mediaItemId);
+    $this->container->get(SponsorBlockTimelineSynchronizer::class)->sync(
+        $mediaItem,
+        [new SponsorBlockSegment('segment-1', TimelineEntryCategory::Sponsor, 15.0, 30.0, 'Ad read', ['UUID' => 'segment-1'])],
+    );
+
+    try {
+        $this->container->get(BroadcastChapterRemuxer::class)->remux(
+            $mediaItem,
+            '/not-used/source.mp4',
+            $this->container->get(StashdConfig::class)->broadcastsPath() . '/unsupported.avi',
+        );
+    } catch (BroadcastException $exception) {
+        expect($exception->errorCode)->toBe('broadcast_chapters_unsupported')
+            ->and($exception->getMessage())->toBe('The broadcast container cannot carry chapters.');
+
+        return;
+    }
+
+    throw new \RuntimeException('Expected unsupported chapter container to be rejected.');
 });
 
 test('SponsorBlock polling ignores unsupported provider items', function (): void {
