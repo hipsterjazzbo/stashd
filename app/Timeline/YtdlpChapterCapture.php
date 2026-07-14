@@ -27,7 +27,14 @@ final readonly class YtdlpChapterCapture
         }
 
         $payload = json_decode((string) file_get_contents($source->path), true);
-        $chapters = is_array($payload) ? ($payload['result']['extract_info']['chapters'] ?? null) : null;
+
+        if (! is_array($payload)) {
+            return 0;
+        }
+
+        $result = $payload['result'] ?? null;
+        $extractInfo = is_array($result) ? ($result['extract_info'] ?? null) : null;
+        $chapters = is_array($extractInfo) ? ($extractInfo['chapters'] ?? null) : null;
 
         if (! is_array($chapters)) {
             return 0;
@@ -50,6 +57,13 @@ final readonly class YtdlpChapterCapture
             $title = isset($chapter['title']) && is_string($chapter['title']) ? trim($chapter['title']) : null;
             $externalId = hash('sha256', json_encode([(float) $start, (float) $end, $title], JSON_THROW_ON_ERROR));
             $entry = $this->entries->findBySourceAndExternalId($mediaItemId, TimelineEntrySource::Ytdlp, $externalId);
+            $raw = [];
+
+            foreach ($chapter as $key => $value) {
+                if (is_string($key)) {
+                    $raw[$key] = $value;
+                }
+            }
 
             if ($entry === null) {
                 $this->entries->create(
@@ -61,7 +75,7 @@ final readonly class YtdlpChapterCapture
                     endSeconds: (float) $end,
                     title: $title === '' ? null : $title,
                     externalId: $externalId,
-                    raw: $chapter,
+                    raw: $raw,
                 );
                 $captured++;
             }

@@ -24,11 +24,13 @@ final class TimelineEntryRepository
     /** @return list<TimelineEntryRecord> */
     public function listForMediaItem(MediaItemId $mediaItemId): array
     {
-        return TimelineEntryRecord::select()
+        $entries = TimelineEntryRecord::select()
             ->where('mediaItemId', $mediaItemId->toString())
             ->orderBy('startSeconds', Direction::ASC)
             ->orderBy('endSeconds', Direction::ASC)
             ->all();
+
+        return array_values(array_filter($entries, static fn (mixed $entry): bool => $entry instanceof TimelineEntryRecord));
     }
 
     public function findBySourceAndExternalId(
@@ -36,11 +38,13 @@ final class TimelineEntryRepository
         TimelineEntrySource $source,
         string $externalId,
     ): ?TimelineEntryRecord {
-        return TimelineEntryRecord::select()
+        $entry = TimelineEntryRecord::select()
             ->where('mediaItemId', $mediaItemId->toString())
             ->where('source', $source)
             ->where('externalId', $externalId)
             ->first();
+
+        return $entry instanceof TimelineEntryRecord ? $entry : null;
     }
 
     public function save(TimelineEntryRecord $entry): TimelineEntryRecord
@@ -51,6 +55,7 @@ final class TimelineEntryRepository
         return $entry;
     }
 
+    /** @param array<string, mixed>|null $raw */
     public function create(
         MediaItemId $mediaItemId,
         TimelineEntrySource $source,
