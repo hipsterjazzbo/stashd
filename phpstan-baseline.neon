@@ -487,36 +487,6 @@ parameters:
 			path: app/Console/StashdRuntimeCommand.php
 
 		-
-			message: '#^Method App\\Database\\AddPodcastBroadcastItemTokens\:\:tablesWithIndexes\(\) should return list\<Tempest\\Database\\QueryStatement\> but returns list\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Database/AddPodcastBroadcastItemTokens.php
-
-		-
-			message: '#^Method App\\Database\\CreateDomainSchema\:\:tablesWithIndexes\(\) should return list\<Tempest\\Database\\QueryStatement\> but returns list\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Database/CreateDomainSchema.php
-
-		-
-			message: '#^Method App\\Database\\CreateFoundationSchema\:\:tablesWithIndexes\(\) should return list\<Tempest\\Database\\QueryStatement\> but returns list\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Database/CreateFoundationSchema.php
-
-		-
-			message: '#^Method App\\Database\\CreatePhase2ExecutionSchema\:\:tablesWithIndexes\(\) should return list\<Tempest\\Database\\QueryStatement\> but returns list\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Database/CreatePhase2ExecutionSchema.php
-
-		-
-			message: '#^Method App\\Database\\CreateSseConnectionsTable\:\:tablesWithIndexes\(\) should return list\<Tempest\\Database\\QueryStatement\> but returns list\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Database/CreateSseConnectionsTable.php
-
-		-
 			message: '#^Method App\\Downloads\\Fake\\FakeDownloader\:\:implementationVersion\(\) never returns null so it can be removed from the return type\.$#'
 			identifier: return.unusedType
 			count: 1
