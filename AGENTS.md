@@ -41,6 +41,21 @@ Stashd is not a YouTube frontend, not a recommendation engine, and not a media p
 - Docker-first default deployment
 - Default HTTP port: `8474`
 
+## Required project instructions
+
+Before planning, editing files, or running commands:
+
+1. Enumerate every Markdown file under `.claude/rules/`.
+2. Read all of those files in full.
+3. Treat their contents as mandatory project instructions, not optional
+   documentation.
+4. Apply more specific rules over more general rules when they conflict.
+5. Do not ask for permission merely to read these files.
+6. If the directory or an individual rule file is absent, continue without it
+   rather than interrupting the task.
+
+These instructions apply to every task in this repository.
+
 ## Repo map
 
 Important directories:
