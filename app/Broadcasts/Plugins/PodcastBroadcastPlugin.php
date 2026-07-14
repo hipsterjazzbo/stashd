@@ -138,6 +138,8 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         $failed = [];
         $included = 0;
 
+        $this->paths->claimRoot($context->broadcast);
+
         foreach ($this->contextFactory->publishableStashItems($context) as $stashItem) {
 
             $mediaItem = $context->mediaItems[(string) $stashItem->mediaItemId] ?? null;
@@ -191,7 +193,6 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
             $included++;
         }
 
-        $this->paths->claimRoot($context->broadcast);
         $feedPath = $this->feedPath($context);
         $this->writeFeed($feedPath, $this->feedBuilder->build($this->metadata($context, $broadcastToken, $includedDescriptions), $episodes));
 
