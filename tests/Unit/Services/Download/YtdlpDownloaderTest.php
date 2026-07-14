@@ -67,6 +67,7 @@ test('ytdlp options builder configures video profile', function (): void {
     expect($options->toArray())->toContain('-f')
         ->and($options->toArray())->toContain('bestvideo[height<=1080]+bestaudio/best')
         ->and($options->toArray())->toContain('stashd-original.%(ext)s')
+        ->and($options->toArray())->toContain('--embed-chapters')
         ->and($builder->profileName(DownloadPolicy::Video))->toBe('video_1080p_merged');
 });
 
@@ -78,7 +79,8 @@ test('ytdlp options builder configures audio profile', function (): void {
         ->and($options->toArray())->toContain('--audio-format')
         ->and($options->toArray())->toContain('mp3')
         ->and($options->toArray())->toContain('--audio-quality')
-        ->and($options->toArray())->toContain('128');
+        ->and($options->toArray())->toContain('128')
+        ->and($options->toArray())->toContain('--embed-chapters');
 });
 
 test('ytdlp downloader uses temp staging directory via stub gateway', function (): void {
