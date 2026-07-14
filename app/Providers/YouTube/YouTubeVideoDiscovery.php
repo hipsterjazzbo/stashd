@@ -8,9 +8,11 @@ use App\Providers\Core\DiscoveredItem;
 use App\Providers\ProviderHttpClient;
 use App\Providers\ResolvedInput;
 use App\Providers\StashdUri;
-use Tempest\Support\Json\Exception\JsonCouldNotBeDecoded;
 
 use function Tempest\Support\Json\decode;
+
+use Tempest\Support\Json\Exception\JsonCouldNotBeDecoded;
+
 use function Tempest\Support\str;
 
 final readonly class YouTubeVideoDiscovery

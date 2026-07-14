@@ -16,9 +16,10 @@ use App\Vault\MediaItemId;
 use App\Vault\MediaItemRepository;
 use App\Vault\MoveFileIntoVault;
 use App\Vault\VaultPathBuilder;
-use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
 
 use function Tempest\Support\Filesystem\create_directory;
+
+use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
 
 final readonly class DownloadCaptions
 {

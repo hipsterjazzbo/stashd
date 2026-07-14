@@ -12,9 +12,10 @@ use Tempest\Database\Exceptions\QueryWasInvalid;
 use Tempest\Database\Migrations\Migration;
 use Tempest\Database\Migrations\MigrationManager;
 use Tempest\Database\Migrations\RunnableMigrations;
-use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
 
 use function Tempest\Support\Filesystem\create_directory;
+
+use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
 
 final readonly class MigrationRunner
 {

@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Vault;
 
 use RuntimeException;
-use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
 
 use function Tempest\Support\Filesystem\create_directory;
+
+use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
 
 /** Moves staged files into Vault using rename when possible, copy+fsync otherwise. */
 final class MoveFileIntoVault

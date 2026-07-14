@@ -7,9 +7,10 @@ namespace App\Vault;
 use App\Config\StashdConfig;
 use App\Support\PrefixedUlid;
 use RuntimeException;
-use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
 
 use function Tempest\Support\Filesystem\create_directory;
+
+use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
 
 final readonly class StageDownloadFiles
 {

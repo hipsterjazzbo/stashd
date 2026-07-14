@@ -8,9 +8,10 @@ use RuntimeException;
 use Tempest\Database\Config\SQLiteConfig;
 use Tempest\Database\Database;
 use Tempest\Database\Query;
-use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
 
 use function Tempest\Support\Filesystem\create_directory;
+
+use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
 
 /**
  * Applies SQLite pragmas on Tempest's active database connection.

@@ -10,6 +10,9 @@ use App\Broadcasts\BroadcastPluginRegistry;
 use App\Broadcasts\BroadcastRecord;
 use App\Broadcasts\Plugins\PodcastBroadcastPlugin;
 use App\Config\StashdConfig;
+use App\Jobs\JobIntent;
+use App\Jobs\JobRecord;
+use App\Jobs\JobState;
 use App\Stashes\StashItemRecord;
 use App\Stashes\StashItemState;
 use App\System\Activity\ActivityEventRecord;
@@ -149,6 +152,32 @@ test('broadcast.rebuild writes video podcast feed for supported ready video asse
     expect($xml)->not->toBeFalse()
         ->and((string) $xml->channel->item->enclosure['url'])->toContain('/episode.mp4')
         ->and((string) $xml->channel->item->enclosure['type'])->toBe('video/mp4');
+});
+
+test('caption downloads complete before they queue a podcast rebuild', function (): void {
+    [$headers, $stashId, $mediaItemId] = podcastFeedReadyStash($this, 'podcast-captions-complete');
+    podcastFeedCreateAsset(
+        $this->container->get(StashdConfig::class),
+        $this->container->get(AssetRepository::class),
+        $mediaItemId,
+        AssetKind::Audio,
+        'original.mp3',
+        'audio/mpeg',
+        'audio-bytes',
+    );
+
+    $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
+        'type' => 'podcast',
+        'name' => 'Captioned Feed',
+        'slug' => 'captioned-feed-' . bin2hex(random_bytes(3)),
+        'settings' => ['captions' => 'creator_only'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+
+    $this->processAllJobs();
+
+    $captionJob = JobRecord::select()->where('intent', JobIntent::DownloadCaptions)->first();
+
+    expect($captionJob?->state)->toBe(JobState::Ready);
 });
 
 test('audio podcast triggers a transcode fallback instead of failing for video only assets', function (): void {

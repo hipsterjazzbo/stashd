@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
-use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
-
 use function Tempest\Support\Filesystem\create_directory;
+
+use Tempest\Support\Filesystem\Exceptions\RuntimeException as FilesystemException;
 
 /** Atomically writes generated broadcast sidecars (NFO, etc.). */
 final class BroadcastSidecarWriter

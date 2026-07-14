@@ -11,10 +11,11 @@ use App\Providers\ProviderException;
 use App\Providers\ProviderHttpClient;
 use App\Providers\ResolvedInput;
 use App\Providers\StashdUri;
-use Tempest\Support\Json\Exception\JsonCouldNotBeDecoded;
 
 use function Tempest\Support\Arr\chunk;
 use function Tempest\Support\Json\decode;
+
+use Tempest\Support\Json\Exception\JsonCouldNotBeDecoded;
 
 final readonly class YouTubeDataApiDiscoveryStrategy implements DiscoveryStrategyHandler
 {
