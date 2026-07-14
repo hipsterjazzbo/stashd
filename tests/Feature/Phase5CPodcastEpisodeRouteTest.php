@@ -176,6 +176,13 @@ test('SponsorBlock podcast episode token returns an X-Accel-Redirect to its broa
     $relative = substr((string) $remux?->path, strlen(rtrim($config->broadcastsPath(), '/') . '/'));
     $accelPath = '/broadcasts/' . implode('/', array_map(rawurlencode(...), explode('/', $relative)));
 
+    $chapters = $this->http->get('/b/' . rawurlencode($parts['broadcastToken']) . '/items/' . rawurlencode($parts['itemToken']) . '/chapters.json');
+    $chapters->assertStatus(Status::OK)->assertHeaderContains('Content-Type', 'application/json; charset=utf-8');
+    expect(json_decode($chapters->body, true, flags: JSON_THROW_ON_ERROR))->toBe([
+        'version' => '1.2.0',
+        'chapters' => [['startTime' => 15, 'title' => 'Ad read']],
+    ])->and($chapters->body)->not->toContain('segment-1');
+
     $this->http->get('/b/' . rawurlencode($parts['broadcastToken']) . '/items/' . rawurlencode($parts['itemToken']) . '/episode.mp4')
         ->assertStatus(Status::OK)
         ->assertHeaderContains('Content-Type', 'video/mp4')
