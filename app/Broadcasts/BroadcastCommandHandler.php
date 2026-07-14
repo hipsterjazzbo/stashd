@@ -30,6 +30,7 @@ final readonly class BroadcastCommandHandler implements CommandHandler
         return $this->commandType;
     }
 
+    /** @param array<string, mixed> $options */
     public function validate(array $options): void
     {
         if ($this->commandType === CommandType::BroadcastRebuildItem) {
@@ -57,13 +58,20 @@ final readonly class BroadcastCommandHandler implements CommandHandler
         }
     }
 
+    /** @param array<string, mixed> $options */
     public function createJobs(CommandRecord $command, array $options): array
     {
         $commandId = CommandId::fromPrimaryKey($command->id);
         $payload = $this->normalizedPayload($options);
+        $targetId = $payload['broadcast_item_id'] ?? $payload['broadcast_id'];
+
+        if (! is_string($targetId)) {
+            throw InvalidCommandPayload::withErrors(['Broadcast target is required.']);
+        }
+
         $command->options = $payload;
         $command->targetType = $this->commandType === CommandType::BroadcastRebuildItem ? 'broadcast_item' : 'broadcast';
-        $command->targetId = $payload['broadcast_item_id'] ?? $payload['broadcast_id'];
+        $command->targetId = $targetId;
         $this->commands->save($command);
 
         return [
@@ -71,19 +79,23 @@ final readonly class BroadcastCommandHandler implements CommandHandler
                 intent: JobIntent::Broadcast,
                 commandId: $commandId,
                 entityType: $command->targetType,
-                entityId: PrefixedUlid::parse($command->targetId),
+                entityId: PrefixedUlid::parse($targetId),
                 priority: 60,
                 payload: $payload,
             ),
         ];
     }
 
+    /** @param array<string, mixed> $options */
     public function extras(CommandRecord $command, array $options): array
     {
         return [];
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @param array<string, mixed> $options
+     * @return array<string, mixed>
+     */
     private function normalizedPayload(array $options): array
     {
         if ($this->commandType === CommandType::BroadcastRebuildItem) {
@@ -103,9 +115,10 @@ final readonly class BroadcastCommandHandler implements CommandHandler
         ];
     }
 
+    /** @param array<string, mixed> $options */
     private function broadcastIdFromOptions(array $options): string
     {
-        $broadcastId = trim((string) ($options['broadcastId'] ?? $options['broadcast_id'] ?? ''));
+        $broadcastId = $this->stringOption($options, 'broadcastId', 'broadcast_id');
 
         if ($broadcastId === '') {
             throw InvalidCommandPayload::withErrors(['broadcast_id is required.']);
@@ -128,10 +141,23 @@ final readonly class BroadcastCommandHandler implements CommandHandler
         };
     }
 
+    /** @param array<string, mixed> $options */
     private function broadcastItemFromOptions(array $options): ?BroadcastItemRecord
     {
-        $id = trim((string) ($options['broadcastItemId'] ?? $options['broadcast_item_id'] ?? ''));
+        $id = $this->stringOption($options, 'broadcastItemId', 'broadcast_item_id');
 
         return BroadcastItemId::isValid($id) ? $this->broadcastItems->find(BroadcastItemId::parse($id)) : null;
+    }
+
+    /** @param array<string, mixed> $options */
+    private function stringOption(array $options, string ...$keys): string
+    {
+        foreach ($keys as $key) {
+            if (is_string($options[$key] ?? null)) {
+                return trim($options[$key]);
+            }
+        }
+
+        return '';
     }
 }
