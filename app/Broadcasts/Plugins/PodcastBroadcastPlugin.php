@@ -33,6 +33,7 @@ use App\Commands\CommandDispatchService;
 use App\Commands\CommandType;
 use App\Stashes\StashItemId;
 use App\Stashes\StashItemState;
+use App\Support\DurationSeconds;
 use App\System\State\StateTransitionService;
 use App\Vault\MediaItemId;
 use App\Vault\MediaItemRecord;
@@ -343,6 +344,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
             enclosureUrl: $this->urls->episodeUrl($broadcastToken, $itemToken, $selection->extension),
             enclosureLength: $selection->length,
             enclosureMimeType: $selection->mimeType,
+            durationSeconds: DurationSeconds::toSeconds($mediaItem->durationSeconds),
             imageUrl: $this->assets->artworkAsset($stashItem->mediaItemId) === null
                 ? null
                 : $this->urls->artworkUrl($broadcastToken, $itemToken),

@@ -104,7 +104,7 @@ publish()/verify() find no audio asset
 
 ### Funding link detection
 
-Podcast feeds emit iTunes, Atom, `content`, and Podcasting 2.0 namespaces. Descriptions retain line breaks and safely linkify plain HTTP(S) URLs in `content:encoded`; provider HTML is escaped, never trusted. Private feeds emit `<itunes:block>yes</itunes:block>`, and a plugin-owned `podcast_guid` is persisted in broadcast settings so `<podcast:guid>` survives feed-token rotation.
+Podcast feeds emit iTunes, Atom, `content`, and Podcasting 2.0 namespaces. Descriptions retain line breaks and safely linkify plain HTTP(S) URLs in `content:encoded`; provider HTML is escaped, never trusted. Private feeds emit `<itunes:block>yes</itunes:block>` and `<itunes:duration>` when canonical media duration is known, and a plugin-owned `podcast_guid` is persisted in broadcast settings so `<podcast:guid>` survives feed-token rotation.
 
 Podcast feed metadata supports a `<podcast:funding url="...">` tag. The funding URL is resolved in `PodcastBroadcastPlugin::metadata()`:
 

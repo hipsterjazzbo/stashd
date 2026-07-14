@@ -90,6 +90,7 @@ test('broadcast.rebuild writes deterministic audio podcast feed with tokenized e
         ->and((string) $xml->channel->item->enclosure['url'])->not->toContain('?')
         ->and((int) $xml->channel->item->enclosure['length'])->toBe(strlen('audio-bytes'))
         ->and((string) $xml->channel->item->enclosure['type'])->toBe('audio/mpeg')
+        ->and((string) $xml->channel->item->children('http://www.itunes.com/dtds/podcast-1.0.dtd')->duration)->toBe('630')
         ->and((string) $item->tokenPreview)->not->toContain($itemToken)
         ->and($feedXml)->not->toContain($config->vaultPath());
 
@@ -151,7 +152,8 @@ test('broadcast.rebuild writes video podcast feed for supported ready video asse
 
     expect($xml)->not->toBeFalse()
         ->and((string) $xml->channel->item->enclosure['url'])->toContain('/episode.mp4')
-        ->and((string) $xml->channel->item->enclosure['type'])->toBe('video/mp4');
+        ->and((string) $xml->channel->item->enclosure['type'])->toBe('video/mp4')
+        ->and((string) $xml->channel->item->children('http://www.itunes.com/dtds/podcast-1.0.dtd')->duration)->toBe('630');
 });
 
 test('caption downloads complete before they queue a podcast rebuild', function (): void {
