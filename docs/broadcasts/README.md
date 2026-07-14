@@ -287,7 +287,8 @@ provider/yt-dlp chapters, and queues only the changed broadcast item for rebuild
 alter Vault media. For Jellyfin/Plex, items with fetched SponsorBlock segments are stream-copy
 remuxed locally with the merged timeline; the original stays hardlinked until segments exist.
 The broadcast preview reports the potential derived-media item count and byte impact before
-`sponsorblock_enabled` is selected. Podcast chapter remuxes remain future work.
+`sponsorblock_enabled` is selected. Podcasts similarly serve a broadcast-local remux and expose
+Podcasting 2.0 chapter JSON at the tokenized episode route.
 
 Media server connections: see `docs/media-servers/README.md`.
 
