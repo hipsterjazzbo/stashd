@@ -6,7 +6,7 @@ Broadcasts are **disposable, regeneratable views** of a stash. They do not own c
 
 - Generic broadcast lifecycle (`plan` → `publish` → `verify` → `prune`)
 - `filesystem_series` broadcast type (hardlinked media, no NFO sidecars)
-- Async commands: `broadcast.plan`, `broadcast.rebuild`, `broadcast.verify`, `broadcast.prune`
+- Async commands: `broadcast.plan`, `broadcast.rebuild`, `broadcast.rebuild_item`, `broadcast.verify`, `broadcast.prune`
 
 ## Phase 5B (complete)
 
@@ -242,6 +242,7 @@ Creating a broadcast automatically queues its first rebuild. Broadcast work runs
 |---|---|---|
 | Plan | `broadcast.plan` | No — computes intended files + sidecars |
 | Rebuild | `broadcast.rebuild` | Yes — plan + publish + verify (+ optional auto scan trigger) |
+| Rebuild item | `broadcast.rebuild_item` | Yes — republishes one `broadcast_item_id`, then verifies the broadcast (+ optional auto scan trigger). Podcast feeds are aggregate artifacts, so their shared `feed.xml` is regenerated. |
 | Verify | `broadcast.verify` | No — checks files + hardlink targets + sidecars |
 | Prune | `broadcast.prune` | Yes — removes stale generated files only |
 | Trigger | `broadcast.trigger` | No — media-server scan only; failures do not invalidate files |
@@ -269,8 +270,25 @@ POST /api/v1/stashes/{stashId}/broadcasts   (type: jellyfin | plex | podcast; po
 GET  /api/v1/broadcasts/{broadcastId}
 GET  /api/v1/broadcasts/{broadcastId}/items
 PATCH /api/v1/broadcasts/{broadcastId}/destination  (destination_path: string | null)
-POST /api/v1/commands  (broadcast.plan|rebuild|verify|prune|trigger)
+POST /api/v1/commands  (broadcast.plan|rebuild|rebuild_item|verify|prune|trigger)
 ```
+
+`broadcast.rebuild_item` accepts `options.broadcast_item_id`. It is intentionally opt-in per
+broadcast type: existing types support it, while future types must implement compatible
+item-scoped publication before advertising it.
+
+### SponsorBlock polling policy
+
+SponsorBlock remains opt-in and does not alter Vault media. At broadcast creation, set
+`settings.sponsorblock_enabled: true` and a non-empty
+`settings.sponsorblock_categories` list. Only YouTube items receive an immediate refresh record;
+the record is checked hourly for seven days. Each refresh stores SponsorBlock segments alongside
+provider/yt-dlp chapters, and queues only the changed broadcast item for rebuild. Refreshes never
+alter Vault media. For Jellyfin/Plex, items with fetched SponsorBlock segments are stream-copy
+remuxed locally with the merged timeline; the original stays hardlinked until segments exist.
+The broadcast preview reports the potential derived-media item count and byte impact before
+`sponsorblock_enabled` is selected. Podcasts similarly serve a broadcast-local remux and expose
+Podcasting 2.0 chapter JSON at the tokenized episode route.
 
 Media server connections: see `docs/media-servers/README.md`.
 

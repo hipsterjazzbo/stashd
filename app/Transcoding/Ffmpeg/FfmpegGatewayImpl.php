@@ -67,9 +67,12 @@ final readonly class FfmpegGatewayImpl implements FfmpegGateway
                 '-loglevel', 'error',
                 '-i', $sourcePath,
                 '-vn',
+                '-map_metadata', '0',
+                '-map_chapters', '0',
                 '-ac', (string) $profile->channels,
                 '-ar', (string) $profile->sampleRateHz,
                 '-b:a', $profile->bitrateKbps . 'k',
+                '-id3v2_version', '3',
                 '-progress', 'pipe:2',
                 '-nostats',
                 $destinationPath,
@@ -89,6 +92,44 @@ final readonly class FfmpegGatewayImpl implements FfmpegGateway
             $buffer .= $bytes;
             $this->parseProgressBlocks($buffer, $onProgress, $totalSeconds, $startedAt);
         });
+
+        if (! $result->successful()) {
+            throw new FfmpegProcessFailedException(
+                $result,
+                $this->redact($result->errorOutput) ?: 'ffmpeg exited with status ' . $result->exitCode,
+            );
+        }
+
+        return new FfmpegTranscodeResult(successful: true, exitCode: $result->exitCode);
+    }
+
+    public function remuxWithChapters(string $sourcePath, string $destinationPath, string $chaptersMetadata): FfmpegTranscodeResult
+    {
+        $metadataPath = tempnam(sys_get_temp_dir(), 'stashd-ffmetadata-');
+
+        if ($metadataPath === false || file_put_contents($metadataPath, $chaptersMetadata) === false) {
+            throw new \RuntimeException('Could not prepare chapter metadata.');
+        }
+
+        try {
+            $result = $this->executor->run(new PendingProcess(
+                command: [
+                    $this->config->binary,
+                    '-y',
+                    '-loglevel', 'error',
+                    '-i', $sourcePath,
+                    '-i', $metadataPath,
+                    '-map', '0',
+                    '-map_metadata', '0',
+                    '-map_chapters', '1',
+                    '-c', 'copy',
+                    $destinationPath,
+                ],
+                timeout: Duration::seconds($this->config->timeoutSeconds),
+            ));
+        } finally {
+            @unlink($metadataPath);
+        }
 
         if (! $result->successful()) {
             throw new FfmpegProcessFailedException(

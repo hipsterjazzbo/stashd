@@ -31,6 +31,11 @@ final readonly class PodcastEpisodeUrlBuilder
         return $this->baseUrl() . '/b/' . rawurlencode($broadcastToken) . '/items/' . rawurlencode($itemToken) . '/artwork';
     }
 
+    public function chapterUrl(string $broadcastToken, string $itemToken): string
+    {
+        return $this->baseUrl() . '/b/' . rawurlencode($broadcastToken) . '/items/' . rawurlencode($itemToken) . '/chapters.json';
+    }
+
     public function transcriptUrl(string $broadcastToken, string $itemToken): string
     {
         return $this->baseUrl() . '/b/' . rawurlencode($broadcastToken) . '/items/' . rawurlencode($itemToken) . '/transcript';

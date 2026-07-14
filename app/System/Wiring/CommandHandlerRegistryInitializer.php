@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\System\Wiring;
 
 use App\Broadcasts\BroadcastCommandHandler;
+use App\Broadcasts\BroadcastItemRepository;
 use App\Broadcasts\BroadcastRepository;
+use App\Broadcasts\SponsorBlockRefreshCommandHandler;
 use App\Commands\CommandHandlerRegistry;
 use App\Commands\CommandRepository;
 use App\Commands\CommandType;
@@ -31,6 +33,7 @@ final class CommandHandlerRegistryInitializer implements Initializer
         $commands = $container->get(CommandRepository::class);
         $jobs = $container->get(JobRepository::class);
         $broadcasts = $container->get(BroadcastRepository::class);
+        $broadcastItems = $container->get(BroadcastItemRepository::class);
         $connections = $container->get(MediaServerConnectionRepository::class);
 
         return new CommandHandlerRegistry([
@@ -40,15 +43,17 @@ final class CommandHandlerRegistryInitializer implements Initializer
             $container->get(ItemDownloadCommandHandler::class),
             $container->get(AssetDownloadCaptionsCommandHandler::class),
             $container->get(SystemStorageCheckCommandHandler::class),
+            $container->get(SponsorBlockRefreshCommandHandler::class),
             $container->get(SystemVerifyVaultCommandHandler::class),
             $container->get(AssetVerifyCommandHandler::class),
             $container->get(AssetTranscodePodcastAudioCommandHandler::class),
-            new BroadcastCommandHandler($commands, $jobs, $broadcasts, CommandType::BroadcastPlan),
-            new BroadcastCommandHandler($commands, $jobs, $broadcasts, CommandType::BroadcastRebuild),
-            new BroadcastCommandHandler($commands, $jobs, $broadcasts, CommandType::BroadcastVerify),
-            new BroadcastCommandHandler($commands, $jobs, $broadcasts, CommandType::BroadcastPrune),
-            new BroadcastCommandHandler($commands, $jobs, $broadcasts, CommandType::BroadcastTrigger),
-            new BroadcastCommandHandler($commands, $jobs, $broadcasts, CommandType::BroadcastRotateToken),
+            new BroadcastCommandHandler($commands, $jobs, $broadcasts, $broadcastItems, CommandType::BroadcastPlan),
+            new BroadcastCommandHandler($commands, $jobs, $broadcasts, $broadcastItems, CommandType::BroadcastRebuild),
+            new BroadcastCommandHandler($commands, $jobs, $broadcasts, $broadcastItems, CommandType::BroadcastRebuildItem),
+            new BroadcastCommandHandler($commands, $jobs, $broadcasts, $broadcastItems, CommandType::BroadcastVerify),
+            new BroadcastCommandHandler($commands, $jobs, $broadcasts, $broadcastItems, CommandType::BroadcastPrune),
+            new BroadcastCommandHandler($commands, $jobs, $broadcasts, $broadcastItems, CommandType::BroadcastTrigger),
+            new BroadcastCommandHandler($commands, $jobs, $broadcasts, $broadcastItems, CommandType::BroadcastRotateToken),
             new MediaServerCommandHandler($commands, $jobs, $connections, CommandType::MediaServerTestConnection),
             new MediaServerCommandHandler($commands, $jobs, $connections, CommandType::MediaServerListLibraries),
         ]);

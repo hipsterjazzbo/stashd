@@ -106,7 +106,12 @@ final readonly class BroadcastController
         }
 
         $mediaKind = isset($body['mediaKind']) ? trim((string) $body['mediaKind']) : null;
-        $preview = $this->lifecycle->preview(StashId::parse($stashId), $typeRaw, $mediaKind);
+        $preview = $this->lifecycle->preview(
+            StashId::parse($stashId),
+            $typeRaw,
+            $mediaKind,
+            ($body['sponsorblockEnabled'] ?? false) === true,
+        );
 
         return new Json(['preview' => ApiJson::encode($preview->toArray())]);
     }
@@ -185,6 +190,12 @@ final readonly class BroadcastController
         }
 
         $settings = is_array($body['settings'] ?? null) ? ApiJson::encode($body['settings']) : null;
+
+        try {
+            SponsorBlockSettings::fromBroadcastSettings($settings ?? []);
+        } catch (\InvalidArgumentException $exception) {
+            return $this->validationError($exception->getMessage());
+        }
 
         $destinationPath = $settings['destination_path'] ?? null;
 

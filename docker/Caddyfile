@@ -32,13 +32,12 @@
 	# this header instead of streaming the file itself. Caddy rewrites the
 	# request to the header's value and serves it with file_server, which
 	# handles Range/HEAD/If-Range natively -- no PHP memory/CPU spent on
-	# multi-hundred-MB episode bodies. Root is the Vault specifically (not
-	# the whole media path), matching PodcastEpisodeController's contract
-	# that it only ever serves Vault assets.
+	# multi-hundred-MB episode bodies. The controller emits only /vault/... or
+	# /broadcasts/... paths after token validation; both remain under media.
 	intercept {
 		@accel header X-Accel-Redirect *
 		handle_response @accel {
-			root {$STASHD_MEDIA_PATH:-media}/vault
+			root {$STASHD_MEDIA_PATH:-media}
 			rewrite * {resp.header.X-Accel-Redirect}
 			method * GET
 

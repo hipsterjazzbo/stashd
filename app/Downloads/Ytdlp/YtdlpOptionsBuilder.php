@@ -83,6 +83,7 @@ final readonly class YtdlpOptionsBuilder
                     ->format($this->config->videoFormatSelector)
                     ->output(self::OUTPUT_TEMPLATE)
                     ->mergeOutputFormat(MergeOutputFormat::Mp4, MergeOutputFormat::Mkv, MergeOutputFormat::Webm)
+                    ->option('--embed-chapters')
                     ->noPlaylist()
                     ->noWarnings()
                     ->option('--restrict-filenames'),
@@ -100,6 +101,7 @@ final readonly class YtdlpOptionsBuilder
                     ->extractAudio()
                     ->audioFormat($format)
                     ->audioQuality($this->config->audioQualityKbps)
+                    ->option('--embed-chapters')
                     ->output(self::OUTPUT_TEMPLATE)
                     ->noPlaylist()
                     ->noWarnings()

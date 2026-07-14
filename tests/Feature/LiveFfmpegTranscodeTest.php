@@ -101,3 +101,82 @@ test('live ffmpeg gateway transcodes a real source with live progress callbacks'
         @unlink($destination);
     }
 })->group('live');
+
+test('ffprobe sees embedded chapters in a Vault file and its broadcast hardlink', function (): void {
+    liveFfmpegSkipUnlessEnabled($this);
+
+    $id = bin2hex(random_bytes(4));
+    $metadata = sys_get_temp_dir() . '/stashd-live-chapters-' . $id . '.ffmeta';
+    $vault = sys_get_temp_dir() . '/stashd-live-chapters-' . $id . '.m4a';
+    $broadcast = sys_get_temp_dir() . '/stashd-live-chapters-' . $id . '-broadcast.m4a';
+    file_put_contents($metadata, ";FFMETADATA1\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=1000\ntitle=Opening\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=1000\nEND=2000\ntitle=Closing\n");
+
+    try {
+        $result = (new GenericProcessExecutor())->run([
+            getenv('STASHD_FFMPEG_BINARY') ?: 'ffmpeg',
+            '-y', '-loglevel', 'error',
+            '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
+            '-f', 'ffmetadata', '-i', $metadata,
+            '-t', '2', '-map', '0:a', '-map_metadata', '0', '-map_chapters', '1', '-c:a', 'aac',
+            $vault,
+        ]);
+
+        expect($result->successful())->toBeTrue()->and(link($vault, $broadcast))->toBeTrue();
+
+        $probe = static function (string $path): array {
+            $result = (new GenericProcessExecutor())->run([
+                getenv('STASHD_FFPROBE_BINARY') ?: 'ffprobe',
+                '-v', 'error', '-show_chapters', '-of', 'json', $path,
+            ]);
+
+            expect($result->successful())->toBeTrue();
+
+            return json_decode($result->output, true, flags: JSON_THROW_ON_ERROR);
+        };
+
+        expect($probe($vault)['chapters'])->toHaveCount(2)
+            ->and($probe($broadcast)['chapters'])->toHaveCount(2)
+            ->and($probe($broadcast)['chapters'][0]['tags']['title'])->toBe('Opening');
+    } finally {
+        @unlink($metadata);
+        @unlink($vault);
+        @unlink($broadcast);
+    }
+})->group('live');
+
+test('ffprobe sees chapters preserved in a podcast audio transcode', function (): void {
+    liveFfmpegSkipUnlessEnabled($this);
+
+    $id = bin2hex(random_bytes(4));
+    $metadata = sys_get_temp_dir() . '/stashd-live-transcode-chapters-' . $id . '.ffmeta';
+    $source = sys_get_temp_dir() . '/stashd-live-transcode-chapters-' . $id . '.m4a';
+    $output = sys_get_temp_dir() . '/stashd-live-transcode-chapters-' . $id . '.mp3';
+    file_put_contents($metadata, ";FFMETADATA1\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=1000\ntitle=Opening\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=1000\nEND=2000\ntitle=Closing\n");
+
+    try {
+        $created = (new GenericProcessExecutor())->run([
+            getenv('STASHD_FFMPEG_BINARY') ?: 'ffmpeg',
+            '-y', '-loglevel', 'error',
+            '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
+            '-f', 'ffmetadata', '-i', $metadata,
+            '-t', '2', '-map', '0:a', '-map_metadata', '0', '-map_chapters', '1', '-c:a', 'aac',
+            $source,
+        ]);
+        expect($created->successful())->toBeTrue();
+
+        liveFfmpegGateway()->transcodeToMp3($source, $output, FfmpegAudioProfile::v1Default(), 2);
+        $probe = (new GenericProcessExecutor())->run([
+            getenv('STASHD_FFPROBE_BINARY') ?: 'ffprobe',
+            '-v', 'error', '-show_chapters', '-of', 'json', $output,
+        ]);
+        expect($probe->successful())->toBeTrue();
+
+        $chapters = json_decode($probe->output, true, flags: JSON_THROW_ON_ERROR)['chapters'];
+        expect($chapters)->toHaveCount(2)
+            ->and($chapters[1]['tags']['title'])->toBe('Closing');
+    } finally {
+        @unlink($metadata);
+        @unlink($source);
+        @unlink($output);
+    }
+})->group('live');

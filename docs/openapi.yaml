@@ -1400,6 +1400,7 @@ components:
         - asset.verify
         - broadcast.plan
         - broadcast.rebuild
+        - broadcast.rebuild_item
         - broadcast.verify
         - broadcast.prune
         - broadcast.trigger

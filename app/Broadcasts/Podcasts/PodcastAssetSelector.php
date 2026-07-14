@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Broadcasts\Podcasts;
 
+use App\Broadcasts\BroadcastItemId;
+use App\Broadcasts\BroadcastItemRecord;
 use App\Vault\AssetKind;
 use App\Vault\AssetRecord;
 use App\Vault\AssetRepository;
@@ -55,6 +57,21 @@ final readonly class PodcastAssetSelector
         }
 
         return null;
+    }
+
+    public function assetForBroadcastItem(BroadcastItemRecord $item, PodcastMediaKind $kind): ?PodcastAssetSelection
+    {
+        $asset = $this->assets->findByBroadcastItemAndRole(BroadcastItemId::fromPrimaryKey($item->id), AssetRole::RemuxedVideo);
+
+        if ($asset === null || $asset->state !== AssetState::Ready || $asset->path === null || ! is_file($asset->path)) {
+            return null;
+        }
+
+        $mimeType = $kind === PodcastMediaKind::Audio
+            ? $this->mimeTypes->forAudioAsset($asset)
+            : $this->mimeTypes->forVideoAsset($asset);
+
+        return $mimeType === null ? null : $this->selection($asset, $mimeType);
     }
 
     public function artworkAsset(MediaItemId $mediaItemId): ?AssetRecord
@@ -110,7 +127,7 @@ final readonly class PodcastAssetSelector
             static fn (AssetRecord $asset): bool => $asset->state === AssetState::Ready
                 && $asset->path !== null
                 && is_file($asset->path)
-                && in_array($asset->role, [AssetRole::VaultOriginal, AssetRole::PodcastAudio, AssetRole::RemuxedVideo], true),
+                && in_array($asset->role, [AssetRole::VaultOriginal, AssetRole::PodcastAudio], true),
         );
 
         usort(
@@ -124,7 +141,7 @@ final readonly class PodcastAssetSelector
     private static function assetPriority(AssetRecord $asset): int
     {
         return match ($asset->role) {
-            AssetRole::PodcastAudio, AssetRole::RemuxedVideo => 0,
+            AssetRole::PodcastAudio => 0,
             AssetRole::VaultOriginal => 1,
             default => 9,
         };

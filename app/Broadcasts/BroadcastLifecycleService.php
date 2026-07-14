@@ -15,7 +15,13 @@ use Tempest\DateTime\Timezone;
 
 final readonly class BroadcastLifecycleResult
 {
-    /** @param array<string, mixed> $plan */
+    /**
+     * @param array<string, mixed>|null $plan
+     * @param array<string, mixed>|null $publish
+     * @param array<string, mixed>|null $verify
+     * @param array<string, mixed>|null $prune
+     * @param array<string, mixed>|null $trigger
+     */
     public function __construct(
         public ?array $plan = null,
         public ?array $publish = null,
@@ -77,7 +83,7 @@ final readonly class BroadcastLifecycleService
      * PodcastTranscodeFallback). Transcoded output size isn't known ahead of
      * time, so those items are reported as a count, not a byte estimate.
      */
-    public function preview(StashId $stashId, string $type, ?string $mediaKind): BroadcastCreationPreview
+    public function preview(StashId $stashId, string $type, ?string $mediaKind, bool $sponsorBlockEnabled = false): BroadcastCreationPreview
     {
         $draftBroadcast = new BroadcastRecord(
             stashId: $stashId,
@@ -85,7 +91,11 @@ final readonly class BroadcastLifecycleService
             name: '',
             slug: '',
             state: BroadcastState::Pending,
-            settings: $mediaKind === null ? null : ['media_kind' => $mediaKind],
+            settings: array_filter([
+                'media_kind' => $mediaKind,
+                'sponsorblock_enabled' => $sponsorBlockEnabled ?: null,
+                'sponsorblock_categories' => $sponsorBlockEnabled ? ['sponsor'] : null,
+            ], static fn (mixed $value): bool => $value !== null),
         );
 
         return $this->impactFor($draftBroadcast);
@@ -111,6 +121,7 @@ final readonly class BroadcastLifecycleService
         $eligible = $this->contextFactory->publishableStashItems($context);
 
         $needsAudioTranscode = $broadcast->type === 'podcast' && PodcastMediaKind::forBroadcast($broadcast) === PodcastMediaKind::Audio;
+        $needsChapterRemux = $broadcast->type !== 'podcast' && SponsorBlockSettings::fromBroadcastSettings($broadcast->settings ?? [])->enabled;
 
         $vaultSizeBytes = 0;
         $transcodeItemCount = 0;
@@ -130,6 +141,8 @@ final readonly class BroadcastLifecycleService
             vaultSizeBytes: $vaultSizeBytes,
             hardlinkedItemCount: count($eligible) - $transcodeItemCount,
             transcodeItemCount: $transcodeItemCount,
+            derivedMediaItemCount: $needsChapterRemux ? count($eligible) : 0,
+            derivedMediaBytes: $needsChapterRemux ? $vaultSizeBytes : 0,
         );
     }
 
@@ -174,6 +187,69 @@ final readonly class BroadcastLifecycleService
 
         return new BroadcastLifecycleResult(
             plan: $plan->toArray(),
+            publish: $publish->toArray(),
+            verify: $verify->toArray(),
+            trigger: $trigger,
+        );
+    }
+
+    public function rebuildItem(BroadcastItemId $broadcastItemId, ?callable $onProgress = null): BroadcastLifecycleResult
+    {
+        $item = $this->broadcastItems->find($broadcastItemId)
+            ?? throw BroadcastException::withCode('broadcast_item_not_found', 'Broadcast item not found.');
+        $broadcast = $this->broadcasts->find($item->broadcastId)
+            ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
+        $plugin = $this->resolvePlugin($broadcast->type);
+
+        if (! $plugin->plugin->supportsItemRebuild()) {
+            throw BroadcastException::withCode(
+                'broadcast_item_rebuild_unsupported',
+                "The {$broadcast->type} broadcast format does not support item rebuilds.",
+            );
+        }
+
+        $this->transitionToProcessing($broadcast);
+
+        if ($onProgress !== null) {
+            $onProgress('Planning broadcast item rebuild');
+        }
+
+        $plan = $this->planOnly($broadcast);
+        $itemPlan = $this->planForItem($plan, (string) $item->stashItemId);
+
+        if ($onProgress !== null) {
+            $onProgress('Publishing broadcast item');
+        }
+
+        $publish = $this->publishOnly($broadcast, $itemPlan);
+        $broadcast->lastPlannedAt = DateTime::now(Timezone::UTC);
+        $broadcast->lastBuiltAt = DateTime::now(Timezone::UTC);
+        $broadcast->lastError = null;
+
+        if ($onProgress !== null) {
+            $onProgress('Verifying broadcast');
+        }
+
+        // Publishing is deliberately limited to this item's files and
+        // sidecars, but validation remains broadcast-wide: an item rebuild
+        // must not accidentally mark an already-stale broadcast as ready.
+        $verify = $this->verifyOnly($broadcast);
+        $broadcast->lastVerifiedAt = DateTime::now(Timezone::UTC);
+        $this->applyVerifyState($broadcast, $verify);
+        $this->broadcasts->save($broadcast);
+
+        $trigger = null;
+
+        if ($verify->ok && $this->shouldAutoTrigger($broadcast)) {
+            if ($onProgress !== null) {
+                $onProgress('Triggering media server scan');
+            }
+
+            $trigger = $this->triggers->execute($broadcast, 'post_rebuild_item')->toArray();
+        }
+
+        return new BroadcastLifecycleResult(
+            plan: $itemPlan->toArray(),
             publish: $publish->toArray(),
             verify: $verify->toArray(),
             trigger: $trigger,
@@ -242,6 +318,27 @@ final readonly class BroadcastLifecycleService
         $plan ??= $plugin->plugin->plan($context);
 
         return $plugin->plugin->publish($context, $plan);
+    }
+
+    private function planForItem(BroadcastPlan $plan, string $stashItemId): BroadcastPlan
+    {
+        return new BroadcastPlan(
+            broadcastId: $plan->broadcastId,
+            broadcastRoot: $plan->broadcastRoot,
+            files: array_values(array_filter(
+                $plan->files,
+                static fn (BroadcastPlannedFile $file): bool => $file->stashItemId === $stashItemId,
+            )),
+            sidecars: array_values(array_filter(
+                $plan->sidecars,
+                static fn (BroadcastPlannedSidecar $sidecar): bool => $sidecar->stashItemId === null || $sidecar->stashItemId === $stashItemId,
+            )),
+            skippedStashItemIds: array_values(array_filter(
+                $plan->skippedStashItemIds,
+                static fn (string $id): bool => $id === $stashItemId,
+            )),
+            estimatedCopyBytes: $plan->estimatedCopyBytes,
+        );
     }
 
     private function verifyOnly(BroadcastRecord $broadcast): BroadcastVerifyResult
