@@ -75,6 +75,9 @@ final readonly class PodcastFeedBuilder
                 $xml .= '      <podcast:transcript url="' . $this->escape($episode->transcriptUrl) . '" type="' . $this->escape($episode->transcriptMimeType) . '"'
                     . ($episode->transcriptLanguage === null ? '' : ' language="' . $this->escape($episode->transcriptLanguage) . '"') . " />\n";
             }
+            if ($episode->chapterUrl !== null) {
+                $xml .= '      <podcast:chapters url="' . $this->escape($episode->chapterUrl) . '" type="application/json" />' . "\n";
+            }
             $xml .= "    </item>\n";
         }
 

@@ -63,6 +63,10 @@ test('valid audio podcast episode token returns an X-Accel-Redirect to the Vault
         ->assertHeaderContains('X-Accel-Redirect', '/vault' . podcastEpisodeExpectedAccelPath($mediaItemId, 'original.mp3'));
 
     expect($response->body)->toBeNull();
+
+    $chapters = $this->http->get('/b/' . rawurlencode($parts['broadcastToken']) . '/items/' . rawurlencode($parts['itemToken']) . '/chapters.json');
+    $chapters->assertStatus(Status::OK)->assertHeaderContains('Content-Type', 'application/json; charset=utf-8');
+    expect(json_decode($chapters->body, true, flags: JSON_THROW_ON_ERROR))->toBe(['version' => '1.2.0', 'chapters' => []]);
 });
 
 test('valid podcast item token returns its source thumbnail through Caddy', function (): void {

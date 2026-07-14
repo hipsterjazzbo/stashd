@@ -9,8 +9,8 @@ use App\Broadcasts\BroadcastContext;
 use App\Broadcasts\BroadcastContextFactory;
 use App\Broadcasts\BroadcastException;
 use App\Broadcasts\BroadcastId;
-use App\Broadcasts\BroadcastItemRecord;
 use App\Broadcasts\BroadcastItemId;
+use App\Broadcasts\BroadcastItemRecord;
 use App\Broadcasts\BroadcastItemRepository;
 use App\Broadcasts\BroadcastItemState;
 use App\Broadcasts\BroadcastPathBuilder;
@@ -370,6 +370,9 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
                 : $this->urls->transcriptUrl($broadcastToken, $itemToken),
             transcriptMimeType: $this->assets->captionAsset($stashItem->mediaItemId)?->mimeType,
             transcriptLanguage: $this->assets->captionAsset($stashItem->mediaItemId)?->language,
+            chapterUrl: $this->timeline->hasEntries($item->mediaItemId)
+                ? $this->urls->chapterUrl($broadcastToken, $itemToken)
+                : null,
         );
     }
 

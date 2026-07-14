@@ -40,6 +40,11 @@ final readonly class TimelineMetadataRenderer
         return false;
     }
 
+    public function hasEntries(MediaItemId $mediaItemId): bool
+    {
+        return $this->entries->listForMediaItem($mediaItemId) !== [];
+    }
+
     private function escape(string $value): string
     {
         return str_replace(["\\", "\n", "\r", '=', ';', '#'], ['\\\\', '\\n', '', '\\=', '\\;', '\\#'], $value);

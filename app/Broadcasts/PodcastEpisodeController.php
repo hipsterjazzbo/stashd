@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Broadcasts;
 
 use App\Broadcasts\Podcasts\PodcastAssetSelector;
+use App\Broadcasts\Podcasts\PodcastChapterJsonBuilder;
 use App\Broadcasts\Podcasts\PodcastMediaKind;
 use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Config\StashdConfig;
@@ -44,6 +45,7 @@ final readonly class PodcastEpisodeController
     public function __construct(
         private PodcastTokenService $tokens,
         private PodcastAssetSelector $assets,
+        private PodcastChapterJsonBuilder $chapters,
         private StashdConfig $config,
     ) {
     }
@@ -99,6 +101,20 @@ final readonly class PodcastEpisodeController
         return (new Ok())
             ->addHeader(ContentType::HEADER, $selection->mimeType)
             ->addHeader('X-Accel-Redirect', $accelPath);
+    }
+
+    #[Get('/b/{broadcastToken}/items/{itemToken}/chapters.json', without: [RequireAuthMiddleware::class])]
+    public function chapterJson(#[SensitiveParameter] string $broadcastToken, #[SensitiveParameter] string $itemToken): Response
+    {
+        $broadcast = $this->tokens->findPodcastBroadcastByFeedToken($broadcastToken);
+        $item = $broadcast === null ? null : $this->tokens->findBroadcastItemByEpisodeToken($broadcast, $itemToken);
+
+        if ($item === null) {
+            return $this->notRevealed();
+        }
+
+        return (new Ok($this->chapters->build($item->mediaItemId)))
+            ->addHeader(ContentType::HEADER, 'application/json; charset=utf-8');
     }
 
     private function extensionFromEpisodeFile(string $episodeFile): ?string
