@@ -32,6 +32,7 @@ final readonly class BootstrapService
     {
         $created = $this->storageRoots->ensureDirectories();
         $this->sqlite->configure($sqliteConfig);
+        $this->sqlite->enableWriteAheadLogging();
         $this->migrations->run($sqliteConfig);
         $this->podcastTokens->backfillMissingTokenDigests();
         $this->storageChecks->checkAll();

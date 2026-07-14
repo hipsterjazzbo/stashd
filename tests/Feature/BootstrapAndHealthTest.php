@@ -60,6 +60,7 @@ test('sqlite pragmas are enabled on the tempest connection', function (): void {
     $configurator = $this->container->get(SqliteConfigurator::class);
 
     $configurator->configure($sqlite);
+    $configurator->enableWriteAheadLogging();
     $pragmas = $configurator->readPragmas();
 
     expect($pragmas['foreign_keys'])->toBe(1)

@@ -38,8 +38,13 @@ final readonly class SqliteConfigurator
         }
 
         $this->database->execute(new Query('PRAGMA foreign_keys = ON'));
-        $this->database->execute(new Query('PRAGMA journal_mode = WAL'));
         $this->database->execute(new Query('PRAGMA busy_timeout = 5000'));
+    }
+
+    /** WAL is a persistent database mode, not a per-connection setting. */
+    public function enableWriteAheadLogging(): void
+    {
+        $this->database->execute(new Query('PRAGMA journal_mode = WAL'));
     }
 
     /** @return array{foreign_keys: int|string, journal_mode: string, busy_timeout: int|string} */
