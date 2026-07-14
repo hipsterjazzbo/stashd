@@ -120,6 +120,7 @@ test('ytdlp discovery maps flat-playlist entries into discovered items', functio
                             'id' => 'video-one',
                             'title' => 'Video One',
                             'duration' => 125.4,
+                            'upload_date' => '20260115',
                             'thumbnails' => [
                                 ['url' => 'https://example.test/thumb-small.jpg'],
                                 ['url' => 'https://example.test/thumb-large.jpg'],
@@ -153,6 +154,7 @@ test('ytdlp discovery maps flat-playlist entries into discovered items', functio
         ->and($items[0]->providerItemId)->toBe('video-one')
         ->and($items[0]->title)->toBe('Video One')
         ->and($items[0]->durationSeconds)->toBe(125)
+        ->and($items[0]->publishedAt?->toRfc3339(useZ: true))->toBe('2026-01-15T00:00:00Z')
         ->and($items[0]->canonicalUri->toString())->toBe('https://www.youtube.com/watch?v=video-one')
         ->and($items[0]->thumbnailUri?->toString())->toBe('https://example.test/thumb-large.jpg')
         ->and($items[1]->providerItemId)->toBe('video-two')
