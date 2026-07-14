@@ -277,6 +277,14 @@ POST /api/v1/commands  (broadcast.plan|rebuild|rebuild_item|verify|prune|trigger
 broadcast type: existing types support it, while future types must implement compatible
 item-scoped publication before advertising it.
 
+### SponsorBlock polling policy
+
+SponsorBlock remains opt-in and does not alter Vault media. At broadcast creation, set
+`settings.sponsorblock_enabled: true` and a non-empty
+`settings.sponsorblock_categories` list. Only YouTube items receive an immediate refresh record;
+the record expires after seven days. Fetching, derived remuxes, and timeline rendering are not
+implemented yet.
+
 Media server connections: see `docs/media-servers/README.md`.
 
 JSON uses snake_case. SQLite columns remain camelCase. Broadcast `settings` JSON is stored snake_case.

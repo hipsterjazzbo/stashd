@@ -186,6 +186,12 @@ final readonly class BroadcastController
 
         $settings = is_array($body['settings'] ?? null) ? ApiJson::encode($body['settings']) : null;
 
+        try {
+            SponsorBlockSettings::fromBroadcastSettings($settings ?? []);
+        } catch (\InvalidArgumentException $exception) {
+            return $this->validationError($exception->getMessage());
+        }
+
         $destinationPath = $settings['destination_path'] ?? null;
 
         if (is_string($destinationPath)) {

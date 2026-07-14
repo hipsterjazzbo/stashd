@@ -20,6 +20,7 @@ final class CreateBroadcastSponsorBlockRefreshes implements MigratesUp
         $table = $this->prefixedIdTable('broadcast_sponsorblock_refreshes')
             ->raw($this->fkColumn('broadcastItemId', 40, 'broadcast_items', OnDelete::CASCADE))
             ->datetime('nextCheckAt')
+            ->datetime('expiresAt')
             ->datetime('lastCheckedAt', nullable: true)
             ->datetime('completedAt', nullable: true)
             ->text('lastError', nullable: true)

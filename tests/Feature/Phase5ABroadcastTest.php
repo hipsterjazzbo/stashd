@@ -10,6 +10,7 @@ use App\Broadcasts\BroadcastLifecycleService;
 use App\Broadcasts\BroadcastPathBuilder;
 use App\Broadcasts\BroadcastRepository;
 use App\Broadcasts\HardlinkPublisher;
+use App\Broadcasts\SponsorBlockRefreshRepository;
 use App\Config\StashdConfig;
 use App\Stashes\StashId;
 use App\Stashes\StashItemRecord;
@@ -337,6 +338,70 @@ test('broadcast.rebuild publishes hardlinks from vault originals', function (): 
         expect(filesize($vaultPath))->toBe(filesize($publishedPath));
         expect(file_get_contents($vaultPath))->toBe(file_get_contents($publishedPath));
     }
+});
+
+test('broadcast publication schedules one delayed SponsorBlock refresh per item', function (): void {
+    [$headers, $stashId, $mediaItemId, $broadcastId] = $this->bootstrapFakeDownloadBroadcast('broadcast-sponsorblock-refresh');
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'item.download',
+        'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $mediaItem = MediaItemRecord::findById(new \Tempest\Database\PrimaryKey($mediaItemId));
+    $mediaItem->providerKey = 'youtube';
+    $mediaItem->save();
+    $broadcast = $this->container->get(BroadcastRepository::class)->find(BroadcastId::parse($broadcastId));
+    $broadcast->settings = ['sponsorblock_enabled' => true, 'sponsorblock_categories' => ['sponsor']];
+    $this->container->get(BroadcastRepository::class)->save($broadcast);
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild',
+        'options' => ['broadcast_id' => $broadcastId],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $itemId = $this->http->get('/api/v1/broadcasts/' . $broadcastId . '/items', headers: $headers)
+        ->assertOk()
+        ->body['items'][0]['id'];
+    $refreshes = $this->container->get(SponsorBlockRefreshRepository::class);
+
+    $refresh = $refreshes->findForBroadcastItem(\App\Broadcasts\BroadcastItemId::parse($itemId));
+    expect($refresh)->not->toBeNull()
+        ->and($refresh->nextCheckAt->equals($refresh->createdAt))->toBeTrue()
+        ->and($refresh->expiresAt->equals($refresh->createdAt->plusDays(7)))->toBeTrue();
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild',
+        'options' => ['broadcast_id' => $broadcastId],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    expect($refreshes->listDue(\Tempest\DateTime\DateTime::now(\Tempest\DateTime\Timezone::UTC)))->toHaveCount(1);
+});
+
+test('SponsorBlock polling ignores unsupported provider items', function (): void {
+    [$headers, $stashId, $mediaItemId, $broadcastId] = $this->bootstrapFakeDownloadBroadcast('broadcast-sponsorblock-unsupported');
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'item.download',
+        'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $broadcast = $this->container->get(BroadcastRepository::class)->find(BroadcastId::parse($broadcastId));
+    $broadcast->settings = ['sponsorblock_enabled' => true, 'sponsorblock_categories' => ['sponsor']];
+    $this->container->get(BroadcastRepository::class)->save($broadcast);
+
+    $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild',
+        'options' => ['broadcast_id' => $broadcastId],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    expect($this->container->get(SponsorBlockRefreshRepository::class)
+        ->listDue(\Tempest\DateTime\DateTime::now(\Tempest\DateTime\Timezone::UTC)))->toBeEmpty();
 });
 
 test('broadcast.rebuild_item republishes only the selected broadcast item', function (): void {

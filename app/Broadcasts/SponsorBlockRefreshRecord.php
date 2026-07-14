@@ -23,6 +23,7 @@ final class SponsorBlockRefreshRecord
     public function __construct(
         public BroadcastItemId $broadcastItemId,
         public DateTime $nextCheckAt,
+        public DateTime $expiresAt,
         public ?DateTime $lastCheckedAt = null,
         public ?DateTime $completedAt = null,
         public ?string $lastError = null,

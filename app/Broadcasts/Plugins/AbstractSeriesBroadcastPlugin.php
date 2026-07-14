@@ -24,6 +24,7 @@ use App\Broadcasts\BroadcastSidecarWriter;
 use App\Broadcasts\BroadcastVerifyResult;
 use App\Broadcasts\FileKind;
 use App\Broadcasts\HardlinkPublisher;
+use App\Broadcasts\SponsorBlockRefreshScheduler;
 use App\Stashes\StashItemId;
 use App\System\State\StateTransitionService;
 use App\Vault\AssetId;
@@ -55,6 +56,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
         protected BroadcastSidecarWriter $sidecarWriter,
         protected HardlinkPublisher $hardlinks,
         protected BroadcastItemRepository $broadcastItems,
+        protected SponsorBlockRefreshScheduler $sponsorBlockRefreshes,
         protected AssetRepository $assets,
         protected StateTransitionService $transitions,
     ) {
@@ -220,6 +222,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
                 );
 
                 $this->transitions->transitionBroadcastItem($item, BroadcastItemState::Ready);
+                $this->sponsorBlockRefreshes->schedule($context->broadcast, $item, $context->mediaItems[$planned->mediaItemId]);
                 $publishedPaths[] = $planned->absolutePath;
                 $publishedCount++;
             } catch (\App\Broadcasts\BroadcastException $exception) {

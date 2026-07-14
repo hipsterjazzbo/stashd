@@ -27,6 +27,7 @@ use App\Broadcasts\Podcasts\PodcastFeedSettings;
 use App\Broadcasts\Podcasts\PodcastGuid;
 use App\Broadcasts\Podcasts\PodcastMediaKind;
 use App\Broadcasts\Podcasts\PodcastTokenService;
+use App\Broadcasts\SponsorBlockRefreshScheduler;
 use App\Broadcasts\StashdBroadcast;
 use App\Broadcasts\UiControl;
 use App\Commands\CommandDispatchService;
@@ -64,6 +65,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         private \App\Broadcasts\Podcasts\PodcastFundingLinkDetector $fundingDetector,
         private \App\Broadcasts\Podcasts\PodcastTranscodeFallback $transcodeFallback,
         private CommandDispatchService $dispatch,
+        private SponsorBlockRefreshScheduler $sponsorBlockRefreshes,
     ) {
     }
 
@@ -172,7 +174,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
             }
 
             $itemToken = $this->tokens->ensureItemToken($item);
-            $this->markItemReady($item);
+            $this->markItemReady($context, $item, $mediaItem);
             $episodes[] = $this->episode($context, $stashItem, $mediaItem, $item, $selection, $broadcastToken, $itemToken);
             $includedDescriptions[] = $mediaItem->description;
             $included++;
@@ -283,7 +285,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         );
     }
 
-    private function markItemReady(BroadcastItemRecord $item): void
+    private function markItemReady(BroadcastContext $context, BroadcastItemRecord $item, MediaItemRecord $mediaItem): void
     {
         if ($item->state !== BroadcastItemState::Processing) {
             $this->transitions->transitionBroadcastItem($item, BroadcastItemState::Processing);
@@ -295,6 +297,7 @@ final readonly class PodcastBroadcastPlugin implements \App\Broadcasts\Broadcast
         $item->lastError = null;
         $this->broadcastItems->save($item);
         $this->transitions->transitionBroadcastItem($item, BroadcastItemState::Ready);
+        $this->sponsorBlockRefreshes->schedule($context->broadcast, $item, $mediaItem);
     }
 
     private function markItemProcessing(BroadcastItemRecord $item, string $reason): void

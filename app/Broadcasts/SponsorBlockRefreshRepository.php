@@ -19,24 +19,35 @@ final class SponsorBlockRefreshRepository
     {
     }
 
-    public function create(BroadcastItemId $broadcastItemId, DateTime $nextCheckAt): SponsorBlockRefreshRecord
+    public function create(BroadcastItemId $broadcastItemId, DateTime $nextCheckAt, DateTime $expiresAt): SponsorBlockRefreshRecord
     {
         $now = DateTime::now(Timezone::UTC);
-        $record = new SponsorBlockRefreshRecord($broadcastItemId, $nextCheckAt, createdAt: $now, updatedAt: $now);
+        $record = new SponsorBlockRefreshRecord($broadcastItemId, $nextCheckAt, $expiresAt, createdAt: $now, updatedAt: $now);
         $record->id = new PrimaryKey($this->ids->generate('sbrefresh')->toString());
         query(SponsorBlockRefreshRecord::class)->insert($record)->execute();
 
         return $record;
     }
 
+    public function findForBroadcastItem(BroadcastItemId $broadcastItemId): ?SponsorBlockRefreshRecord
+    {
+        $record = SponsorBlockRefreshRecord::select()
+            ->where('broadcastItemId', $broadcastItemId->toString())
+            ->first();
+
+        return $record instanceof SponsorBlockRefreshRecord ? $record : null;
+    }
+
     /** @return list<SponsorBlockRefreshRecord> */
     public function listDue(DateTime $now): array
     {
-        return array_values(SponsorBlockRefreshRecord::select()
+        $records = SponsorBlockRefreshRecord::select()
             ->whereNull('completedAt')
-            ->where('nextCheckAt', '<=', $now)
+            ->where('nextCheckAt <= ? AND expiresAt >= ?', $now, $now)
             ->orderBy('nextCheckAt', Direction::ASC)
-            ->all());
+            ->all();
+
+        return array_values(array_filter($records, static fn (mixed $record): bool => $record instanceof SponsorBlockRefreshRecord));
     }
 
     public function complete(SponsorBlockRefreshRecord $record): void
