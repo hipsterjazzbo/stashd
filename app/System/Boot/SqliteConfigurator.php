@@ -44,7 +44,7 @@ final readonly class SqliteConfigurator
     /** WAL is a persistent database mode, not a per-connection setting. */
     public function enableWriteAheadLogging(): void
     {
-        $this->database->execute(new Query('PRAGMA journal_mode = WAL'));
+        $this->database->fetchFirst(new Query('PRAGMA journal_mode = WAL'));
     }
 
     /** @return array{foreign_keys: int|string, journal_mode: string, busy_timeout: int|string} */

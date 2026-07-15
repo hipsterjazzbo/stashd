@@ -71,6 +71,21 @@ test('sqlite pragmas are enabled on the tempest connection', function (): void {
     }
 });
 
+test('enabling WAL does not retain a SQLite statement that blocks schema migrations', function (): void {
+    $sqlite = $this->container->get(\Tempest\Database\Config\SQLiteConfig::class);
+    $configurator = $this->container->get(SqliteConfigurator::class);
+    $database = $this->container->get(\Tempest\Database\Database::class);
+
+    $configurator->configure($sqlite);
+    $database->execute(new \Tempest\Database\Query('CREATE INDEX `stashes_slug` ON `stashes` (`name`)'));
+    $configurator->enableWriteAheadLogging();
+    $database->execute(new \Tempest\Database\Query('DROP INDEX IF EXISTS `stashes_slug`'));
+
+    expect($database->fetchFirst(new \Tempest\Database\Query(
+        "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'stashes_slug'",
+    )))->toBeNull();
+});
+
 test('migration runner skips backup when no pending migrations remain', function (): void {
     $runner = $this->container->get(MigrationRunner::class);
     $sqlite = $this->container->get(\Tempest\Database\Config\SQLiteConfig::class);
