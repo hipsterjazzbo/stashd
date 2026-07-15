@@ -198,44 +198,6 @@ test('SponsorBlock chapters create a podcast-local remux for the episode', funct
         ->and(file_get_contents($source?->path))->toBe('video-bytes');
 });
 
-test('SponsorBlock chapters create a podcast-local remux for the episode', function (): void {
-    [$headers, $stashId, $mediaItemId] = podcastFeedReadyStash($this, 'podcast-sponsorblock-remux');
-    $config = $this->container->get(StashdConfig::class);
-    $assets = $this->container->get(AssetRepository::class);
-    podcastFeedCreateAsset($config, $assets, $mediaItemId, AssetKind::Video, 'original.mp4', 'video/mp4', 'video-bytes');
-
-    $broadcast = $this->http->post('/api/v1/stashes/' . $stashId . '/broadcasts', [
-        'type' => 'podcast',
-        'name' => 'SponsorBlock Feed',
-        'slug' => 'sponsorblock-feed-' . bin2hex(random_bytes(3)),
-        'settings' => [
-            'media_kind' => 'video',
-            'sponsorblock_enabled' => true,
-            'sponsorblock_categories' => ['sponsor'],
-        ],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->container->get(SponsorBlockTimelineSynchronizer::class)->sync(
-        MediaItemId::parse($mediaItemId),
-        [new SponsorBlockSegment('segment-1', TimelineEntryCategory::Sponsor, 15.0, 30.0, 'Ad read', ['UUID' => 'segment-1'])],
-    );
-
-    $this->http->post('/api/v1/commands', [
-        'type' => 'broadcast.rebuild',
-        'options' => ['broadcast_id' => $broadcast->body['broadcast']['id']],
-    ], headers: $headers)->assertStatus(Status::CREATED);
-    $this->processAllJobs();
-
-    $item = BroadcastItemRecord::select()->where('broadcastId = ?', $broadcast->body['broadcast']['id'])->first();
-    $remux = $assets->findByBroadcastItemAndRole(BroadcastItemId::fromPrimaryKey($item->id), AssetRole::RemuxedVideo);
-    $source = $assets->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::VaultOriginal);
-
-    expect($remux)->not->toBeNull()
-        ->and($remux->path)->not->toBe($source?->path)
-        ->and($remux->path)->toContain($config->broadcastsPath())
-        ->and(file_get_contents($remux->path))->toContain('stub-ffmpeg-remux')
-        ->and(file_get_contents($source?->path))->toBe('video-bytes');
-});
-
 test('caption downloads complete before they queue a podcast rebuild', function (): void {
     [$headers, $stashId, $mediaItemId] = podcastFeedReadyStash($this, 'podcast-captions-complete');
     podcastFeedCreateAsset(
