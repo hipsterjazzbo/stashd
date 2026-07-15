@@ -39,6 +39,7 @@ function useSessionCookieFrom(TestResponseHelper $response): void
 $worker = getenv('TEST_TOKEN') ?: 'default';
 $data = sys_get_temp_dir() . '/stashd-test/' . $worker . '/data';
 $media = sys_get_temp_dir() . '/stashd-test/' . $worker . '/media';
+$databaseConnection = strtolower((string) (getenv('DB_CONNECTION') ?: 'sqlite'));
 
 foreach ([$data, $media] as $directory) {
     if (! is_dir($directory)) {
@@ -48,13 +49,50 @@ foreach ([$data, $media] as $directory) {
 
 putenv('STASHD_DATA_PATH=' . $data);
 putenv('STASHD_MEDIA_PATH=' . $media);
-putenv('DB_DATABASE=' . $data . '/stashd.sqlite');
 $_ENV['STASHD_DATA_PATH'] = $data;
 $_ENV['STASHD_MEDIA_PATH'] = $media;
-$_ENV['DB_DATABASE'] = $data . '/stashd.sqlite';
+
+if ($databaseConnection === 'pgsql') {
+    $databaseBase = preg_replace('/[^a-zA-Z0-9_]+/', '_', (string) (getenv('DB_DATABASE') ?: 'stashd'));
+    $databaseBase = trim((string) $databaseBase, '_') ?: 'stashd';
+    $workerName = preg_replace('/[^a-zA-Z0-9_]+/', '_', $worker);
+    $workerName = trim((string) $workerName, '_') ?: 'default';
+    $databaseName = substr($databaseBase, 0, 40) . '_test_' . substr($workerName, 0, 16);
+
+    $host = (string) (getenv('DB_HOST') ?: '127.0.0.1');
+    $port = (string) (getenv('DB_PORT') ?: '5432');
+    $username = (string) (getenv('DB_USERNAME') ?: 'postgres');
+    $password = (string) (getenv('DB_PASSWORD') ?: '');
+    $adminDatabase = (string) (getenv('DB_ADMIN_DATABASE') ?: 'postgres');
+    $pdo = new PDO(
+        "pgsql:host={$host};port={$port};dbname={$adminDatabase}",
+        $username,
+        $password,
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
+    );
+    $databaseExists = $pdo->prepare('SELECT 1 FROM pg_database WHERE datname = ?');
+    $databaseExists->execute([$databaseName]);
+
+    if ($databaseExists->fetchColumn() === false) {
+        try {
+            $pdo->exec(sprintf('CREATE DATABASE "%s"', $databaseName));
+        } catch (PDOException $exception) {
+            if ($exception->getCode() !== '42P04') {
+                throw $exception;
+            }
+        }
+    }
+
+    putenv('DB_DATABASE=' . $databaseName);
+    $_ENV['DB_DATABASE'] = $databaseName;
+} else {
+    $databasePath = $data . '/stashd.sqlite';
+    putenv('DB_DATABASE=' . $databasePath);
+    $_ENV['DB_DATABASE'] = $databasePath;
+}
 
 pest()->extend(IntegrationTestCase::class)
-    ->beforeEach(function () use ($media): void {
+    ->beforeEach(function () use ($databaseConnection, $media): void {
         $wipe = null;
         $wipe = static function (string $directory) use (&$wipe): void {
             if (! is_dir($directory)) {
@@ -95,7 +133,9 @@ pest()->extend(IntegrationTestCase::class)
         $this->useTestingDatabase();
         $this->database->reset();
 
-        $sqlite = $this->container->get(\Tempest\Database\Config\SQLiteConfig::class);
-        $this->container->get(\App\System\Boot\SqliteConfigurator::class)->configure($sqlite);
+        if ($databaseConnection === 'sqlite') {
+            $sqlite = $this->container->get(\Tempest\Database\Config\SQLiteConfig::class);
+            $this->container->get(\App\System\Boot\SqliteConfigurator::class)->configure($sqlite);
+        }
     })
     ->in('Feature');
