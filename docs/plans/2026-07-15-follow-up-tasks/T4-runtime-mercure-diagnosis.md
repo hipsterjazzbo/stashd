@@ -50,3 +50,36 @@ This is a diagnosis-first task. Reproduce and characterize before changing code 
 - Any implemented fix survives repeated process and full-site restarts and leaves all supervised processes
   healthy.
 - Relevant focused checks and Docker/runtime smoke pass, or every unrun/blocked check is explicitly recorded.
+
+## Findings — 2026-07-15
+
+| Scenario | Result | Evidence |
+| --- | --- | --- |
+| Full Lerd site restart | Recovered cleanly | FrankenPHP, scheduler, and all three job workers entered `RUNNING` within 10 seconds; no Mercure Bolt error recurred. |
+| Normal proxied API request | 403 in 349 ms; no app diagnostic headers | Lerd nginx logged `connect() failed` and `send() to syslog failed` for its missing `lerd-access.sock` on the same request. |
+| Lerd watcher | Repeats every minute against an unrelated worktree | It runs dependency installation, then reports `unable to open database file` and missing Lerd `npm`; this is separate from the active application container. |
+
+### Root cause and ownership
+
+The active Stashd custom container is healthy. The reproducible faults are in Lerd's host services:
+
+- nginx is configured to write every access record to `unix:/home/hazel/.local/share/lerd/run/lerd-access.sock`, but that socket is absent. This emits an alert and a failed send for every proxied request.
+- the Lerd watcher repeatedly installs dependencies in `.claude/worktrees/composed-seeking-wombat`; that environment has neither its expected npm binary nor the active Stashd database path.
+
+Neither fault proves a Mercure failure. The earlier `invalid transport: timeout` did not recur after the full site restart, so no Stashd/Mercure code change is justified from this evidence.
+
+### Active database and safe migration command
+
+The active custom container uses its mounted `.env`: `DB_DATABASE=database/database.sqlite`, resolving to `/data/database/database.sqlite`. The checkout/host CLI may target a different database.
+
+Run migrations only inside the active container:
+
+```sh
+podman exec lerd-custom-stashd php tempest stashd:boot
+```
+
+Do not run a host/standalone PHP migration command against this site until Lerd makes its database target explicit.
+
+### Handoff
+
+Repair the missing Lerd access-log socket and stop/fix the runaway worktree watcher in Lerd. Then repeat one authenticated browser request and compare browser duration, `Server-Timing`, `X-Stashd-Request-Id`, application log, and nginx access log. No application change was made by this diagnosis.
