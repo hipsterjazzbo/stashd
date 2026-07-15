@@ -43,6 +43,14 @@ test('stash.retry_failed retries every failed item in the stash, ignores non-fai
         'type' => 'stash.retry_failed',
         'options' => ['stash_id' => $stashIdA],
     ], headers: $headers)->assertStatus(Status::CREATED);
+
+    $worker = $this->container->get(\App\Jobs\JobWorkerService::class);
+    expect($worker->processNextJob())->toBeTrue();
+
+    foreach ($failedMediaItemIdsA as $mediaItemId) {
+        expect($mediaItems->find(MediaItemId::parse($mediaItemId))->state)->toBe(MediaItemState::DownloadPending);
+    }
+
     $this->processAllJobs();
 
     $command = $this->http->get('/api/v1/commands/' . $response->body['command_id'], headers: $headers)->assertOk();

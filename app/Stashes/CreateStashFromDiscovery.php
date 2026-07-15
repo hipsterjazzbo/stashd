@@ -130,11 +130,7 @@ final readonly class CreateStashFromDiscovery
             }
 
             if ($isFirstInput && $stash->name === 'New Stash' && $resolved->sourceTitle !== null) {
-                $this->stashes->update(
-                    $stash,
-                    name: $resolved->sourceTitle,
-                    slug: $this->stashes->nextAvailableSlug($this->stashes->slugify($resolved->sourceTitle)),
-                );
+                $this->stashes->update($stash, name: $resolved->sourceTitle);
             }
 
             $stashInputId = StashInputId::fromPrimaryKey($stashInput->id);

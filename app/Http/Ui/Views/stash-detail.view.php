@@ -5,7 +5,10 @@
 	<div x-data="stashDetail('<?= htmlspecialchars($id) ?>')">
 		<div class="mb-6 flex items-center justify-between">
 			<h1 class="text-base font-semibold text-cream">Stash</h1>
-			<p class="text-[13px] text-error" x-show="error" x-text="error"></p>
+			<div class="text-right text-[13px]">
+				<p class="text-error" x-show="error" x-text="error"></p>
+				<p class="text-success" x-show="actionFeedback" x-text="actionFeedback"></p>
+			</div>
 		</div>
 
 		<template x-if="loading">
@@ -35,7 +38,6 @@
 								class="rounded border border-line px-2 py-1 text-[12px] text-error transition-colors hover:bg-error/10">Delete</button>
 						</div>
 					</div>
-					<p class="mt-1 font-mono text-[12px] text-muted" x-text="stash?.slug"></p>
 					<p class="mt-2 text-[13px] text-muted">
 						<span x-text="stash?.sync_mode"></span>
 						·
@@ -249,6 +251,14 @@
 										<span x-show="actionPending === broadcast.id + ':rotate_token'" class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
 										rotate token
 									</button>
+									<button type="button"
+										class="inline-flex items-center gap-1.5 rounded border border-error/60 px-2 py-1 text-[12px] text-error transition-colors hover:border-error hover:text-cream disabled:opacity-50"
+										x-bind:disabled="actionPending === broadcast.id + ':delete' || broadcastJobFor(broadcast.id)"
+										x-on:click="deleteBroadcast(broadcast)">
+										<span x-show="actionPending === broadcast.id + ':delete'" class="h-1.5 w-1.5 rounded-full bg-amber pulse-dot"></span>
+										<span x-show="actionPending !== broadcast.id + ':delete'">delete</span>
+										<span x-show="actionPending === broadcast.id + ':delete'">queueing…</span>
+									</button>
 									</div>
 								</details>
 								</div>
@@ -337,6 +347,12 @@
 						<input type="text" x-model="newBroadcastDestinationPath" placeholder="Destination path (optional) — e.g. /mnt/nas/media/TV"
 							class="mt-2 w-full rounded border border-line bg-espresso px-3 py-2 text-cream outline-none focus:border-amber"/>
 
+						<label class="mt-2 flex items-center gap-2 text-[12px] text-muted">
+							<input type="checkbox" x-model="newBroadcastSponsorBlockEnabled" x-on:change="cancelBroadcastPreview()"
+								class="rounded border-line bg-espresso text-amber focus:ring-amber"/>
+							<span>Skip SponsorBlock sponsor segments (experimental; creates broadcast-local media)</span>
+						</label>
+
 						<p class="mt-2 text-[12px] text-muted" x-show="isSeriesBroadcastType(newBroadcastType) && inputs.length > 1">
 							Multiple inputs go into Season 01 by default — you can map each one to its own season from this broadcast's card once it's created.
 						</p>
@@ -405,7 +421,8 @@
 							<button type="button" class="ml-1 rounded border border-line px-2 py-0.5 text-muted transition-colors hover:text-cream disabled:opacity-50"
 								x-bind:disabled="actionPending === 'retry-all'"
 								x-on:click="retryAllFailed()">
-								retry all failed
+								<span x-show="actionPending !== 'retry-all'">retry all failed</span>
+								<span x-show="actionPending === 'retry-all'">queueing…</span>
 							</button>
 							<button type="button" class="ml-1 rounded border border-line px-2 py-0.5 text-muted transition-colors hover:text-cream" x-show="ignoredItemCount() > 0"
 								x-on:click="showIgnored = !showIgnored">
@@ -434,7 +451,7 @@
 							class="rounded border border-line bg-espresso px-2 py-1 text-[12px] text-cream outline-none focus:border-amber">
 							<option value="all">All statuses</option>
 							<template x-for="status in itemStatusOptions()" x-bind:key="status">
-								<option x-bind:value="status" x-text="status.replace(/_/g, ' ')"></option>
+								<option x-bind:value="status" x-text="statusBadge(status).label"></option>
 							</template>
 						</select>
 					</div>
@@ -490,7 +507,8 @@
 												class="ml-2 rounded border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:text-cream disabled:opacity-50"
 												x-bind:disabled="actionPending === row.item.id + ':retry'"
 												x-on:click="retryDownload(row.item)">
-												retry
+												<span x-show="actionPending !== row.item.id + ':retry'">retry</span>
+												<span x-show="actionPending === row.item.id + ':retry'">queueing…</span>
 											</button>
 											<p class="mt-1 text-[12px] text-muted" x-show="row.item.state === 'ignored'" x-text="'ignored: ' + (row.item.ignored_reason ?? 'unknown reason').replace(/_/g, ' ')"></p>
 										</td>

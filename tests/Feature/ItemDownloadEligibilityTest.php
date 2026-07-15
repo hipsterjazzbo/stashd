@@ -20,7 +20,7 @@ test('item.download is rejected for an ignored stash item, surfacing the ignored
     $items = $this->container->get(StashItemRepository::class);
     $media = $this->container->get(MediaItemRepository::class);
 
-    $stash = $stashes->create(name: 'Eligibility Spike', slug: 'eligibility-spike-' . bin2hex(random_bytes(3)));
+    $stash = $stashes->create(name: 'Eligibility Spike');
     $stashId = StashId::fromPrimaryKey($stash->id);
 
     $mediaItem = $media->create(

@@ -638,6 +638,7 @@ paths:
                 slug: { type: string, description: Derived from name if omitted }
                 settings:
                   type: object
+                  description: "For SponsorBlock-derived media, set sponsorblock_enabled: true and sponsorblock_categories to a non-empty category list (for example, [sponsor])."
                   additionalProperties: true
       responses:
         "201":
@@ -675,6 +676,7 @@ paths:
               properties:
                 type: { $ref: "#/components/schemas/BroadcastType" }
                 mediaKind: { type: string, description: "PodcastMediaKind (audio/video); only relevant for type=podcast." }
+                sponsorblockEnabled: { type: boolean, description: "Whether the preview should include broadcast-local SponsorBlock-derived media." }
       responses:
         "200":
           description: Preview
@@ -1431,7 +1433,6 @@ components:
       properties:
         id: { type: string }
         name: { type: string }
-        slug: { type: string }
         description: { type: string, nullable: true }
         sync_mode: { $ref: "#/components/schemas/SyncMode" }
         download_policy: { $ref: "#/components/schemas/DownloadPolicy" }

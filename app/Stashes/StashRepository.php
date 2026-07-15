@@ -16,8 +16,6 @@ use function Tempest\Database\query;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
-use function Tempest\Support\str;
-
 final class StashRepository
 {
     public function __construct(
@@ -32,7 +30,6 @@ final class StashRepository
 
     public function create(
         string $name,
-        string $slug,
         SyncMode $syncMode = SyncMode::Automatic,
         DownloadPolicy $downloadPolicy = DownloadPolicy::Video,
         OrganizationMode $organizationMode = OrganizationMode::Flat,
@@ -42,7 +39,6 @@ final class StashRepository
         $id = $this->ids->generate('stash')->toString();
         $record = new StashRecord(
             name: $name,
-            slug: $slug,
             syncMode: $syncMode,
             downloadPolicy: $downloadPolicy,
             organizationMode: $organizationMode,
@@ -63,11 +59,6 @@ final class StashRepository
     public function find(StashId $id): ?StashRecord
     {
         return StashRecord::findById($id->toPrimaryKey());
-    }
-
-    public function findBySlug(string $slug): ?StashRecord
-    {
-        return StashRecord::select()->where('slug', $slug)->first();
     }
 
     /**
@@ -92,44 +83,6 @@ final class StashRepository
         return $stashes;
     }
 
-    public function slugify(string $name): string
-    {
-        $slug = str($name)->slug()->toString();
-
-        return $slug !== '' ? $slug : 'stash';
-    }
-
-    /**
-     * Returns `$base` if it is free, otherwise the lowest unused `$base-N` (N starts at 1).
-     */
-    public function nextAvailableSlug(string $base): string
-    {
-        $taken = array_map(
-            static fn (StashRecord $stash): string => $stash->slug,
-            StashRecord::select()->where('slug = ? OR slug LIKE ?', $base, $base . '-%')->all(),
-        );
-
-        if (! in_array($base, $taken, true)) {
-            return $base;
-        }
-
-        $usedOrdinals = [];
-
-        foreach ($taken as $slug) {
-            if (preg_match('/^' . preg_quote($base, '/') . '-(\d+)$/', $slug, $match)) {
-                $usedOrdinals[(int) $match[1]] = true;
-            }
-        }
-
-        $ordinal = 1;
-
-        while (isset($usedOrdinals[$ordinal])) {
-            $ordinal++;
-        }
-
-        return "{$base}-{$ordinal}";
-    }
-
     /** @return list<StashRecord> */
     public function list(): array
     {
@@ -141,7 +94,6 @@ final class StashRepository
     public function update(
         StashRecord $stash,
         ?string $name = null,
-        ?string $slug = null,
         ?string $description = null,
         ?SyncMode $syncMode = null,
         ?DownloadPolicy $downloadPolicy = null,
@@ -150,10 +102,6 @@ final class StashRepository
     ): StashRecord {
         if ($name !== null) {
             $stash->name = $name;
-        }
-
-        if ($slug !== null) {
-            $stash->slug = $slug;
         }
 
         if ($description !== null) {

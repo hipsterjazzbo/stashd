@@ -31,8 +31,7 @@ test('PATCH stash updates provided fields and leaves others unchanged', function
     $response->assertOk();
     expect($response->body['stash']['name'])->toBe('Renamed Stash')
         ->and($response->body['stash']['sync_mode'])->toBe('manual')
-        ->and($response->body['stash']['download_policy'])->toBe($before->downloadPolicy->value)
-        ->and($response->body['stash']['slug'])->toBe($before->slug);
+        ->and($response->body['stash']['download_policy'])->toBe($before->downloadPolicy->value);
 
     $after = StashRecord::findById(new PrimaryKey($stashId));
     expect($after->name)->toBe('Renamed Stash')

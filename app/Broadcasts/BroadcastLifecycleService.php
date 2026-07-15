@@ -10,6 +10,9 @@ use App\Broadcasts\Podcasts\PodcastTokenService;
 use App\Stashes\StashId;
 use App\System\State\StateTransitionService;
 use App\Vault\AssetKind;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use SplFileInfo;
 use Tempest\DateTime\DateTime;
 use Tempest\DateTime\Timezone;
 
@@ -54,6 +57,7 @@ final readonly class BroadcastLifecycleService
         private BroadcastTriggerService $triggers,
         private PodcastTokenService $podcastTokens,
         private StateTransitionService $transitions,
+        private BroadcastPathBuilder $paths,
     ) {
     }
 
@@ -278,6 +282,45 @@ final readonly class BroadcastLifecycleService
         $plugin = $this->resolvePlugin($context->broadcast->type);
 
         return $plugin->plugin->prune($context);
+    }
+
+    public function delete(BroadcastId $broadcastId): BroadcastDeleteResult
+    {
+        $broadcast = $this->broadcasts->find($broadcastId)
+            ?? throw BroadcastException::withCode('broadcast_not_found', 'Broadcast not found.');
+        $root = $this->paths->assertOwnsRoot($broadcast);
+        $removedCount = 0;
+
+        if (is_link($root)) {
+            throw BroadcastException::withCode('broadcast_destination_conflict', 'Broadcast root cannot be a symlink.');
+        }
+
+        if (is_dir($root)) {
+            /** @var SplFileInfo $entry */
+            foreach (new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($root, RecursiveDirectoryIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::CHILD_FIRST,
+            ) as $entry) {
+                $path = $entry->getPathname();
+                $deleted = $entry->isDir() && ! $entry->isLink()
+                    ? @rmdir($path)
+                    : @unlink($path);
+
+                if (! $deleted) {
+                    throw BroadcastException::withCode('broadcast_delete_failed', 'Could not remove generated broadcast output.');
+                }
+
+                $removedCount++;
+            }
+
+            if (! @rmdir($root)) {
+                throw BroadcastException::withCode('broadcast_delete_failed', 'Could not remove generated broadcast output.');
+            }
+        }
+
+        $this->broadcasts->delete($broadcast);
+
+        return new BroadcastDeleteResult($removedCount);
     }
 
     public function trigger(BroadcastId $broadcastId): BroadcastTriggerResult

@@ -474,7 +474,7 @@ test('scheduler creates preflight commands for due automatic stash inputs', func
     $inputRepo = $this->container->get(\App\Stashes\StashInputRepository::class);
     $scheduler = $this->container->get(\App\System\Scheduler\RoutineDiscoveryScheduler::class);
 
-    $stash = $stashRepo->create('Scheduler Stash', 'scheduler-stash');
+    $stash = $stashRepo->create('Scheduler Stash');
     $inputRepo->create(
         stashId: \App\Stashes\StashId::parse((string) $stash->id),
         providerKey: 'fake',

@@ -28,6 +28,7 @@ test('podcast feed builder emits valid escaped deterministic rss', function (): 
             enclosureUrl: 'http://localhost:8474/b/feed-token/items/item-token/episode.mp3',
             enclosureLength: 456,
             enclosureMimeType: 'audio/mpeg',
+            durationSeconds: 456,
             imageUrl: 'https://example.com/episode.jpg',
         ),
         new PodcastEpisode(
@@ -50,6 +51,8 @@ test('podcast feed builder emits valid escaped deterministic rss', function (): 
         ->and($first)->toContain('url="http://localhost:8474/b/feed-token/items/item-token-1/episode.mp3"')
         ->and($first)->toContain('length="123"')
         ->and($first)->toContain('type="audio/mpeg"')
+        ->and($first)->toContain('<itunes:duration>456</itunes:duration>')
+        ->and(substr_count($first, '<itunes:duration>'))->toBe(1)
         ->and($first)->toContain('<podcast:guid>917393e3-1b1e-5cef-ace4-edaa54e1f810</podcast:guid>')
         ->and($first)->toContain('<br />')
         ->and($first)->toContain('<a href="https://example.com/support">https://example.com/support</a>')

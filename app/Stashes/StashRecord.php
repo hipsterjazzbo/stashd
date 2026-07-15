@@ -23,7 +23,6 @@ final class StashRecord
 
     public function __construct(
         public string $name,
-        public string $slug,
         public SyncMode $syncMode,
         public DownloadPolicy $downloadPolicy,
         public OrganizationMode $organizationMode,

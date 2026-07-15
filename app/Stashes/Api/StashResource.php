@@ -25,7 +25,6 @@ final readonly class StashResource
         return ApiJson::encode([
             'id' => (string) $this->stash->id,
             'name' => $this->stash->name,
-            'slug' => $this->stash->slug,
             'description' => $this->stash->description,
             'syncMode' => $this->stash->syncMode->value,
             'downloadPolicy' => $this->stash->downloadPolicy->value,

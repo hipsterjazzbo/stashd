@@ -94,7 +94,7 @@
   - `ProviderDates` parses/constructs `Tempest\DateTime\DateTime` (`tryParse()`, `utc()`)
   - `YouTubeUris` centralizes watch/feed/oembed/Data API URL construction
   - `DiscoveredItem` / `ResolvedInput` hold `StashdUri` + `DateTime`; serializers/repos emit `toString()` / `toRfc3339(useZ: true)` for JSON/DB
-  - String manipulation via `Tempest\Support\str()` (trim, slug, path parsing) instead of raw PHP helpers
+  - String manipulation via `Tempest\Support\str()` (trim and path parsing) instead of raw PHP helpers
 - [x] Wired into async `stash.preflight` + `stash.create_from_preflight` (media-item dedupe preserved)
 - [x] Fixtures under `tests/fixtures/providers/youtube/`; no live YouTube in normal CI
 - [x] Covered by `tests/Unit/Domain/Provider/YouTube/*`, `tests/Feature/YouTubeProviderTest.php`
@@ -258,7 +258,7 @@ Stashes/Vault, Create Stash + Settings, and the Slice 6 refinement/multi-input p
 
 ### Slice 5 — Create Stash flow + Settings + broadcast creation (complete)
 
-- [x] Create Stash (`GET /stashes/new`): paste-URL → `stash.preflight` → review (item count, total duration) → configure (name, download policy prominent; sync mode/organization mode/slug/description under a collapsed "advanced options" disclosure) → `stash.create_from_preflight` → redirect to the new stash. No disk-size/impact-warning estimates — backend doesn't compute them yet (spec-only).
+- [x] Create Stash (`GET /stashes/new`): paste-URL → `stash.preflight` → review (item count, total duration) → configure (name, download policy prominent; sync mode/organization mode/description under a collapsed "advanced options" disclosure) → `stash.create_from_preflight` → redirect to the new stash. No disk-size/impact-warning estimates — backend doesn't compute them yet (spec-only).
 - [x] Settings (`GET /settings`): API tokens (create-once display, list, revoke), media-server connections (create/list/test/delete), and read-only system/storage info, all against already-existing endpoints — no backend changes needed.
 - [x] Broadcast creation: Stash detail gained a minimal "new broadcast" form (type + name) — there was previously no UI anywhere to create one, only to act on existing ones. Found during this slice's planning, not in the original scope.
 

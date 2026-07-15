@@ -68,6 +68,9 @@ final readonly class PodcastFeedBuilder
             $xml .= '      <enclosure url="' . $this->escape($episode->enclosureUrl) . '" length="'
                 . $episode->enclosureLength
                 . '" type="' . $this->escape($episode->enclosureMimeType) . "\" />\n";
+            if ($episode->durationSeconds !== null) {
+                $xml .= '      <itunes:duration>' . $episode->durationSeconds . "</itunes:duration>\n";
+            }
             if ($episode->imageUrl !== null) {
                 $xml .= '      <itunes:image href="' . $this->escape($episode->imageUrl) . "\" />\n";
             }

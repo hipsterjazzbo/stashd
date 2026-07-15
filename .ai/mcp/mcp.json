@@ -6,15 +6,6 @@
                 "@modelcontextprotocol/server-sequential-thinking"
             ],
             "command": "npx"
-        },
-        "lerd": {
-            "args": [
-                "mcp"
-            ],
-            "command": "lerd",
-            "env": {
-                "LERD_SITE_PATH": "/home/hazel/Projects/stashd"
-            }
         }
     }
 }

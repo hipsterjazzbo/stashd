@@ -46,6 +46,12 @@ Tempest's stock `GenericResponseSender` only knows how to stream a `Generator` b
 
 Replaced the RoadRunner-era SQLite-poll SSE endpoint with FrankenPHP's embedded Mercure hub (`docker/Caddyfile`'s `mercure` block). `App\System\Event\MercurePublisher` publishes the same five event types over HTTP to `/.well-known/mercure` (from both web requests and out-of-process worker/scheduler CLI roles, which can't use the `mercure_publish()` function). Job events carry a safe job summary (never the job payload); activity events carry the activity resource. Subscribers need a JWT: `GET /api/v1/events/subscription` (behind `RequireAuthMiddleware`) mints one via `AuthService::issueMercureSubscriberToken()` and sets it as the `mercureAuthorization` cookie, scoped to `/.well-known/mercure`. The frontend uses one shared `EventSource`, patches live jobs/activity in memory, and does one authoritative page resync after a reconnect or when a tab becomes visible. It polls only in browsers without `EventSource` support.
 
+## Request diagnostics
+
+Every `/api/v1/` response includes `Server-Timing: app;dur=…` and an `X-Stashd-Request-Id` correlation header. Browser developer tools therefore show both total request time and time spent inside the PHP application. The frontend also writes a console diagnostic for requests taking at least 500 ms, server errors, and requests that fail before any response arrives.
+
+The application log records API requests taking at least 500 ms and all API server failures. Entries contain the request ID, HTTP method, path without its query string, status, and application duration. Search the application log for the request ID shown in a failed-response message or browser console entry; raw request bodies, query strings, and tokenized public routes are deliberately excluded.
+
 ## Podcast media
 
 `PodcastEpisodeController` authorizes the tokenized request and returns an internal redirect. Caddy serves the selected Vault asset directly, including range requests, so episode bytes do not pass through PHP.

@@ -55,13 +55,48 @@ function wireLogout(): void {
 /** Thrown by apiFetch on 401/403, after it has already redirected to /login. */
 class UnauthenticatedError extends Error {}
 
+const SLOW_API_REQUEST_MILLISECONDS = 500
+
+function apiDiagnosticPath(path: string): string {
+	try {
+		return new URL(path, window.location.origin).pathname
+	} catch {
+		return '/api/v1/[invalid-path]'
+	}
+}
+
 /**
  * Shared fetch wrapper for every /api/v1 call made from the dashboard shell.
  * Sends the session cookie, and treats 401/403 as "bounce to /login" rather
  * than something each call site needs to check for itself.
  */
 async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-	const response = await fetch(path, { ...init, credentials: 'same-origin' })
+	const startedAt = performance.now()
+	const diagnosticPath = apiDiagnosticPath(path)
+	let response: Response
+
+	try {
+		response = await fetch(path, { ...init, credentials: 'same-origin' })
+	} catch (cause) {
+		console.warn('Stashd API request failed before receiving a response.', {
+			method: init.method ?? 'GET',
+			path: diagnosticPath,
+			duration_ms: Math.round(performance.now() - startedAt),
+		})
+		throw cause
+	}
+
+	const duration = performance.now() - startedAt
+	if (duration >= SLOW_API_REQUEST_MILLISECONDS || response.status >= 500) {
+		console.warn('Stashd API request diagnostic.', {
+			method: init.method ?? 'GET',
+			path: diagnosticPath,
+			status: response.status,
+			duration_ms: Math.round(duration),
+			server_timing: response.headers.get('Server-Timing'),
+			request_id: response.headers.get('X-Stashd-Request-Id'),
+		})
+	}
 
 	if (response.status === 401 || response.status === 403) {
 		window.location.assign('/login')
@@ -219,7 +254,7 @@ const STATE_BADGES: Record<string, Badge> = {
 	hidden: { label: 'hidden', dot: 'bg-muted', text: 'text-muted' },
 	discovered: { label: 'discovered', dot: 'bg-muted', text: 'text-muted' },
 	metadata_ready: { label: 'metadata ready', dot: 'bg-amber', text: 'text-amber' },
-	download_pending: { label: 'download pending', dot: 'bg-amber', text: 'text-amber' },
+	download_pending: { label: 'queued', dot: 'bg-amber', text: 'text-amber' },
 	downloading: { label: 'downloading', dot: 'bg-amber', text: 'text-amber' },
 }
 
@@ -693,7 +728,6 @@ interface CommandShowResponse {
 interface StashSummary {
 	id: string
 	name: string
-	slug: string
 	description: string | null
 	sync_mode: string
 	download_policy: string
@@ -915,11 +949,14 @@ interface LibrarySummary {
 }
 
 async function describeFailedResponse(response: Response): Promise<string> {
+	const requestId = response.headers.get('X-Stashd-Request-Id')
+	const reference = requestId ? ` [request ${requestId}]` : ''
+
 	try {
 		const body = (await response.json()) as { error?: { message?: string } }
-		return body.error?.message ?? `HTTP ${response.status}`
+		return `${body.error?.message ?? `HTTP ${response.status}`}${reference}`
 	} catch {
-		return `HTTP ${response.status}`
+		return `HTTP ${response.status}${reference}`
 	}
 }
 
@@ -1288,8 +1325,10 @@ function stashDetailComponent(stashId: string) {
 		broadcasts: [] as BroadcastSummary[],
 		broadcastPlugins: [] as BroadcastPluginSummary[],
 		actionPending: null as string | null,
+		actionFeedback: null as string | null,
 		newBroadcastType: 'podcast',
 		newBroadcastMediaKind: 'audio',
+		newBroadcastSponsorBlockEnabled: false,
 		newBroadcastName: '',
 		newBroadcastDestinationPath: '',
 		creatingBroadcast: false,
@@ -1490,6 +1529,7 @@ function stashDetailComponent(stashId: string) {
 				const response = await apiFetch('/api/v1/broadcast-plugins')
 				const body = await response.json()
 				this.broadcastPlugins = body.plugins ?? this.broadcastPlugins
+				this.newBroadcastType = this.broadcastPlugins[0]?.key ?? this.newBroadcastType
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
 				this.error = 'Could not reach the server.'
@@ -1647,7 +1687,7 @@ function stashDetailComponent(stashId: string) {
 		// a client-side tally over the current page.
 		itemStatusSummary(): Array<{ label: string; filter: string }> {
 			return ITEM_STATUS_OPTIONS.filter((status) => (this.itemStatusCounts[status] ?? 0) > 0).map((status) => ({
-				label: `${this.itemStatusCounts[status]} ${status.replace(/_/g, ' ')}`,
+				label: `${this.itemStatusCounts[status]} ${statusBadge(status).label}`,
 				filter: status,
 			}))
 		},
@@ -1688,8 +1728,9 @@ function stashDetailComponent(stashId: string) {
 		// the same command the initial download used, just issued again.
 		async retryDownload(item: StashItemSummary) {
 			this.actionPending = `${item.id}:retry`
+			this.actionFeedback = null
 			try {
-				await apiFetch('/api/v1/commands', {
+				const response = await apiFetch('/api/v1/commands', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
@@ -1697,6 +1738,12 @@ function stashDetailComponent(stashId: string) {
 						options: { media_item_id: item.media_item_id, stash_id: item.stash_id },
 					}),
 				})
+				if (!response.ok) {
+					this.error = await describeFailedResponse(response)
+					return
+				}
+				this.error = null
+				this.actionFeedback = 'Retry queued.'
 				await this.refresh()
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
@@ -1712,8 +1759,9 @@ function stashDetailComponent(stashId: string) {
 		// retries all of them.
 		async retryAllFailed() {
 			this.actionPending = 'retry-all'
+			this.actionFeedback = null
 			try {
-				await apiFetch('/api/v1/commands', {
+				const response = await apiFetch('/api/v1/commands', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
@@ -1721,6 +1769,12 @@ function stashDetailComponent(stashId: string) {
 						options: { stash_id: stashId },
 					}),
 				})
+				if (!response.ok) {
+					this.error = await describeFailedResponse(response)
+					return
+				}
+				this.error = null
+				this.actionFeedback = 'Retries queued.'
 				await this.refresh()
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
@@ -1784,6 +1838,29 @@ function stashDetailComponent(stashId: string) {
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
 				this.error = 'Could not run that action.'
+			} finally {
+				this.actionPending = null
+			}
+		},
+
+		async deleteBroadcast(broadcast: BroadcastSummary) {
+			if (!window.confirm(`Delete “${broadcast.name}”? This removes its generated files but keeps Vault media.`)) return
+
+			this.actionPending = `${broadcast.id}:delete`
+			this.actionFeedback = null
+			try {
+				const response = await apiFetch(`/api/v1/broadcasts/${broadcast.id}`, { method: 'DELETE' })
+				if (!response.ok) {
+					this.error = await describeFailedResponse(response)
+					return
+				}
+
+				this.error = null
+				this.actionFeedback = 'Broadcast deletion queued.'
+				await this.refresh()
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not reach the server.'
 			} finally {
 				this.actionPending = null
 			}
@@ -1914,6 +1991,7 @@ function stashDetailComponent(stashId: string) {
 					body: JSON.stringify({
 						type: this.newBroadcastType,
 						...(this.newBroadcastType === 'podcast' ? { mediaKind: this.newBroadcastMediaKind } : {}),
+						...(this.newBroadcastSponsorBlockEnabled ? { sponsorblockEnabled: true } : {}),
 					}),
 				})
 				if (!response.ok) {
@@ -1962,6 +2040,10 @@ function stashDetailComponent(stashId: string) {
 		async createBroadcast() {
 			this.creatingBroadcast = true
 			const settings: Record<string, unknown> = this.newBroadcastType === 'podcast' ? { media_kind: this.newBroadcastMediaKind } : {}
+			if (this.newBroadcastSponsorBlockEnabled) {
+				settings.sponsorblock_enabled = true
+				settings.sponsorblock_categories = ['sponsor']
+			}
 			const destinationPath = this.newBroadcastDestinationPath.trim()
 			if (destinationPath !== '') settings.destination_path = destinationPath
 			const name = this.newBroadcastName.trim()
@@ -1982,6 +2064,7 @@ function stashDetailComponent(stashId: string) {
 				}
 				this.newBroadcastName = ''
 				this.newBroadcastDestinationPath = ''
+				this.newBroadcastSponsorBlockEnabled = false
 				this.broadcastPreview = null
 				this.error = null
 				await this.refresh()

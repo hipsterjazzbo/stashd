@@ -23,7 +23,7 @@ beforeEach(function (): void {
     $media = $this->container->get(MediaItemRepository::class);
     $assets = $this->container->get(AssetRepository::class);
 
-    $stash = $stashes->create(name: 'Filter Spike', slug: 'filter-spike-' . bin2hex(random_bytes(3)));
+    $stash = $stashes->create(name: 'Filter Spike');
     $this->stashId = StashId::fromPrimaryKey($stash->id);
 
     $seed = [
