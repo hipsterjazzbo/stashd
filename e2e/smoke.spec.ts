@@ -63,13 +63,13 @@ test('selected broadcast type is sent through preview and creation', async ({ pa
 
 	await page.getByText('+ Add broadcast').click();
 	const typeSelect = page.locator('select[x-model="newBroadcastType"]');
-	await expect(typeSelect).toHaveValue('jellyfin');
+	await expect(typeSelect).toHaveValue('podcast');
 
 	const previewRequest = page.waitForRequest((request) =>
 		request.method() === 'POST' && request.url().endsWith('/broadcasts/preview'),
 	);
 	await page.getByRole('button', { name: 'Preview', exact: true }).click();
-	expect((await previewRequest).postDataJSON()).toMatchObject({ type: 'jellyfin' });
+	expect((await previewRequest).postDataJSON()).toMatchObject({ type: 'podcast' });
 	await expect(page.getByText('What this will do')).toBeVisible();
 
 	const createResponse = page.waitForResponse((response) =>
@@ -80,5 +80,5 @@ test('selected broadcast type is sent through preview and creation', async ({ pa
 	const response = await createResponse;
 	expect(response.ok()).toBeTruthy();
 	const body = await response.json() as { broadcast: { type: string } };
-	expect(body.broadcast.type).toBe('jellyfin');
+	expect(body.broadcast.type).toBe('podcast');
 });
