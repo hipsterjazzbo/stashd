@@ -9,7 +9,7 @@ use App\Broadcasts\StashdBroadcast;
 /**
  * Plex-friendly series layout with SxxExxx naming and NFO sidecars.
  */
-#[StashdBroadcast('Plex Series', 'Plex-compatible series layout with SxxExxx naming, NFO sidecars, and poster hardlinks.')]
+#[StashdBroadcast('Plex Series', 'Plex-compatible series layout with SxxExxx naming, NFO sidecars, captions, and poster hardlinks.')]
 final class PlexBroadcastPlugin extends AbstractSeriesBroadcastPlugin
 {
     protected function broadcastKey(): string

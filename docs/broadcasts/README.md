@@ -16,6 +16,7 @@ Deleting a broadcast is asynchronous. It removes only its marker-owned generated
 - Media-server-friendly layout with `SxxExxx - Title.ext` episode names
 - Minimal deterministic NFO sidecars (`tvshow.nfo`, per-episode `.nfo`)
 - Optional poster hardlink when Vault thumbnail exists and hardlink succeeds (skipped otherwise)
+- Optional creator or auto-generated YouTube captions, hardlinked beside each episode as `Episode.language.vtt`
 - Scan triggers via Jellyfin/Plex HTTP clients (see `docs/media-servers/README.md`)
 - `broadcast.trigger` command + optional `auto_trigger_scan` after rebuild
 
@@ -183,6 +184,7 @@ publish/verify/prune checks that marker before touching anything:
   poster.jpg                    # optional hardlink when available
   Season 01/
     S01E001 - Episode-title.ext
+    S01E001 - Episode-title.en.vtt      # optional hardlinked caption
     S01E001 - Episode-title.nfo
     S01E002 - Another-title.ext
 
@@ -262,7 +264,7 @@ A broadcast or item becomes `stale` when:
 - Hardlink target is invalid (inode mismatch)
 - Expected NFO sidecar is missing (jellyfin/plex types)
 
-Not yet implemented: settings-change detection, artwork/subtitle drift beyond optional poster, season mapping changes.
+Not yet implemented: settings-change detection, optional poster drift, season mapping changes.
 
 ## API
 

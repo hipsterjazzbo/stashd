@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Broadcasts;
 
-/** Generated sidecar file (NFO, etc.) — written atomically, not hardlinked. */
+/** Intended sidecar file (generated metadata or a hardlinked Vault asset). */
 final readonly class BroadcastPlannedSidecar
 {
     public function __construct(

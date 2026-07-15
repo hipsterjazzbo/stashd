@@ -27,6 +27,9 @@ use App\Broadcasts\FileKind;
 use App\Broadcasts\HardlinkPublisher;
 use App\Broadcasts\SponsorBlockRefreshScheduler;
 use App\Broadcasts\SponsorBlockSettings;
+use App\Broadcasts\UiControl;
+use App\Commands\CommandDispatchService;
+use App\Commands\CommandType;
 use App\Stashes\StashItemId;
 use App\System\State\StateTransitionService;
 use App\Timeline\TimelineMetadataRenderer;
@@ -64,6 +67,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
         protected TimelineMetadataRenderer $timeline,
         protected AssetRepository $assets,
         protected StateTransitionService $transitions,
+        protected CommandDispatchService $dispatch,
     ) {
     }
 
@@ -94,7 +98,10 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
 
     public function uiControls(): array
     {
-        return [];
+        return [
+            new UiControl('captions', 'Captions', 'select', 'off', ['off', 'creator_only', 'creator_or_auto']),
+            new UiControl('caption_languages', 'Caption languages', 'text', 'en'),
+        ];
     }
 
     public function plan(BroadcastContext $context): BroadcastPlan
@@ -162,6 +169,25 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
                     mediaItemId: (string) $stashItem->mediaItemId,
                 );
             }
+
+            // ponytail: Vault currently exposes one subtitle per media item; plan multiple sidecars when it supports multiple tracks.
+            $subtitle = $this->captionMode($context) === 'off'
+                ? null
+                : $this->readySubtitle($stashItem->mediaItemId);
+
+            if ($subtitle?->path !== null) {
+                $language = preg_replace('/[^a-z0-9_-]+/i', '-', $subtitle->language ?? 'und') ?: 'und';
+                $extension = preg_replace('/[^a-z0-9]+/i', '', pathinfo($subtitle->path, PATHINFO_EXTENSION)) ?: 'vtt';
+                $subtitleFilename = pathinfo($filename, PATHINFO_FILENAME) . ".{$language}.{$extension}";
+                $sidecars[] = new BroadcastPlannedSidecar(
+                    kind: BroadcastSidecarType::Subtitle,
+                    relativePath: $this->paths->relativeFile($season, $subtitleFilename),
+                    absolutePath: $this->paths->broadcastFile($context->broadcast, $season, $subtitleFilename),
+                    content: '',
+                    stashItemId: (string) $stashItem->id,
+                    mediaItemId: (string) $stashItem->mediaItemId,
+                );
+            }
         }
 
         if ($profile->attemptPosterHardlink) {
@@ -188,6 +214,8 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
         $publishedPaths = [];
         $failedStashItemIds = [];
         $publishedCount = 0;
+
+        $this->dispatchMissingCaptions($context, $plan);
 
         foreach ($plan->files as $planned) {
             $item = $this->broadcastItems->findByBroadcastAndStashItem(
@@ -249,6 +277,14 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
         foreach ($plan->sidecars as $sidecar) {
             if ($sidecar->kind === BroadcastSidecarType::Poster) {
                 $this->publishPosterSidecar($sidecar, $root);
+
+                continue;
+            }
+
+            if ($sidecar->kind === BroadcastSidecarType::Subtitle) {
+                if ($this->publishSubtitleSidecar($sidecar, $root)) {
+                    $publishedPaths[] = $sidecar->absolutePath;
+                }
 
                 continue;
             }
@@ -324,6 +360,18 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
 
         foreach ($plan->sidecars as $sidecar) {
             if ($sidecar->kind === BroadcastSidecarType::Poster) {
+                continue;
+            }
+
+            if ($sidecar->kind === BroadcastSidecarType::Subtitle) {
+                $subtitle = $sidecar->mediaItemId === null
+                    ? null
+                    : $this->readySubtitle(MediaItemId::parse($sidecar->mediaItemId));
+
+                if ($subtitle?->path === null || ! $this->hardlinks->verifyHardlink($subtitle->path, $sidecar->absolutePath)) {
+                    $staleItemIds[] = 'sidecar:' . $sidecar->relativePath;
+                }
+
                 continue;
             }
 
@@ -443,6 +491,69 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
         } catch (\App\Broadcasts\BroadcastException) {
             // Poster is optional — skip when hardlink unavailable.
         }
+    }
+
+    private function publishSubtitleSidecar(BroadcastPlannedSidecar $sidecar, string $root): bool
+    {
+        if ($sidecar->mediaItemId === null) {
+            return false;
+        }
+
+        $subtitle = $this->readySubtitle(MediaItemId::parse($sidecar->mediaItemId));
+
+        if ($subtitle?->path === null) {
+            return false;
+        }
+
+        $this->hardlinks->publishHardlink($subtitle->path, $sidecar->absolutePath, $root);
+
+        return true;
+    }
+
+    private function dispatchMissingCaptions(BroadcastContext $context, BroadcastPlan $plan): void
+    {
+        $mode = $this->captionMode($context);
+
+        if ($mode === 'off') {
+            return;
+        }
+
+        $languages = $context->settings()['caption_languages'] ?? 'en';
+        $languages = is_string($languages) && trim($languages) !== '' ? trim($languages) : 'en';
+
+        foreach ($plan->files as $planned) {
+            $mediaItemId = MediaItemId::parse($planned->mediaItemId);
+
+            if ($this->readySubtitle($mediaItemId) !== null) {
+                continue;
+            }
+
+            $this->dispatch->dispatch(CommandType::AssetDownloadCaptions, [
+                'media_item_id' => $planned->mediaItemId,
+                'languages' => $languages,
+                'include_auto' => $mode === 'creator_or_auto',
+            ]);
+        }
+    }
+
+    private function captionMode(BroadcastContext $context): string
+    {
+        $mode = $context->settings()['captions'] ?? 'off';
+
+        return is_string($mode) && in_array($mode, ['creator_only', 'creator_or_auto'], true)
+            ? $mode
+            : 'off';
+    }
+
+    private function readySubtitle(MediaItemId $mediaItemId): ?\App\Vault\AssetRecord
+    {
+        $subtitle = $this->assets->findByMediaItemAndRole($mediaItemId, AssetRole::Subtitle);
+
+        return $subtitle?->state === AssetState::Ready
+            && $subtitle->path !== null
+            && is_file($subtitle->path)
+            ? $subtitle
+            : null;
     }
 
     private function upsertPublishedAsset(

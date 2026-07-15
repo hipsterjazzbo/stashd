@@ -15,6 +15,9 @@ use App\MediaServers\MediaServerLibrarySelection;
 use App\System\Activity\ActivityEventRecord;
 use App\System\Secret\SecretRecord;
 use App\System\Secret\SecretsService;
+use App\Vault\AssetRepository;
+use App\Vault\AssetRole;
+use App\Vault\MediaItemId;
 use Tempest\Database\Database;
 use Tempest\Database\PrimaryKey;
 use Tempest\Database\Query;
@@ -51,7 +54,7 @@ test('jellyfin_series broadcast plan includes SxxExxx filenames and nfo sidecars
     expect($hasTvShowNfo)->toBeTrue();
 });
 
-test('plex_series broadcast rebuild publishes hardlinks and nfo sidecars', function (): void {
+test('plex_series broadcast rebuild publishes media captions and nfo sidecars', function (): void {
     [$headers, $stashId, $mediaItemId] = array_slice($this->bootstrapFakeDownloadStash('plex-rebuild'), 0, 3);
 
     $server = $this->http->post('/api/v1/media-servers', [
@@ -66,7 +69,11 @@ test('plex_series broadcast rebuild publishes hardlinks and nfo sidecars', funct
         'type' => 'plex',
         'name' => 'Plex Demo',
         'slug' => 'plex-demo-' . bin2hex(random_bytes(3)),
-        'settings' => ['media_server_connection_id' => $server->body['media_server']['id']],
+        'settings' => [
+            'media_server_connection_id' => $server->body['media_server']['id'],
+            'captions' => 'creator_only',
+            'caption_languages' => 'en',
+        ],
     ], headers: $headers)->assertStatus(Status::CREATED);
 
     $this->http->post('/api/v1/commands', [
@@ -86,11 +93,29 @@ test('plex_series broadcast rebuild publishes hardlinks and nfo sidecars', funct
 
     $items = $this->http->get('/api/v1/broadcasts/' . $broadcast->body['broadcast']['id'] . '/items', headers: $headers);
     $publishedPath = $items->body['items'][0]['published_path'];
+    $subtitle = $this->container->get(AssetRepository::class)
+        ->findByMediaItemAndRole(MediaItemId::parse($mediaItemId), AssetRole::Subtitle);
+    $publishedSubtitlePath = dirname($publishedPath) . '/' . pathinfo($publishedPath, PATHINFO_FILENAME) . '.en.vtt';
+
     expect($publishedPath)->toMatch('/S\d{2}E\d{3} - /')
-        ->and(is_file($publishedPath))->toBeTrue();
+        ->and(is_file($publishedPath))->toBeTrue()
+        ->and($subtitle?->path)->not->toBeNull()
+        ->and(is_file($publishedSubtitlePath))->toBeTrue()
+        ->and(fileinode($publishedSubtitlePath))->toBe(fileinode($subtitle->path));
 
     $root = dirname(dirname($publishedPath));
     expect(is_file($root . '/tvshow.nfo'))->toBeTrue();
+
+    unlink($publishedSubtitlePath);
+    file_put_contents($publishedSubtitlePath, 'drifted-caption');
+
+    $verify = $this->container->get(BroadcastLifecycleService::class)
+        ->verify(BroadcastId::parse($broadcast->body['broadcast']['id']));
+
+    expect($verify->ok)->toBeFalse()
+        ->and($verify->staleItemIds)->toContain(
+            'sidecar:' . ltrim(substr($publishedSubtitlePath, strlen($root)), '/'),
+        );
 });
 
 test('media server connection stores token through secrets service', function (): void {

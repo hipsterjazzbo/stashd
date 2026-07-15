@@ -10,4 +10,5 @@ enum BroadcastSidecarType: string
     case EpisodeNfo = 'episode_nfo';
     case FeedXml = 'feed_xml';
     case Poster = 'poster';
+    case Subtitle = 'subtitle';
 }

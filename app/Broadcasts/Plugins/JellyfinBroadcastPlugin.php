@@ -9,7 +9,7 @@ use App\Broadcasts\StashdBroadcast;
 /**
  * Jellyfin-friendly series layout with SxxExxx naming and NFO sidecars.
  */
-#[StashdBroadcast('Jellyfin Series', 'Jellyfin-compatible series layout with SxxExxx naming, NFO sidecars, and poster hardlinks.')]
+#[StashdBroadcast('Jellyfin Series', 'Jellyfin-compatible series layout with SxxExxx naming, NFO sidecars, captions, and poster hardlinks.')]
 final class JellyfinBroadcastPlugin extends AbstractSeriesBroadcastPlugin
 {
     protected function broadcastKey(): string
