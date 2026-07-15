@@ -57,7 +57,7 @@ final readonly class BroadcastJobHandler implements JobHandler
         $broadcast = $this->broadcasts->find($broadcastId);
 
         $job->progressTotal = match ($action) {
-            'plan', 'verify', 'prune', 'trigger', 'rotate_token' => 2,
+            'plan', 'verify', 'prune', 'delete', 'trigger', 'rotate_token' => 2,
             'rebuild' => null,
             default => 1,
         };
@@ -69,6 +69,7 @@ final readonly class BroadcastJobHandler implements JobHandler
                 'rebuild' => $this->handleRebuild($command, $job, $context, $broadcastId),
                 'verify' => $this->handleVerify($command, $job, $context, $broadcastId),
                 'prune' => $this->handlePrune($command, $job, $context, $broadcastId),
+                'delete' => $this->handleDelete($job, $context, $broadcastId),
                 'trigger' => $this->handleTrigger($command, $job, $context, $broadcastId),
                 'rotate_token' => $this->handleRotateToken($command, $job, $context, $broadcastId),
                 default => throw BroadcastException::withCode('broadcast_action_unsupported', 'Unsupported broadcast action.'),
@@ -229,6 +230,19 @@ final readonly class BroadcastJobHandler implements JobHandler
         $context->progress($job, JobProgressUpdate::ofSteps(2, 2, 'Broadcast prune complete'));
 
         return ['prune' => $prune->toArray()];
+    }
+
+    /** @return array<string, mixed> */
+    private function handleDelete(
+        JobRecord $job,
+        JobHandlerContext $context,
+        BroadcastId $broadcastId,
+    ): array {
+        $context->progress($job, JobProgressUpdate::ofSteps(1, 2, 'Removing generated broadcast files'));
+        $deleted = $this->lifecycle->delete($broadcastId);
+        $context->progress($job, JobProgressUpdate::ofSteps(2, 2, 'Broadcast deleted'));
+
+        return ['delete' => $deleted->toArray()];
     }
 
     private function requireCommand(JobRecord $job): CommandRecord

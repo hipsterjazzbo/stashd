@@ -89,6 +89,11 @@ final class BroadcastRepository
         return $record;
     }
 
+    public function delete(BroadcastRecord $record): void
+    {
+        $record->delete();
+    }
+
     /** @return list<BroadcastRecord> */
     public function listForStash(StashId $stashId): array
     {

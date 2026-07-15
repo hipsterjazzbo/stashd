@@ -99,6 +99,7 @@ final readonly class BroadcastCommandHandler implements CommandHandler
             CommandType::BroadcastRebuild => 'rebuild',
             CommandType::BroadcastVerify => 'verify',
             CommandType::BroadcastPrune => 'prune',
+            CommandType::BroadcastDelete => 'delete',
             CommandType::BroadcastTrigger => 'trigger',
             CommandType::BroadcastRotateToken => 'rotate_token',
             default => throw InvalidCommandPayload::withErrors(['Unsupported broadcast command type.']),

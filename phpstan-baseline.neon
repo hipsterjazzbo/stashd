@@ -601,18 +601,6 @@ parameters:
 			path: app/Downloads/ItemDownloadCommandHandler.php
 
 		-
-			message: '#^Parameter \#1 \$value of static method App\\Support\\PrefixedUlid\:\:parse\(\) expects string, mixed given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Downloads/ItemDownloadCommandHandler.php
-
-		-
-			message: '#^Property App\\Commands\\CommandRecord\:\:\$targetId \(string\|null\) does not accept mixed\.$#'
-			identifier: assign.propertyType
-			count: 1
-			path: app/Downloads/ItemDownloadCommandHandler.php
-
-		-
 			message: '#^Parameter \$sizeBytes of class App\\Downloads\\DownloadedFile constructor expects int\|null, int\<0, max\>\|false\|null given\.$#'
 			identifier: argument.type
 			count: 1

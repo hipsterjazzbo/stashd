@@ -59,6 +59,7 @@ test('GET /api/v1/stashes/{id}/items lists stash items', function (): void {
         'type' => 'item.download',
         'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
     ], headers: $headers)->assertStatus(Status::CREATED);
+
     $this->processAllJobs();
 
     $response = $this->http->get('/api/v1/stashes/' . $stashId . '/items', headers: $headers)
@@ -109,6 +110,9 @@ test('a failed download surfaces its failure reason, and retrying clears it once
         'type' => 'item.download',
         'options' => ['media_item_id' => $mediaItemId, 'stash_id' => $stashId],
     ], headers: $headers)->assertStatus(Status::CREATED);
+
+    expect($mediaItems->find(MediaItemId::parse($mediaItemId))->state)->toBe(MediaItemState::DownloadPending);
+
     $this->processAllJobs();
 
     $item = $findItem();

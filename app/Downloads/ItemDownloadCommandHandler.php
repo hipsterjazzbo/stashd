@@ -17,8 +17,10 @@ use App\Stashes\StashItemRepository;
 use App\Stashes\StashItemState;
 use App\Stashes\StashRepository;
 use App\Support\PrefixedUlid;
+use App\System\State\StateTransitionService;
 use App\Vault\MediaItemId;
 use App\Vault\MediaItemRepository;
+use App\Vault\MediaItemState;
 
 final readonly class ItemDownloadCommandHandler implements CommandHandler
 {
@@ -28,6 +30,7 @@ final readonly class ItemDownloadCommandHandler implements CommandHandler
         private MediaItemRepository $mediaItems,
         private StashRepository $stashes,
         private StashItemRepository $stashItems,
+        private StateTransitionService $transitions,
     ) {
     }
 
@@ -82,6 +85,12 @@ final readonly class ItemDownloadCommandHandler implements CommandHandler
         $command->targetId = $payload['media_item_id'];
         $this->commands->save($command);
 
+        $mediaItem = $this->mediaItems->find(MediaItemId::parse($payload['media_item_id']));
+
+        if ($mediaItem !== null && in_array($mediaItem->state, [MediaItemState::Failed, MediaItemState::Missing], true)) {
+            $this->transitions->transitionMediaItem($mediaItem, MediaItemState::DownloadPending);
+        }
+
         return [
             $this->jobs->create(
                 intent: JobIntent::Download,
@@ -99,7 +108,7 @@ final readonly class ItemDownloadCommandHandler implements CommandHandler
         return [];
     }
 
-    /** @return array<string, mixed> */
+    /** @return array{media_item_id: string, stash_id: string, force: bool} */
     private function normalizedPayload(array $options): array
     {
         return [

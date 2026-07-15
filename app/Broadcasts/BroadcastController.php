@@ -24,6 +24,7 @@ use App\Vault\MediaItemRepository;
 use Tempest\Http\Request;
 use Tempest\Http\Responses\Json;
 use Tempest\Http\Status;
+use Tempest\Router\Delete;
 use Tempest\Router\Get;
 use Tempest\Router\Patch;
 use Tempest\Router\Post;
@@ -241,6 +242,22 @@ final readonly class BroadcastController
         return new Json([
             'items' => $this->mapBroadcastItems($this->broadcastItems->listForBroadcast(BroadcastId::parse($id))),
         ]);
+    }
+
+    #[Delete('/api/v1/broadcasts/{id}')]
+    public function delete(string $id): Json
+    {
+        if ($this->findBroadcast($id) === null) {
+            return $this->notFound('Broadcast not found.');
+        }
+
+        $command = $this->commands->dispatch(CommandType::BroadcastDelete, [
+            'broadcast_id' => $id,
+        ]);
+
+        return new Json([
+            'command_id' => (string) $command->command->id,
+        ], Status::ACCEPTED);
     }
 
     #[Patch('/api/v1/broadcasts/{id}/season-mapping')]

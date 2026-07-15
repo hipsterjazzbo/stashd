@@ -10,6 +10,7 @@ enum CommandType: string
     case BroadcastRebuild = 'broadcast.rebuild';
     case BroadcastVerify = 'broadcast.verify';
     case BroadcastPrune = 'broadcast.prune';
+    case BroadcastDelete = 'broadcast.delete';
     case BroadcastTrigger = 'broadcast.trigger';
     case BroadcastRotateToken = 'broadcast.rotate_token';
     case StashPreflight = 'stash.preflight';

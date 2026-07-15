@@ -2,6 +2,8 @@
 
 Broadcasts are **disposable, regeneratable views** of a stash. They do not own canonical media — the Vault remains the source of truth.
 
+Deleting a broadcast is asynchronous. It removes only its marker-owned generated output directory and its broadcast records; the source stash and Vault media remain intact. Stashd refuses deletion when the destination directory is not marked as owned by that broadcast.
+
 ## Phase 5A (complete)
 
 - Generic broadcast lifecycle (`plan` → `publish` → `verify` → `prune`)

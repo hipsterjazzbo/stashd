@@ -254,7 +254,7 @@ const STATE_BADGES: Record<string, Badge> = {
 	hidden: { label: 'hidden', dot: 'bg-muted', text: 'text-muted' },
 	discovered: { label: 'discovered', dot: 'bg-muted', text: 'text-muted' },
 	metadata_ready: { label: 'metadata ready', dot: 'bg-amber', text: 'text-amber' },
-	download_pending: { label: 'download pending', dot: 'bg-amber', text: 'text-amber' },
+	download_pending: { label: 'queued', dot: 'bg-amber', text: 'text-amber' },
 	downloading: { label: 'downloading', dot: 'bg-amber', text: 'text-amber' },
 }
 
@@ -1325,6 +1325,7 @@ function stashDetailComponent(stashId: string) {
 		broadcasts: [] as BroadcastSummary[],
 		broadcastPlugins: [] as BroadcastPluginSummary[],
 		actionPending: null as string | null,
+		actionFeedback: null as string | null,
 		newBroadcastType: 'podcast',
 		newBroadcastMediaKind: 'audio',
 		newBroadcastName: '',
@@ -1685,7 +1686,7 @@ function stashDetailComponent(stashId: string) {
 		// a client-side tally over the current page.
 		itemStatusSummary(): Array<{ label: string; filter: string }> {
 			return ITEM_STATUS_OPTIONS.filter((status) => (this.itemStatusCounts[status] ?? 0) > 0).map((status) => ({
-				label: `${this.itemStatusCounts[status]} ${status.replace(/_/g, ' ')}`,
+				label: `${this.itemStatusCounts[status]} ${statusBadge(status).label}`,
 				filter: status,
 			}))
 		},
@@ -1726,8 +1727,9 @@ function stashDetailComponent(stashId: string) {
 		// the same command the initial download used, just issued again.
 		async retryDownload(item: StashItemSummary) {
 			this.actionPending = `${item.id}:retry`
+			this.actionFeedback = null
 			try {
-				await apiFetch('/api/v1/commands', {
+				const response = await apiFetch('/api/v1/commands', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
@@ -1735,6 +1737,12 @@ function stashDetailComponent(stashId: string) {
 						options: { media_item_id: item.media_item_id, stash_id: item.stash_id },
 					}),
 				})
+				if (!response.ok) {
+					this.error = await describeFailedResponse(response)
+					return
+				}
+				this.error = null
+				this.actionFeedback = 'Retry queued.'
 				await this.refresh()
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
@@ -1750,8 +1758,9 @@ function stashDetailComponent(stashId: string) {
 		// retries all of them.
 		async retryAllFailed() {
 			this.actionPending = 'retry-all'
+			this.actionFeedback = null
 			try {
-				await apiFetch('/api/v1/commands', {
+				const response = await apiFetch('/api/v1/commands', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
@@ -1759,6 +1768,12 @@ function stashDetailComponent(stashId: string) {
 						options: { stash_id: stashId },
 					}),
 				})
+				if (!response.ok) {
+					this.error = await describeFailedResponse(response)
+					return
+				}
+				this.error = null
+				this.actionFeedback = 'Retries queued.'
 				await this.refresh()
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
@@ -1822,6 +1837,29 @@ function stashDetailComponent(stashId: string) {
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
 				this.error = 'Could not run that action.'
+			} finally {
+				this.actionPending = null
+			}
+		},
+
+		async deleteBroadcast(broadcast: BroadcastSummary) {
+			if (!window.confirm(`Delete “${broadcast.name}”? This removes its generated files but keeps Vault media.`)) return
+
+			this.actionPending = `${broadcast.id}:delete`
+			this.actionFeedback = null
+			try {
+				const response = await apiFetch(`/api/v1/broadcasts/${broadcast.id}`, { method: 'DELETE' })
+				if (!response.ok) {
+					this.error = await describeFailedResponse(response)
+					return
+				}
+
+				this.error = null
+				this.actionFeedback = 'Broadcast deletion queued.'
+				await this.refresh()
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not reach the server.'
 			} finally {
 				this.actionPending = null
 			}
