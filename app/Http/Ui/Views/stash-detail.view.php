@@ -89,7 +89,13 @@
 													class="w-full rounded border border-line bg-panel px-2 py-1 text-[12px] text-cream outline-none focus:border-amber"/>
 												<input type="text" x-model="editInputTitleRegexExclude" placeholder="Exclude title regex"
 													class="w-full rounded border border-line bg-panel px-2 py-1 text-[12px] text-cream outline-none focus:border-amber"/>
-												<p class="text-[11px] text-muted">Applies to future syncs only — already-discovered items are unaffected.</p>
+												<template x-for="option in input.input_options" x-bind:key="option.key">
+													<label class="flex items-center gap-2 text-[12px] text-muted" x-show="option.type === 'bool'">
+														<input type="checkbox" x-model="editInputProviderOptions[option.key]" class="rounded border-line"/>
+														<span x-text="option.label"></span>
+													</label>
+												</template>
+												<p class="text-[11px] text-muted">Applies to existing and future items.</p>
 												<div class="flex items-center gap-2">
 													<button type="button" x-on:click="saveInputFilters(input.id)"
 														x-bind:disabled="savingInputFilters === input.id"

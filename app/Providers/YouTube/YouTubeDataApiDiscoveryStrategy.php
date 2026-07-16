@@ -241,7 +241,6 @@ final readonly class YouTubeDataApiDiscoveryStrategy implements DiscoveryStrateg
         $contentType = match (true) {
             $liveBroadcastContent === 'live' => 'live',
             $liveBroadcastContent === 'upcoming' => 'premiere',
-            $liveStreamingDetails !== null && (isset($liveStreamingDetails['actualStartTime']) || isset($liveStreamingDetails['scheduledStartTime'])) => 'live',
             $durationSeconds !== null && $durationSeconds <= 180 => 'short',
             default => 'regular',
         };

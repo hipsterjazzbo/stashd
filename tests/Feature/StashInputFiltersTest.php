@@ -259,7 +259,7 @@ test('PATCH stash input rejects a malformed title-regex pattern', function (): v
     expect($response->body['error']['code'])->toBe('validation_error');
 });
 
-test('PATCH stash input does not retroactively re-filter already-committed items', function (): void {
+test('PATCH stash input re-filters already-committed items', function (): void {
     $headers = $this->authHeaders();
 
     $stash = $this->http->post('/api/v1/stashes', ['name' => 'No Retroactive Filter'], headers: $headers)->assertStatus(Status::CREATED);
@@ -290,12 +290,41 @@ test('PATCH stash input does not retroactively re-filter already-committed items
         'options' => ['title_regex_include' => 'Episode 2'],
     ], headers: $headers)->assertOk();
 
-    // Editing the filter is stored, but the 3 already-committed items are untouched.
+    // Editing the filter applies to the items already committed from this input.
     $afterStates = array_map(
         static fn (StashItemRecord $item): string => $item->state->value,
         StashItemRecord::select()->where('stashId = ?', $stashId)->all(),
     );
-    expect($afterStates)->toBe(['active', 'active', 'active']);
+    expect($afterStates)->toBe(['ignored', 'active', 'ignored']);
+});
+
+test('PATCH stash input reactivates filtered YouTube items and queues their downloads', function (): void {
+    $headers = $this->authHeaders();
+    $this->http->put('/api/v1/providers/youtube/credentials', ['api_key' => 'test-api-key'], headers: $headers)->assertOk();
+
+    $stash = $this->http->post('/api/v1/stashes', ['name' => 'Enable YouTube Types'], headers: $headers)->assertStatus(Status::CREATED);
+    $stashId = $stash->body['stash']['id'];
+    $preflight = $this->http->post('/api/v1/commands', [
+        'type' => 'stash.preflight',
+        'options' => ['source_uri' => 'https://www.youtube.com/channel/UCStashdDemoCh0012345678'],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+    $this->http->post('/api/v1/stashes/' . $stashId . '/inputs', [
+        'preflight_command_id' => $preflight->body['command_id'],
+        'options' => ['provider' => ['include_shorts' => false, 'include_live' => false]],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $inputs = $this->http->get('/api/v1/stashes/' . $stashId . '/inputs', headers: $headers)->assertOk();
+    $inputId = $inputs->body['inputs'][0]['id'];
+    expect(array_column($inputs->body['inputs'][0]['input_options'], 'key'))->toBe(['include_shorts', 'include_live']);
+    $this->http->patch('/api/v1/stashes/' . $stashId . '/inputs/' . $inputId, [
+        'options' => ['provider' => ['include_shorts' => true, 'include_live' => true]],
+    ], headers: $headers)->assertOk();
+    $this->processAllJobs();
+
+    $items = StashItemRecord::select()->where('stashId = ?', $stashId)->all();
+    expect(array_map(static fn (StashItemRecord $item): string => $item->state->value, $items))->toBe(array_fill(0, 18, 'active'));
 });
 
 test('PATCH stash input returns 404 for an input belonging to a different stash', function (): void {

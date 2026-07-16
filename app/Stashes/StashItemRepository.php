@@ -79,9 +79,14 @@ final class StashItemRepository
         bool $includeIgnored = true,
         string $sort = 'position',
         Direction $direction = Direction::ASC,
+        ?StashInputId $stashInputId = null,
     ): array {
         $query = $this->filteredQuery($stashId, $search, $status, $includeIgnored)
             ->with('mediaItem');
+
+        if ($stashInputId !== null) {
+            $query->where('stashInputId', $stashInputId->toString());
+        }
 
         match ($sort) {
             'title' => $query->orderBy('media_items.title', $direction),

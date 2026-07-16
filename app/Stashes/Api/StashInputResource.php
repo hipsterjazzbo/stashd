@@ -5,18 +5,22 @@ declare(strict_types=1);
 namespace App\Stashes\Api;
 
 use App\Http\Api\ApiJson;
+use App\Providers\InputOption;
 use App\Stashes\StashInputRecord;
 
 final readonly class StashInputResource
 {
+    /** @param list<InputOption> $inputOptions */
     public function __construct(
         private StashInputRecord $input,
+        private array $inputOptions = [],
     ) {
     }
 
-    public static function fromRecord(StashInputRecord $input): self
+    /** @param list<InputOption> $inputOptions */
+    public static function fromRecord(StashInputRecord $input, array $inputOptions = []): self
     {
-        return new self($input);
+        return new self($input, $inputOptions);
     }
 
     /** @return array<string, mixed> */
@@ -43,6 +47,7 @@ final readonly class StashInputResource
             'title' => $this->input->title,
             'syncMode' => $this->input->syncMode?->value,
             'options' => $options,
+            'inputOptions' => array_map(static fn ($option): array => $option->toArray(), $this->inputOptions),
             'lastCheckedAt' => $this->input->lastCheckedAt,
             'nextCheckAt' => $this->input->nextCheckAt,
             'lastSuccessAt' => $this->input->lastSuccessAt,

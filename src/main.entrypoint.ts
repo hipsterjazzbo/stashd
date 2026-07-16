@@ -809,6 +809,7 @@ interface StashInputSummary {
 		title_regex_exclude: string | null
 		provider: Record<string, boolean | string>
 	} | null
+	input_options: InputOptionDeclaration[]
 	last_checked_at: string | null
 	next_check_at: string | null
 	last_success_at: string | null
@@ -1321,6 +1322,7 @@ function stashDetailComponent(stashId: string) {
 		editingInputFiltersId: null as string | null,
 		editInputTitleRegexInclude: '',
 		editInputTitleRegexExclude: '',
+		editInputProviderOptions: {} as Record<string, boolean | string>,
 		savingInputFilters: null as string | null,
 		broadcasts: [] as BroadcastSummary[],
 		broadcastPlugins: [] as BroadcastPluginSummary[],
@@ -1788,6 +1790,7 @@ function stashDetailComponent(stashId: string) {
 			this.editingInputFiltersId = input.id
 			this.editInputTitleRegexInclude = input.options?.title_regex_include ?? ''
 			this.editInputTitleRegexExclude = input.options?.title_regex_exclude ?? ''
+			this.editInputProviderOptions = Object.fromEntries(input.input_options.map((option) => [option.key, input.options?.provider?.[option.key] ?? option.default]))
 		},
 
 		cancelEditInputFilters() {
@@ -1804,6 +1807,7 @@ function stashDetailComponent(stashId: string) {
 						options: {
 							title_regex_include: this.editInputTitleRegexInclude.trim() || undefined,
 							title_regex_exclude: this.editInputTitleRegexExclude.trim() || undefined,
+							provider: this.editInputProviderOptions,
 						},
 					}),
 				})

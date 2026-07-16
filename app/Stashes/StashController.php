@@ -37,6 +37,7 @@ final readonly class StashController
         private StashRepository $stashes,
         private StashItemRepository $stashItems,
         private StashInputRepository $stashInputs,
+        private UpdateStashInputOptions $inputOptions,
         private CommandDispatchService $dispatch,
         private AuthContext $context,
         private ActivityEventService $activity,
@@ -210,7 +211,7 @@ final readonly class StashController
 
         return new Json([
             'inputs' => array_map(
-                static fn ($input): array => StashInputResource::fromRecord($input)->toArray(),
+                fn ($input): array => StashInputResource::fromRecord($input, $this->inputOptions->declaredOptions($input))->toArray(),
                 $this->stashInputs->listForStash(StashId::fromPrimaryKey($stash->id)),
             ),
         ]);
@@ -247,11 +248,6 @@ final readonly class StashController
         return new Json(ApiJson::encode($result->toArray()), Status::CREATED);
     }
 
-    /**
-     * Only affects future discovery/sync passes for this input -- items
-     * already committed keep whatever ignoredReason they were given at
-     * discovery time; this never retroactively re-filters them.
-     */
     #[Patch('/api/v1/stashes/{id}/inputs/{inputId}')]
     public function updateInput(string $id, string $inputId, Request $request): Json
     {
@@ -279,10 +275,10 @@ final readonly class StashController
             }
         }
 
-        $input = $this->stashInputs->updateOptions($input, $inputOptions);
+        $input = $this->inputOptions->execute($stash, $input, $inputOptions);
 
         return new Json([
-            'input' => StashInputResource::fromRecord($input)->toArray(),
+            'input' => StashInputResource::fromRecord($input, $this->inputOptions->declaredOptions($input))->toArray(),
         ]);
     }
 
