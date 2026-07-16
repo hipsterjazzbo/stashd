@@ -1530,7 +1530,12 @@ function stashDetailComponent(stashId: string) {
 			try {
 				const response = await apiFetch('/api/v1/broadcast-plugins')
 				const body = await response.json()
-				this.broadcastPlugins = body.plugins ?? this.broadcastPlugins
+				const plugins = (body.plugins ?? this.broadcastPlugins) as BroadcastPluginSummary[]
+				this.broadcastPlugins = plugins.sort((left, right) => {
+					if (left.key === 'podcast') return -1
+					if (right.key === 'podcast') return 1
+					return 0
+				})
 				this.newBroadcastType = this.broadcastPlugins[0]?.key ?? this.newBroadcastType
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
