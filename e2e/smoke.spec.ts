@@ -26,18 +26,14 @@ test('owner can create a Fake-provider stash and open its Vault item', async ({ 
 	await page.locator('#auth-submit').click();
 	await page.waitForURL('**/');
 
-	await page.goto('/stashes');
-	await page.getByRole('button', { name: '+ New stash' }).click();
-	await page.getByLabel('Title (optional)').fill('Browser Fake Stash');
-	await page.getByRole('button', { name: 'Create' }).click();
-	await page.waitForURL(/\/stashes\/[^/]+$/);
-
-	await page.getByRole('button', { name: '+ Add input' }).first().click();
+	await page.goto('/stashes/new');
 	await page.getByLabel('Channel, playlist, or video URL').fill('fake://channel/e2e');
-	await page.getByRole('button', { name: 'Continue' }).click();
-	await page.getByRole('button', { name: 'Add input', exact: true }).click();
-	await expect(page.getByRole('heading', { name: 'Add input' })).toBeHidden({ timeout: 30000 });
-	await expect(page.getByText('fake://channel/e2e')).toBeVisible();
+	await page.getByRole('button', { name: 'Review source' }).click();
+	await expect(page.getByRole('button', { name: 'Create stash', exact: true })).toBeEnabled({ timeout: 30000 });
+	await page.getByLabel('Name (optional)').fill('Browser Fake Stash');
+	await page.getByRole('button', { name: 'Create stash', exact: true }).click();
+	await page.waitForURL(/\/stashes\/[^/]+$/, { timeout: 30000, waitUntil: 'domcontentloaded' });
+	await expect(page.getByText('fake://channel/e2e')).toBeVisible({ timeout: 30000 });
 
 	const items = await page.request.get(new URL('/api/v1/stashes/' + page.url().split('/').pop() + '/items', page.url()).toString());
 	expect(items.ok()).toBeTruthy();
@@ -55,10 +51,9 @@ test('selected broadcast type is sent through preview and creation', async ({ pa
 	await page.locator('#auth-submit').click();
 	await page.waitForURL('**/');
 
-	await page.goto('/stashes');
-	await page.getByRole('button', { name: '+ New stash' }).click();
-	await page.getByLabel('Title (optional)').fill('Broadcast Type Selection');
-	await page.getByRole('button', { name: 'Create' }).click();
+	await page.goto('/stashes/new');
+	await page.getByLabel('Name (optional)').fill('Broadcast Type Selection');
+	await page.getByRole('button', { name: 'Create empty stash' }).click();
 	await page.waitForURL(/\/stashes\/[^/]+$/);
 
 	await page.getByText('+ Add broadcast').click();

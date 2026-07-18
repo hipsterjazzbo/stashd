@@ -232,21 +232,23 @@ async function waitForBroadcastItemsReady(
 
 async function createStashWithLink(page: Page, title: string, link?: string): Promise<string> {
 	step('createStashWithLink: starting', title);
-	await page.goto('/stashes');
-	await page.getByRole('button', { name: '+ New stash' }).click();
-	await page.getByLabel('Title (optional)').fill(title);
-	if (link) await page.getByLabel('Link (optional)').fill(link);
-	await page.getByRole('button', { name: 'Create' }).click();
-	await page.waitForURL(/\/stashes\/[^/?]+/, { timeout: 15000 });
+	await page.goto('/stashes/new');
+	await page.getByLabel('Name (optional)').fill(title);
+	if (link) {
+		await page.getByLabel('Channel, playlist, or video URL').fill(link);
+		await page.getByRole('button', { name: 'Review source' }).click();
+		await expect(page.getByRole('button', { name: 'Create stash', exact: true })).toBeEnabled({ timeout: 180000 });
+	}
+	await page.getByRole('button', { name: link ? 'Create stash' : 'Create empty stash', exact: true }).click();
+	await page.waitForURL(/\/stashes\/[^/?]+/, { timeout: link ? 300000 : 15000 });
 	const stashId = new URL(page.url()).pathname.split('/').pop()!;
 	step('createStashWithLink: created', stashId);
 	return stashId;
 }
 
-// Waits out the add-input modal's full lifecycle: auto-opened preflight ->
-// review (optionally filling a title regex) -> commit -> auto-close on
-// completion. Assumes the modal is already open (either via the ?link= auto
-// -open on stash creation, or after clicking "+ Add input" + Continue).
+// Waits out the add-input modal's full lifecycle: preflight -> review
+// (optionally filling a title regex) -> commit -> auto-close on completion.
+// Assumes the modal was opened from an existing stash.
 async function completeAddInput(page: Page, opts?: { titleRegexInclude?: string }) {
 	step('completeAddInput: waiting for modal');
 	await expect(page.getByRole('heading', { name: 'Add input' })).toBeVisible({ timeout: 10000 });
@@ -404,9 +406,8 @@ test('oculusimperia: video download + audio podcast broadcast (transcode fix acc
 	attachBrowserDiagnostics(page);
 	await login(page);
 
-	// No ?link= auto-open here (unlike the old flow) -- the download policy
-	// has to be switched to manual before any input is added, and the
-	// auto-opened add-input modal would block reaching the Edit button.
+	// Create the empty stash first so its download policy can be switched to
+	// manual before any input is added.
 	const stashId = await createStashWithLink(page, 'oculusimperia');
 	await setManualDownloadPolicy(page);
 	await addFollowUpInput(page, 'https://www.youtube.com/@oculusimperia');
@@ -497,9 +498,8 @@ test('criticalrole: regex-filtered video download + Jellyfin broadcast', async (
 	attachBrowserDiagnostics(page);
 	await login(page);
 
-	// No ?link= auto-open here (unlike the old flow) -- the download policy
-	// has to be switched to manual before any input is added, and the
-	// auto-opened add-input modal would block reaching the Edit button.
+	// Create the empty stash first so its download policy can be switched to
+	// manual before any input is added.
 	const stashId = await createStashWithLink(page, 'criticalrole');
 	await setManualDownloadPolicy(page);
 	await addFollowUpInput(page, 'https://www.youtube.com/@criticalrole', { titleRegexInclude: 'Campaign 4, Episode \\d+' });
