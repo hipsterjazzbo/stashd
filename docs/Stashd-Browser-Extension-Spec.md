@@ -35,7 +35,7 @@ Unsupported pages show a short explanation and an **Open Stashd** action.
 The extension opens:
 
 ```text
-{configured-base-url}/stashes#stashd-source={encodeURIComponent(current-page-url)}
+{configured-base-url}/stashes/new#stashd-source={encodeURIComponent(current-page-url)}
 ```
 
 The URL is in the fragment, so it is not sent in the HTTP request, proxy logs, or referrer headers. On load, the Stashd UI reads `stashd-source`, validates it as a URL, pre-fills the New Stash link field, removes the fragment with `history.replaceState()`, and lets the user submit the normal create flow.
@@ -116,14 +116,14 @@ The extension only validates its configured URL and current-page URL. Once it op
 
 ## Stashd change required before packaging
 
-Teach the `/stashes` UI to consume the `#stashd-source=` fragment as described above. Reuse the existing URL validation and create-stash preflight path; do not add a new API endpoint or an extension-specific server session.
+Teach the `/stashes/new` UI to consume the `#stashd-source=` fragment as described above. Reuse the existing URL validation and create-stash preflight path; do not add a new API endpoint or an extension-specific server session.
 
 Minimum coverage:
 
 - a valid fragment pre-fills the New Stash link;
 - the fragment is removed after it is consumed;
 - an invalid fragment is ignored safely;
-- a normal `/stashes` visit is unchanged.
+- a normal `/stashes/new` visit is unchanged.
 
 ## Delivery order
 

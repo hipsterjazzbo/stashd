@@ -1142,11 +1142,6 @@ function stashesComponent() {
 		loadingDeleteImpact: false,
 		deletingBusy: false,
 
-		creatingStash: false,
-		newStashForm: { title: '', link: '' },
-		newStashError: null as string | null,
-		creatingBusy: false,
-
 		async init() {
 			await this.refresh()
 			this.loading = false
@@ -1258,41 +1253,209 @@ function stashesComponent() {
 				this.deletingBusy = false
 			}
 		},
+	}
+}
 
-		startCreate() {
-			this.newStashForm = { title: '', link: '' }
-			this.newStashError = null
-			this.creatingStash = true
+function createStashComponent() {
+	return {
+		sourceUri: '',
+		reviewedSourceUri: '',
+		step: 'idle' as 'idle' | 'reviewing' | 'review' | 'creating' | 'committing' | 'failed',
+		busy: false,
+		error: null as string | null,
+		preflightCommandId: null as string | null,
+		commitCommandId: null as string | null,
+		createdStashId: null as string | null,
+		sseCancel: null as (() => void) | null,
+		resolved: null as ResolvedInputSummary | null,
+		estimatedItemCount: null as number | null,
+		estimatedTotalDurationSeconds: null as number | null,
+		sampleItems: [] as DiscoveredItemSummary[],
+		universalFilters: [] as UniversalFilterDeclaration[],
+		inputOptions: [] as InputOptionDeclaration[],
+		titleRegexInclude: '',
+		titleRegexExclude: '',
+		providerOptions: {} as Record<string, boolean | string>,
+		form: { name: '', description: '', syncMode: 'automatic', downloadPolicy: 'video', organizationMode: 'flat' } as StashEditForm,
+		formatDuration,
+
+		sourceNeedsReview() {
+			return this.sourceUri.trim() !== this.reviewedSourceUri
 		},
 
-		cancelCreate() {
-			this.creatingStash = false
-		},
+		async reviewSource() {
+			const sourceUri = this.sourceUri.trim()
+			if (sourceUri === '' || this.busy) return
 
-		async submitCreateStash() {
-			this.creatingBusy = true
+			this.sseCancel?.()
+			this.sseCancel = null
+			this.busy = true
+			this.error = null
+			this.reviewedSourceUri = ''
+			this.resolved = null
+			this.estimatedItemCount = null
+			this.estimatedTotalDurationSeconds = null
+			this.sampleItems = []
+			this.universalFilters = []
+			this.inputOptions = []
+			this.titleRegexInclude = ''
+			this.titleRegexExclude = ''
+			this.providerOptions = {}
+
 			try {
-				const response = await apiFetch('/api/v1/stashes', {
+				const response = await apiFetch('/api/v1/stashes/preflight', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						name: this.newStashForm.title.trim() || undefined,
-					}),
+					body: JSON.stringify({ source_uri: sourceUri, origin: 'web_ui' }),
 				})
 				if (!response.ok) {
 					const body = (await response.json()) as { error?: { message?: string } }
-					this.newStashError = body.error?.message ?? 'Could not create the stash.'
+					this.error = body.error?.message ?? 'Could not start discovery.'
+					this.busy = false
 					return
 				}
-				const body = (await response.json()) as { stash: StashSummary }
-				const link = this.newStashForm.link.trim()
-				this.creatingStash = false
-				window.location.assign(link ? `/stashes/${body.stash.id}?link=${encodeURIComponent(link)}` : `/stashes/${body.stash.id}`)
+
+				const body = (await response.json()) as { command_id: string }
+				this.preflightCommandId = body.command_id
+				this.step = 'reviewing'
+				this.sseCancel = awaitSseTerminal(() => this.checkPreflightTerminal(sourceUri))
 			} catch (cause) {
 				if (cause instanceof UnauthenticatedError) return
-				this.newStashError = 'Could not reach the server.'
-			} finally {
-				this.creatingBusy = false
+				this.error = 'Could not reach the server.'
+				this.busy = false
+			}
+		},
+
+		async checkPreflightTerminal(sourceUri: string): Promise<boolean> {
+			try {
+				const response = await apiFetch(`/api/v1/commands/${this.preflightCommandId}`)
+				const body = (await response.json()) as CommandShowResponse
+
+				if (body.command.state === 'completed') {
+					const review = await apiFetch(`/api/v1/stashes/preflight/${this.preflightCommandId}/review`)
+					const reviewBody = (await review.json()) as PreflightReview
+					const discovery = reviewBody.preflight?.discovery ?? null
+					this.resolved = reviewBody.preflight?.resolved_input ?? null
+					this.estimatedItemCount = discovery?.estimated_item_count ?? null
+					this.estimatedTotalDurationSeconds = discovery?.estimated_total_duration_seconds ?? null
+					this.sampleItems = discovery?.sample_items ?? []
+					this.universalFilters = reviewBody.preflight?.universal_filters ?? []
+					this.inputOptions = reviewBody.preflight?.input_options ?? []
+					this.providerOptions = Object.fromEntries(this.inputOptions.map((option) => [option.key, option.default]))
+					this.reviewedSourceUri = sourceUri
+					this.step = 'review'
+					this.busy = false
+					return true
+				}
+
+				if (body.command.state === 'failed' || body.command.state === 'rejected') {
+					const lastError = body.jobs[0]?.last_error ?? 'Discovery failed.'
+					this.error = lastError.startsWith('unsupported_provider_url:') ? "That source isn't supported yet." : lastError
+					this.step = 'failed'
+					this.busy = false
+					return true
+				}
+
+				return false
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return true
+				return false
+			}
+		},
+
+		async create() {
+			if (this.busy || (this.sourceUri.trim() !== '' && this.sourceNeedsReview())) return
+			this.busy = true
+			this.error = null
+
+			try {
+				if (this.createdStashId === null) {
+					this.step = 'creating'
+					const response = await apiFetch('/api/v1/stashes', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							name: this.form.name.trim() || undefined,
+							description: this.form.description.trim() || undefined,
+							sync_mode: this.form.syncMode,
+							download_policy: this.form.downloadPolicy,
+							organization_mode: this.form.organizationMode,
+						}),
+					})
+					if (!response.ok) {
+						const body = (await response.json()) as { error?: { message?: string } }
+						this.error = body.error?.message ?? 'Could not create the stash.'
+						this.step = 'failed'
+						this.busy = false
+						return
+					}
+
+					const body = (await response.json()) as { stash: StashSummary }
+					this.createdStashId = body.stash.id
+				}
+
+				if (this.sourceUri.trim() === '') {
+					window.location.assign(`/stashes/${this.createdStashId}`)
+					return
+				}
+
+				await this.commitInput()
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return
+				this.error = 'Could not reach the server.'
+				this.step = 'failed'
+				this.busy = false
+			}
+		},
+
+		async commitInput() {
+			const response = await apiFetch(`/api/v1/stashes/${this.createdStashId}/inputs`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					preflight_command_id: this.preflightCommandId,
+					options: {
+						title_regex_include: this.titleRegexInclude.trim() || undefined,
+						title_regex_exclude: this.titleRegexExclude.trim() || undefined,
+						provider: this.providerOptions,
+					},
+				}),
+			})
+			if (!response.ok) {
+				const body = (await response.json()) as { error?: { message?: string } }
+				this.error = body.error?.message ?? 'Could not add that input.'
+				this.step = 'failed'
+				this.busy = false
+				return
+			}
+
+			const body = (await response.json()) as { command_id: string }
+			this.commitCommandId = body.command_id
+			this.step = 'committing'
+			this.sseCancel = awaitSseTerminal(() => this.checkCommitTerminal())
+		},
+
+		async checkCommitTerminal(): Promise<boolean> {
+			try {
+				const response = await apiFetch(`/api/v1/commands/${this.commitCommandId}`)
+				const body = (await response.json()) as CommandShowResponse
+
+				if (body.command.state === 'completed') {
+					window.location.assign(`/stashes/${this.createdStashId}`)
+					return true
+				}
+
+				if (body.command.state === 'failed' || body.command.state === 'rejected') {
+					this.error = body.jobs[0]?.last_error ?? 'Adding the input failed.'
+					this.step = 'failed'
+					this.busy = false
+					return true
+				}
+
+				return false
+			} catch (cause) {
+				if (cause instanceof UnauthenticatedError) return true
+				return false
 			}
 		},
 	}
@@ -2667,6 +2830,7 @@ function settingsComponent() {
 Alpine.data('dashboard', dashboardComponent)
 Alpine.data('activity', activityComponent)
 Alpine.data('stashes', stashesComponent)
+Alpine.data('createStash', createStashComponent)
 Alpine.data('stashDetail', stashDetailComponent)
 Alpine.data('vault', vaultComponent)
 Alpine.data('vaultDetail', vaultDetailComponent)

@@ -633,5 +633,5 @@ the live status tracker, so "what's left" never again needs a tour of `docs/plan
 
 - [ ] Browser extension — revised v1 spec at `docs/Stashd-Browser-Extension-Spec.md`: explicit
   browser-to-web-app handoff into the existing create-stash flow; no extension code yet
-  roadmap phase assigned. First add the small `/stashes` fragment handoff described in the spec,
+  roadmap phase assigned. First add the small `/stashes/new` fragment handoff described in the spec,
   then package the Chromium popup.
