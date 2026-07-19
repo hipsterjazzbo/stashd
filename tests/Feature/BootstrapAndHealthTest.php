@@ -15,7 +15,11 @@ use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRecord;
 use App\System\Storage\StorageLocationState;
 use App\System\Storage\StorageRootService;
+use Tempest\Database\Config\DatabaseDialect;
 use Tempest\Database\Config\PostgresConfig;
+use Tempest\Database\Database;
+use Tempest\Database\Migrations\Migration;
+use Tempest\Database\Migrations\RunnableMigrations;
 use Tempest\Database\PrimaryKey;
 
 test('boot creates sqlite schema command and job records', function (): void {
@@ -37,6 +41,16 @@ test('boot skips SQLite setup for a PostgreSQL config', function (): void {
 
     expect($result['command_id'])->toStartWith('cmd_')
         ->and($result['job_id'])->toStartWith('job_');
+});
+
+test('PostgreSQL replays every Stashd migration', function (): void {
+    if ($this->container->get(Database::class)->dialect !== DatabaseDialect::POSTGRESQL) {
+        $this->markTestSkipped('Run with DB_CONNECTION=pgsql to exercise PostgreSQL migrations.');
+    }
+
+    $migrations = $this->container->get(RunnableMigrations::class);
+
+    expect(Migration::all())->toHaveCount(iterator_count($migrations->up()));
 });
 
 test('health endpoint returns ok after boot', function (): void {

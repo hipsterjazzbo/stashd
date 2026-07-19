@@ -26,13 +26,13 @@ final class CreateFoundationSchema implements MigratesUp
 
     public function up(): QueryStatement
     {
-        return new CompoundStatement(
+        return new CompoundStatement(...$this->tablesWithIndexes(
             $this->storageLocations(),
             $this->storageChecks(),
             $this->commands(),
             $this->jobs(),
             $this->settings(),
-        );
+        ));
     }
 
     private function storageLocations(): CreateTableStatement
