@@ -15,6 +15,7 @@ use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRecord;
 use App\System\Storage\StorageLocationState;
 use App\System\Storage\StorageRootService;
+use Tempest\Database\Config\PostgresConfig;
 use Tempest\Database\PrimaryKey;
 
 test('boot creates sqlite schema command and job records', function (): void {
@@ -28,6 +29,14 @@ test('boot creates sqlite schema command and job records', function (): void {
         ->and(JobRecord::findById(new PrimaryKey($result['job_id'])))->not->toBeNull()
         ->and(StorageLocationRecord::select()->all())->toHaveCount(5)
         ->and(StorageCheckRecord::select()->all())->not->toBeEmpty();
+});
+
+test('boot skips SQLite setup for a PostgreSQL config', function (): void {
+    $result = $this->container->get(BootstrapService::class)
+        ->boot(new PostgresConfig());
+
+    expect($result['command_id'])->toStartWith('cmd_')
+        ->and($result['job_id'])->toStartWith('job_');
 });
 
 test('health endpoint returns ok after boot', function (): void {
@@ -60,7 +69,7 @@ test('sqlite pragmas are enabled on the tempest connection', function (): void {
     $configurator = $this->container->get(SqliteConfigurator::class);
 
     $configurator->configure($sqlite);
-    $configurator->enableWriteAheadLogging();
+    $configurator->enableWriteAheadLogging($sqlite);
     $pragmas = $configurator->readPragmas();
 
     expect($pragmas['foreign_keys'])->toBe(1)
@@ -78,7 +87,7 @@ test('enabling WAL does not retain a SQLite statement that blocks schema migrati
 
     $configurator->configure($sqlite);
     $database->execute(new \Tempest\Database\Query('CREATE INDEX `stashes_slug` ON `stashes` (`name`)'));
-    $configurator->enableWriteAheadLogging();
+    $configurator->enableWriteAheadLogging($sqlite);
     $database->execute(new \Tempest\Database\Query('DROP INDEX IF EXISTS `stashes_slug`'));
 
     expect($database->fetchFirst(new \Tempest\Database\Query(
