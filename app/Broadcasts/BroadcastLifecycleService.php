@@ -172,6 +172,10 @@ final readonly class BroadcastLifecycleService
         $broadcast->lastError = null;
         $this->broadcasts->save($broadcast);
 
+        // Podcast prune intentionally deletes its generated feed, while
+        // series prune reconciles it with the current filesystem plan.
+        $prune = $broadcast->type === 'podcast' ? null : $this->prune($broadcastId);
+
         if ($onProgress !== null) {
             $onProgress('Verifying broadcast');
         }
@@ -193,6 +197,7 @@ final readonly class BroadcastLifecycleService
             plan: $plan->toArray(),
             publish: $publish->toArray(),
             verify: $verify->toArray(),
+            prune: $prune?->toArray(),
             trigger: $trigger,
         );
     }
