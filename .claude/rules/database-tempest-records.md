@@ -1,7 +1,7 @@
 # Database and Tempest records
 
 Stashd runs on PostgreSQL. SQLite survives only as the upgrade source that
-`stashd db:import-sqlite` reads from an older install — not as a runtime target.
+`stashd:import-sqlite` reads from an older install — not as a runtime target.
 
 ## Conventions
 

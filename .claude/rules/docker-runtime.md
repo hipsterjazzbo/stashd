@@ -42,8 +42,8 @@ Docker smoke should cover boot, FrankenPHP, Tempest, PostgreSQL migration, stora
 
 - Requiring any service beyond PostgreSQL. Compose ships it, so the copy-paste
   promise still holds; do not add Redis or RabbitMQ to the required deployment.
-- Treating SQLite as a runtime target. It is only the source `stashd
-  db:import-sqlite` reads when upgrading an older install.
+- Treating SQLite as a runtime target. It is only the source
+  `stashd:import-sqlite` reads when upgrading an older install.
 - Hiding permission problems.
 - Assuming root runtime.
 - Adding Kubernetes-first complexity.

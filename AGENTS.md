@@ -34,7 +34,7 @@ Stashd is not a YouTube frontend, not a recommendation engine, and not a media p
 - PHP `^8.5`
 - Tempest Framework `^3.0`
 - FrankenPHP application server (classic mode)
-- PostgreSQL (SQLite only as the `db:import-sqlite` upgrade source)
+- PostgreSQL (SQLite only as the `stashd:import-sqlite` upgrade source)
 - Pest for tests
 - Laravel Pint with PSR-12 formatting
 - `hazel/ytdlphp` wrapping `yt-dlp`

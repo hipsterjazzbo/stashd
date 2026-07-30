@@ -54,8 +54,10 @@ db_query() {
         psql -U "$PG_USER" -d "$PG_DB" -tAc "$1"
 }
 
-assert_database_live() {
-    if [ "$(db_query 'SELECT 1' 2>/dev/null | tr -d "[:space:]")" != "1" ]; then
+# Asserts the *application's* schema is present, not merely that PostgreSQL is
+# up: a bare "SELECT 1" would pass even if the app never connected or migrated.
+assert_schema_present() {
+    if ! db_query "SELECT tablename FROM pg_tables WHERE tablename = 'activity_events'" 2>/dev/null | grep -q activity_events; then
         echo "smoke failed: $1" >&2
         exit 1
     fi
@@ -189,7 +191,7 @@ case "$body" in
         ;;
 esac
 
-assert_database_live "PostgreSQL schema not reachable after boot"
+assert_schema_present "application schema missing after boot (migrations did not run)"
 
 if [ ! -f "$TMP/data/.env" ] || ! grep -q '^SIGNING_KEY=' "$TMP/data/.env"; then
     echo "smoke failed: SIGNING_KEY was not generated/persisted to /data/.env" >&2
@@ -288,7 +290,7 @@ case "$body_after_restart" in
         ;;
 esac
 
-assert_database_live "PostgreSQL not reachable after restart"
+assert_schema_present "application schema missing after restart"
 
 if [ "$(grep '^SIGNING_KEY=' "$TMP/data/.env")" != "$signing_key_initial" ]; then
     echo "smoke failed: SIGNING_KEY changed after container restart" >&2
@@ -329,7 +331,7 @@ case "$recreate_health" in
         ;;
 esac
 
-assert_database_live "PostgreSQL not reachable after container recreate"
+assert_schema_present "application schema missing after container recreate"
 
 echo "Running fake-provider preflight → create-from-preflight end-to-end check..."
 preflight_body="$(curl -fsS -X POST "http://127.0.0.1:18474/api/v1/commands" \

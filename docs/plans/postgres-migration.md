@@ -1,8 +1,8 @@
 # PostgreSQL migration plan and handoff
 
 Status: PostgreSQL is the default runtime on `agent/postgres-migration-foundation`.
-SQLite remains supported only as the source `stashd db:import-sqlite` reads when
-upgrading an existing install.
+SQLite remains supported only as the source the `import-sqlite` upgrade role
+reads (`stashd:import-sqlite`) when upgrading an existing install.
 
 ## Goal
 
@@ -81,7 +81,7 @@ The Dockerfile already carried both `pdo_sqlite` and `pdo_pgsql`.
 
 ```bash
 docker compose up -d postgres
-docker compose run --rm stashd stashd db:import-sqlite /data/stashd.sqlite
+docker compose run --rm stashd import-sqlite /data/stashd.sqlite
 docker compose up -d
 ```
 

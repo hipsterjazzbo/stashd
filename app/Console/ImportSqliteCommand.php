@@ -20,7 +20,7 @@ final readonly class ImportSqliteCommand
     }
 
     #[ConsoleCommand(
-        name: 'db:import-sqlite',
+        name: 'stashd:import-sqlite',
         description: 'Copy a legacy SQLite database into PostgreSQL once, when upgrading an existing install.',
     )]
     public function __invoke(
