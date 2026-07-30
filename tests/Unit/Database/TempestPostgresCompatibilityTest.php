@@ -77,7 +77,7 @@ final class TempestPostgresCompatibilityTest extends IntegrationTestCase
             bindings: ['tempest_mapping_camel'],
         ));
         $loaded = TempestMappingCamelCaseDateTimeRecord::select()
-            ->where('id = ?', 'map_postgres_1')
+            ->where('id', 'map_postgres_1')
             ->first();
 
         expect(array_column($columns, 'column_name'))->toBe([

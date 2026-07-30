@@ -7,6 +7,8 @@ namespace App\Jobs;
 use App\Commands\CommandId;
 use App\Support\PrefixedUlid;
 use App\Support\PrefixedUlidGenerator;
+use Tempest\Database\Builder\QueryBuilders\WhereGroupBuilder;
+use Tempest\Database\Builder\WhereOperator;
 use Tempest\Database\Config\DatabaseDialect;
 use Tempest\Database\Connection\Connection;
 use Tempest\Database\Database;
@@ -102,7 +104,10 @@ final class JobRepository
         }
 
         $query = JobRecord::select()
-            ->where('state = ? AND (scheduledAt IS NULL OR scheduledAt <= ?)', JobState::Pending, DateTime::now(Timezone::UTC))
+            ->where('state', JobState::Pending)
+            ->andWhereGroup(fn (WhereGroupBuilder $group) => $group
+                ->whereNull('scheduledAt')
+                ->orWhere('scheduledAt', DateTime::now(Timezone::UTC), WhereOperator::LESS_THAN_OR_EQUAL))
             ->orderBy('priority', Direction::ASC)
             ->orderBy('createdAt', Direction::ASC)
             ->limit(5);

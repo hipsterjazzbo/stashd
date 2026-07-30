@@ -384,7 +384,7 @@ test('api token scopes are stored as a typed value object', function (): void {
     ], headers: $headers)->assertStatus(Status::CREATED);
 
     $record = ApiTokenRecord::select()
-        ->where('id = ?', $created->body['id'])
+        ->where('id', $created->body['id'])
         ->first();
 
     expect($record)->not->toBeNull()
