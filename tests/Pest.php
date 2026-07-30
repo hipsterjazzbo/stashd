@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use App\Auth\AuthService;
+use Tempest\Database\Config\DatabaseDialect;
+use Tempest\Database\Database;
+use Tempest\Database\Query;
 use Tempest\Framework\Testing\Http\TestResponseHelper;
 use Tempest\Http\Cookie\Cookie;
 use Tests\IntegrationTestCase;
@@ -26,6 +29,54 @@ function useSessionCookieFrom(TestResponseHelper $response): void
     }
 
     throw new RuntimeException('Response did not set a ' . AuthService::SESSION_COOKIE . ' cookie.');
+}
+
+// Schema introspection has no portable form: SQLite exposes PRAGMA/sqlite_master,
+// PostgreSQL exposes information_schema/pg_*. Defined here (global namespace),
+// like useSessionCookieFrom above, so every --parallel worker loads them
+// regardless of which test files it was assigned.
+function schemaTableExists(Database $database, string $table): bool
+{
+    $row = $database->fetchFirst(match ($database->dialect) {
+        DatabaseDialect::POSTGRESQL => new Query(
+            'SELECT tablename FROM pg_tables WHERE schemaname = current_schema() AND tablename = ?',
+            bindings: [$table],
+        ),
+        default => new Query(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+            bindings: [$table],
+        ),
+    });
+
+    return $row !== null;
+}
+
+/** @return list<string> */
+function schemaColumns(Database $database, string $table): array
+{
+    $rows = match ($database->dialect) {
+        DatabaseDialect::POSTGRESQL => $database->fetch(new Query(
+            'SELECT column_name AS name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ?',
+            bindings: [$table],
+        )),
+        default => $database->fetch(new Query("PRAGMA table_info({$table})")),
+    };
+
+    return array_values(array_column($rows ?? [], 'name'));
+}
+
+/** @return list<string> */
+function schemaIndexes(Database $database, string $table): array
+{
+    $rows = match ($database->dialect) {
+        DatabaseDialect::POSTGRESQL => $database->fetch(new Query(
+            'SELECT indexname AS name FROM pg_indexes WHERE schemaname = current_schema() AND tablename = ?',
+            bindings: [$table],
+        )),
+        default => $database->fetch(new Query("PRAGMA index_list({$table})")),
+    };
+
+    return array_values(array_column($rows ?? [], 'name'));
 }
 
 // Computed and applied once, at file-load time, before the first test's

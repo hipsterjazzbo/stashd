@@ -15,6 +15,7 @@ use App\System\Storage\StorageLocationKey;
 use App\System\Storage\StorageLocationRecord;
 use App\System\Storage\StorageLocationState;
 use App\System\Storage\StorageRootService;
+use Tempest\Database\Config\DatabaseConfig;
 use Tempest\Database\Config\DatabaseDialect;
 use Tempest\Database\Config\PostgresConfig;
 use Tempest\Database\Database;
@@ -22,10 +23,9 @@ use Tempest\Database\Migrations\Migration;
 use Tempest\Database\Migrations\RunnableMigrations;
 use Tempest\Database\PrimaryKey;
 
-test('boot creates sqlite schema command and job records', function (): void {
+test('boot creates schema command and job records', function (): void {
     $bootstrap = $this->container->get(BootstrapService::class);
-    $sqlite = $this->container->get(\Tempest\Database\Config\SQLiteConfig::class);
-    $result = $bootstrap->boot($sqlite);
+    $result = $bootstrap->boot($this->container->get(DatabaseConfig::class));
 
     expect($result['command_id'])->toStartWith('cmd_')
         ->and($result['job_id'])->toStartWith('job_')
@@ -55,7 +55,7 @@ test('PostgreSQL replays every Stashd migration', function (): void {
 
 test('health endpoint returns ok after boot', function (): void {
     $this->container->get(BootstrapService::class)
-        ->boot($this->container->get(\Tempest\Database\Config\SQLiteConfig::class));
+        ->boot($this->container->get(DatabaseConfig::class));
 
     $response = $this->http->get('/health');
 
@@ -79,6 +79,10 @@ test('provider registry resolves youtube uris', function (): void {
 });
 
 test('sqlite pragmas are enabled on the tempest connection', function (): void {
+    if ($this->container->get(Database::class)->dialect === DatabaseDialect::POSTGRESQL) {
+        $this->markTestSkipped('SQLite-specific: pragmas, WAL, and file backups have no PostgreSQL equivalent.');
+    }
+
     $sqlite = $this->container->get(\Tempest\Database\Config\SQLiteConfig::class);
     $configurator = $this->container->get(SqliteConfigurator::class);
 
@@ -95,6 +99,10 @@ test('sqlite pragmas are enabled on the tempest connection', function (): void {
 });
 
 test('enabling WAL does not retain a SQLite statement that blocks schema migrations', function (): void {
+    if ($this->container->get(Database::class)->dialect === DatabaseDialect::POSTGRESQL) {
+        $this->markTestSkipped('SQLite-specific: pragmas, WAL, and file backups have no PostgreSQL equivalent.');
+    }
+
     $sqlite = $this->container->get(\Tempest\Database\Config\SQLiteConfig::class);
     $configurator = $this->container->get(SqliteConfigurator::class);
     $database = $this->container->get(\Tempest\Database\Database::class);
@@ -110,6 +118,10 @@ test('enabling WAL does not retain a SQLite statement that blocks schema migrati
 });
 
 test('migration runner skips backup when no pending migrations remain', function (): void {
+    if ($this->container->get(Database::class)->dialect === DatabaseDialect::POSTGRESQL) {
+        $this->markTestSkipped('SQLite-specific: pragmas, WAL, and file backups have no PostgreSQL equivalent.');
+    }
+
     $runner = $this->container->get(MigrationRunner::class);
     $sqlite = $this->container->get(\Tempest\Database\Config\SQLiteConfig::class);
     $data = getenv('STASHD_DATA_PATH') ?: '/tmp/stashd-test/data';
@@ -143,6 +155,10 @@ test('migration runner detects pending migrations when a record is missing', fun
 });
 
 test('migration runner creates a timestamped backup file before applying migrations', function (): void {
+    if ($this->container->get(Database::class)->dialect === DatabaseDialect::POSTGRESQL) {
+        $this->markTestSkipped('SQLite-specific: pragmas, WAL, and file backups have no PostgreSQL equivalent.');
+    }
+
     $runner = $this->container->get(MigrationRunner::class);
     $sqlite = $this->container->get(\Tempest\Database\Config\SQLiteConfig::class);
     $data = getenv('STASHD_DATA_PATH') ?: '/tmp/stashd-test/data';
@@ -188,8 +204,8 @@ test('vault to broadcasts hardlink probe succeeds on a shared filesystem', funct
     expect($result->ok)->toBeTrue()
         ->and($result->errorCode)->toBeNull();
 
-    $vault = StorageLocationRecord::select()->where('key = ?', StorageLocationKey::Vault)->first();
-    $broadcasts = StorageLocationRecord::select()->where('key = ?', StorageLocationKey::Broadcasts)->first();
+    $vault = StorageLocationRecord::select()->where('key', StorageLocationKey::Vault)->first();
+    $broadcasts = StorageLocationRecord::select()->where('key', StorageLocationKey::Broadcasts)->first();
 
     expect($vault?->supportsHardlinks)->toBeTrue()
         ->and($broadcasts?->supportsHardlinks)->toBeTrue();
@@ -218,7 +234,7 @@ test('an unwritable storage root is recorded as unwritable, not silently ready',
 
 test('detailed health reports vault broadcast hardlink status', function (): void {
     $this->container->get(BootstrapService::class)
-        ->boot($this->container->get(\Tempest\Database\Config\SQLiteConfig::class));
+        ->boot($this->container->get(DatabaseConfig::class));
 
     $response = $this->http->get('/api/v1/system/health', headers: $this->authHeaders());
 
