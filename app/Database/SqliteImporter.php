@@ -10,6 +10,8 @@ use RuntimeException;
 use Tempest\Database\Config\DatabaseDialect;
 use Tempest\Database\Database;
 use Tempest\Database\Query;
+use Tempest\Database\Transactions\TransactionManager;
+use Throwable;
 
 /**
  * Copies a legacy SQLite database into the PostgreSQL schema Tempest migrations
@@ -30,6 +32,7 @@ final readonly class SqliteImporter
 
     public function __construct(
         private Database $database,
+        private TransactionManager $transactions,
     ) {
     }
 
@@ -72,16 +75,26 @@ final readonly class SqliteImporter
 
         // One transaction for the whole import: a failure anywhere leaves
         // PostgreSQL exactly as it was and SQLite untouched, so it can be retried.
-        $committed = $this->database->withinTransaction(function () use ($legacy, $tables, &$copied): void {
+        //
+        // Deliberately not Database::withinTransaction() -- that catches
+        // Throwable and returns a bool, which would leave the operator with
+        // "the import failed" and no cause. The real exception matters here.
+        $this->transactions->begin();
+
+        try {
             foreach ($tables as $table) {
                 $copied[$table] = $this->copyTable($legacy, $table);
             }
 
             $this->verifyCounts($legacy, $copied);
-        });
+            $this->transactions->commit();
+        } catch (Throwable $throwable) {
+            $this->transactions->rollback();
 
-        if (! $committed) {
-            throw new RuntimeException('The import transaction could not be committed; PostgreSQL was left unchanged.');
+            throw new RuntimeException(
+                sprintf('Import failed and was rolled back; PostgreSQL is unchanged. %s', $throwable->getMessage()),
+                previous: $throwable,
+            );
         }
 
         return $copied;
