@@ -1,78 +1,145 @@
 # PostgreSQL migration plan and handoff
 
-Status: foundation implemented on `agent/postgres-migration-foundation`; PostgreSQL is not yet a supported production runtime.
+Status: PostgreSQL is the default runtime on `agent/postgres-migration-foundation`.
+SQLite remains supported only as the source `stashd db:import-sqlite` reads when
+upgrading an existing install.
 
 ## Goal
 
-Replace the default SQLite deployment with a PostgreSQL Docker sidecar while allowing an existing Docker installation to upgrade in place without losing data.
+Replace the default SQLite deployment with a PostgreSQL Docker sidecar while
+allowing an existing Docker installation to upgrade in place without losing data.
 
 ## Decisions
 
-- Use Tempest's native `PostgresConfig`, migrations, query statements, transactions, and tagged databases where two simultaneous connections are needed during import.
-- Keep database columns camelCase. Tempest maps record properties directly to column names, and the compatibility proof confirms quoted camelCase identifiers round-trip correctly on PostgreSQL.
+- Use Tempest's native `PostgresConfig`, migrations, query statements, and
+  transactions.
+- Keep database columns camelCase. Tempest maps record properties directly to
+  column names, and PostgreSQL round-trips quoted camelCase identifiers fine.
 - Keep public API JSON snake_case.
-- Do not add Redis initially. PostgreSQL can provide durable job claiming with `FOR UPDATE SKIP LOCKED`; add Redis only if measured queue throughput or features justify another required service.
-- Preserve SQLite support during the upgrade window and keep the legacy database as the rollback artifact.
+- No Redis. PostgreSQL provides durable job claiming with
+  `FOR UPDATE SKIP LOCKED`; add Redis only if measured throughput justifies
+  another required service.
+- **Prefer the query builder over raw SQL.** Raw fragments were the single
+  largest source of PostgreSQL breakage (see below).
+- The importer is an operator-run console command, not boot-time magic. It runs
+  once per install; auto-detection, "skip if already imported", and
+  merge-refusal-on-boot would be machinery for a one-time event. Trade-off: the
+  operator must run one command, so it is documented in `docker-compose.yml`
+  and `.env.example`.
 
-## Completed foundation
+## What made the app dialect-safe
 
-- `DB_CONNECTION=sqlite|pgsql` selects the appropriate Tempest database config; SQLite remains the default.
-- The application image includes both `pdo_sqlite` and `pdo_pgsql`.
-- Test bootstrap creates a database per ParaTest worker when PostgreSQL is selected.
-- A focused integration test proves Tempest model insert, select, update, booleans, floats, `DateTime`, and camelCase column names on PostgreSQL 18.
-- Database config environment values are explicitly validated, removing the related PHPStan baseline entries.
+Tempest v3.17.0 shipped `database: quote relation query identifiers` (#2229),
+which was the blocker this work waited on. The branch now runs **Tempest
+v3.18.0**.
 
-Changed files:
+With that in place, one root cause accounted for the bulk of the failures:
 
-- `.env.example`
-- `Dockerfile`
-- `app/Config/database.config.php`
-- `app/Config/database.testing.config.php`
-- `phpstan-baseline.neon`
-- `tests/Pest.php`
-- `tests/Unit/Database/TempestPostgresCompatibilityTest.php`
+- `where('stashId', $value)` resolves the field and quotes it per dialect.
+- `where('stashId = ?', $value)` is a **raw fragment**. It is not quoted, so
+  PostgreSQL folds `stashId` to `stashid` and the query fails.
 
-Verification completed:
+`tests/IntegrationTestCase.php` used the raw form in a shared helper, which alone
+explained 52 failures. 62 simple raw clauses were converted to the field form and
+11 compound ones to `andWhereGroup` / `whereNull` / `whereNotNull` /
+`whereLike` / `whereField` with a `WhereOperator`. There are now **no raw
+`where()` fragments in `app/` or `tests/`**.
 
-- PostgreSQL compatibility proof: 1 passed, 7 assertions.
-- `composer test:parallel`: 518 passed, 10 skipped, 2,686 assertions across 16 processes.
-- Pint: passed.
-- PHPStan: passed with no errors.
+The one deliberate remaining raw query is
+`StashItemRepository::statusCountsForStash` — a genuine grouped aggregate the
+builder cannot express. It quotes its identifiers and documents why.
 
-Local-only state: Lerd's PostgreSQL 18 service is installed and running, and the Stashd custom image has been rebuilt. Lerd currently routes `shell`/on-demand PHP commands for this custom-container site through the shared FPM runtime, so the PostgreSQL proof was executed directly in the Lerd-managed `lerd-custom-stashd` container.
+SQLite-only SQL was made dialect-aware rather than deleted:
 
-## Remaining work
+- `PRAGMA table_info` / `PRAGMA index_list` / `sqlite_master` became the
+  `schemaColumns` / `schemaIndexes` / `schemaTableExists` helpers in
+  `tests/Pest.php` (`information_schema` / `pg_tables` / `pg_indexes` on
+  PostgreSQL).
+- `EXPLAIN QUERY PLAN` index-usage assertions in `DomainSchemaTest` stay
+  SQLite-only on purpose: PostgreSQL's planner picks a sequential scan on empty
+  test tables regardless of indexes, so the assertion would prove nothing and
+  flake. Index *existence* is still asserted on both dialects, and every query is
+  still executed on both to prove the SQL is valid.
+- `TempestColumnMappingSpikeTest` is gated to SQLite: it pins SQLite's own error
+  text and integer/boolean coercion. `TempestPostgresCompatibilityTest` is the
+  PostgreSQL counterpart.
+- The SQLite pragma/WAL/file-backup tests in `BootstrapAndHealthTest` are gated;
+  the tests that only needed "the active database config" now ask for
+  `DatabaseConfig` instead of `SQLiteConfig`.
 
-### 1. Make the application dialect-safe
+## Deployment
 
-- Replace concrete `SQLiteConfig` dependencies in boot, health, middleware, scheduler, worker, and rediscovery paths with `DatabaseConfig` or dialect-specific conditional behavior.
-- Retain SQLite pragmas, WAL, and file backups only on SQLite.
-- Convert raw SQLite/backtick migration fragments to Tempest query statements or the smallest dialect-specific statements required.
-- Port job claiming to PostgreSQL row locking with `FOR UPDATE SKIP LOCKED`.
-- Run the complete feature suite against both databases before changing deployment defaults.
+`docker-compose.yml` ships a pinned `postgres:18-alpine` sidecar with a health
+check, a named volume, and **no published ports** (reachable only on the compose
+network). `depends_on: condition: service_healthy` keeps the app from racing it.
+`copy → paste → docker compose up` still works because compose provides the
+database.
 
-### 2. Add the PostgreSQL sidecar
+The Dockerfile already carried both `pdo_sqlite` and `pdo_pgsql`.
 
-- Add a pinned PostgreSQL service, health check, persistent volume, and internal-only connection settings to `docker-compose.yml`.
-- Make PostgreSQL the default for fresh installs only after the full suite and Docker smoke pass.
-- Do not add Redis to the required deployment.
+## Upgrading an existing SQLite install
 
-### 3. Implement the in-place importer
+```bash
+docker compose up -d postgres
+docker compose run --rm stashd stashd db:import-sqlite /data/stashd.sqlite
+docker compose up -d
+```
 
-- Open the legacy SQLite database as a tagged, read-only Tempest connection while PostgreSQL is the primary connection.
-- Stop application writes during import and create a timestamped SQLite backup first.
-- Apply the normal Tempest schema migrations to an empty PostgreSQL database.
-- Copy tables in dependency order inside bounded transactions while preserving IDs, timestamps, JSON payloads, and migration history.
-- Verify per-table counts, foreign-key integrity, and critical domain invariants before success.
-- On failure, leave SQLite untouched, exit startup clearly, and allow retry.
-- On later boots, detect an already-completed matching import and skip safely; refuse to merge unrelated non-empty databases.
+`App\Database\SqliteImporter`:
 
-### 4. Prove upgrade and rollback
+- refuses to run unless the active connection is PostgreSQL;
+- opens the SQLite file **read-only**, so it stays valid as the rollback artifact;
+- refuses to merge into a database that already holds rows (`--force` overrides);
+- copies tables in an order derived from the legacy schema's own foreign keys
+  (topological sort over `PRAGMA foreign_key_list`) rather than creation order,
+  because a later migration can rebuild a table and move it after tables that
+  reference it;
+- copies only columns present on both sides, so an older file with
+  since-dropped columns still imports;
+- skips `migrations` — Tempest owns migration history on the PostgreSQL side;
+- runs entirely in one transaction and verifies per-table row counts before
+  committing.
 
-- Add a Docker smoke fixture representing the latest SQLite release.
-- Boot the new compose stack, import it, verify auth/jobs/Vault/Broadcast state, restart, and verify persistence.
-- Prove rollback by starting the prior image against the preserved SQLite database.
+Rollback is "point the old image at the untouched SQLite file".
 
-## Next action
+## Verification
 
-Start with the concrete `SQLiteConfig` dependency inventory and migration SQL audit, then make one existing schema migration run unchanged on both SQLite and PostgreSQL before broad conversion.
+| Check | Result |
+| --- | --- |
+| PostgreSQL suite (`--parallel --processes=6`) | 514 passed, 23 skipped |
+| SQLite suite (`--parallel`) | 524 passed, 11 skipped |
+| Importer tests (PostgreSQL) | 3 passed |
+| PHPStan (`level: max`) | no errors |
+| Pint | passed |
+
+## Known issues and follow-ups
+
+1. **Test-harness connection accumulation.** The suite opens roughly one
+   PostgreSQL connection per test and does not release them until the worker
+   exits, so 535 tests across 6 workers exhausted the default
+   `max_connections = 100`. The local dev service was raised to 400. This is a
+   harness lifecycle issue, not a production one (each runtime process holds a
+   single connection), but it is worth fixing so the suite runs on a stock
+   PostgreSQL. Until then, cap parallelism or raise `max_connections`.
+2. **Rare parallel schema race.** One run showed 7 failures in `AuthTest` /
+   `ActivityControllerTest` with a mix of `relation ... already exists` and
+   `relation migrations does not exist`; a rerun was clean and both files pass in
+   isolation. `MigrationManager::dropAll()` swallows every exception, so a
+   partial drop silently leaves a stale schema that the following `migrate()`
+   replays over. Worth pinning down before relying on the suite as a hard gate.
+3. **Docker smoke has not been executed** in this environment. The script was
+   converted from a single SQLite container to a two-container PostgreSQL stack
+   (network, `pg_isready` gate, `db_query` via `psql`, quoted camelCase
+   identifiers, `NOW()` for timestamps) and passes `sh -n`, but
+   `composer test:docker-smoke` still needs a real run — it is the release gate.
+4. **No upgrade/rollback smoke fixture yet.** Section 4 of the original plan
+   wanted a Docker fixture representing the latest SQLite release, imported and
+   verified end to end. The importer is unit-proven against real PostgreSQL, but
+   the full "boot old release → import → verify Vault/Broadcast state → restart"
+   path is not automated.
+5. `MigrationSqlStatement` rewrites any quoted identifier containing a backslash
+   to `TEXT`. That targets Tempest's PostgreSQL `enum()` support, which references
+   a native type name built from the enum FQCN (`"App\Stashes\SyncMode"`) without
+   ever emitting the matching `CREATE TYPE` (`CreateEnumTypeStatement` has no
+   callers in v3.18.0). The rewrite is load-bearing; treat it as a workaround for
+   an upstream gap, not dead code.
