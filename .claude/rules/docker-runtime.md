@@ -36,6 +36,14 @@ composer test:docker-smoke:no-build
 composer test:docker-smoke
 ```
 
+Changes touching the database or the entrypoint should also run the SQLite ->
+PostgreSQL upgrade gate:
+
+```bash
+composer test:docker-upgrade:no-build
+composer test:docker-upgrade
+```
+
 Docker smoke should cover boot, FrankenPHP, Tempest, PostgreSQL migration, storage roots, health, setup/auth, worker/scheduler, fake provider/download, fake broadcast, SSE, restart persistence, and clean shutdown.
 
 ## Avoid

@@ -176,7 +176,9 @@ ensure_mercure_secret() {
     export MERCURE_JWT_SECRET
 }
 
-prepare_runtime() {
+# Everything stashd:boot needs, without running it -- the import role wants the
+# schema in place but no rows yet.
+prepare_runtime_env() {
     cd "$APP_DIR"
     git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
     ensure_writable
@@ -185,6 +187,10 @@ prepare_runtime() {
     export STASHD_DATA_PATH="$DATA_DIR"
     export STASHD_MEDIA_PATH="$MEDIA_DIR"
     export TEMPEST_INTERNAL_STORAGE="${DATA_DIR}/.tempest"
+}
+
+prepare_runtime() {
+    prepare_runtime_env
     run_app php tempest stashd:boot
 }
 
@@ -232,13 +238,16 @@ case "$ROLE" in
         prepare_runtime
         ;;
     import-sqlite)
-        # One-shot upgrade from a SQLite release. Migrations must already exist
-        # on the PostgreSQL side, so this runs the same boot path first.
+        # One-shot upgrade from a SQLite release.
         if [ -z "${2:-}" ]; then
             log "import-sqlite requires a path, e.g. import-sqlite /data/stashd.sqlite" >&2
             exit 1
         fi
-        prepare_runtime
+        prepare_runtime_env
+        # Migrations only. stashd:boot would create storage locations plus a boot
+        # command and job, and the importer then (correctly) refuses to merge
+        # into a database that already holds rows. Normal startup boots after.
+        run_app php tempest migrate:up
         run_app php tempest stashd:import-sqlite "$2" ${3:+"$3"}
         ;;
     *)

@@ -109,6 +109,8 @@ Rollback is "point the old image at the untouched SQLite file".
 | PostgreSQL suite (`--parallel --processes=6`) | 515 passed, 23 skipped |
 | SQLite suite (`composer test:sqlite:parallel`) | 524 passed, 14 skipped |
 | Importer tests (PostgreSQL) | 3 passed |
+| `composer test:docker-smoke` | passed |
+| `composer test:docker-upgrade` | passed |
 | PHPStan (`level: max`) | no errors |
 | Pint | passed |
 
@@ -129,17 +131,14 @@ Rollback is "point the old image at the untouched SQLite file".
    so a partial drop silently leaves a stale schema that the following
    `migrate()` replays over. Worth pinning down before treating the suite as a
    hard gate.
-3. **Docker smoke has not been executed** in this environment. The script was
-   converted from a single SQLite container to a two-container PostgreSQL stack
-   (network, `pg_isready` gate, `db_query` via `psql`, quoted camelCase
-   identifiers, `NOW()` for timestamps) and passes `sh -n`, but
-   `composer test:docker-smoke` still needs a real run — it is the release gate.
-4. **No upgrade/rollback smoke fixture yet.** Section 4 of the original plan
-   wanted a Docker fixture representing the latest SQLite release, imported and
-   verified end to end. The importer is unit-proven against real PostgreSQL, but
-   the full "boot old release → import → verify Vault/Broadcast state → restart"
-   path is not automated.
-5. `MigrationSqlStatement` rewrites any quoted identifier containing a backslash
+3. **The upgrade proof runs on a freshly booted install (19 rows).**
+   `composer test:docker-upgrade` covers the real schema — enum, timestamp and
+   foreign-key columns all cross over, and it asserts import order, intact
+   migration history, an unchanged SQLite file, and that a second import refuses.
+   It does not yet import a heavily populated Vault with downloaded assets and
+   built broadcasts, which is the case most likely to surface a
+   column-type surprise.
+4. `MigrationSqlStatement` rewrites any quoted identifier containing a backslash
    to `TEXT`. That targets Tempest's PostgreSQL `enum()` support, which references
    a native type name built from the enum FQCN (`"App\Stashes\SyncMode"`) without
    ever emitting the matching `CREATE TYPE` (`CreateEnumTypeStatement` has no
