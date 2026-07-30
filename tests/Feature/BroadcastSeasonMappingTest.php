@@ -95,6 +95,14 @@ test('broadcast.rebuild honours per-input season mapping, falling back to season
     $patch->assertOk();
     expect($patch->body['broadcast']['settings']['season_mapping'])->toBe([$inputB => 3]);
 
+    $expectedEpisodeNumbers = [];
+
+    foreach (StashItemRecord::select()->where('stashInputId = ?', $inputA)->all() as $stashItem) {
+        $expectedEpisodeNumbers[(string) $stashItem->id] = $stashItem->position;
+        $stashItem->position = 4 - $stashItem->position;
+        $stashItem->save();
+    }
+
     $rebuild = $this->http->post('/api/v1/commands', [
         'type' => 'broadcast.rebuild',
         'options' => ['broadcast_id' => $broadcastId],
@@ -102,7 +110,8 @@ test('broadcast.rebuild honours per-input season mapping, falling back to season
     $this->processAllJobs();
 
     $rebuildCommand = $this->http->get('/api/v1/commands/' . $rebuild->body['command_id'], headers: $headers)->assertOk();
-    expect($rebuildCommand->body['command']['result']['publish']['published_count'])->toBe(6);
+    expect($rebuildCommand->body['command']['result']['publish']['published_count'])->toBe(6)
+        ->and($rebuildCommand->body['command']['result']['prune']['removed_count'])->toBe(0);
 
     $itemsResponse = $this->http->get('/api/v1/broadcasts/' . $broadcastId . '/items', headers: $headers)->assertOk();
 
@@ -132,4 +141,34 @@ test('broadcast.rebuild honours per-input season mapping, falling back to season
     foreach ($pathsForB as $path) {
         expect($path)->toContain('/Season 03/');
     }
+
+    foreach ($itemsResponse->body['items'] as $item) {
+        $episodeNumber = $expectedEpisodeNumbers[$item['stash_item_id']] ?? null;
+
+        if ($episodeNumber !== null) {
+            expect($item['published_path'])->toContain(sprintf('S01E%03d', $episodeNumber));
+        }
+    }
+
+    $patch = $this->http->patch('/api/v1/broadcasts/' . $broadcastId . '/season-mapping', [
+        'mapping' => [$inputB => 4],
+    ], headers: $headers)->assertOk();
+    expect($patch->body['broadcast']['settings']['season_mapping'])->toBe([$inputB => 4]);
+
+    $rebuild = $this->http->post('/api/v1/commands', [
+        'type' => 'broadcast.rebuild',
+        'options' => ['broadcast_id' => $broadcastId],
+    ], headers: $headers)->assertStatus(Status::CREATED);
+    $this->processAllJobs();
+
+    $rebuildCommand = $this->http->get('/api/v1/commands/' . $rebuild->body['command_id'], headers: $headers)->assertOk();
+    expect($rebuildCommand->body['command']['result']['prune']['removed_count'])->toBeGreaterThan(0);
+
+    $itemsResponse = $this->http->get('/api/v1/broadcasts/' . $broadcastId . '/items', headers: $headers)->assertOk();
+
+    foreach ($itemsResponse->body['items'] as $item) {
+        expect($item['published_path'])->not->toContain('/Season 03/');
+    }
+
+    expect(is_dir(dirname($pathsForB[0])))->toBeFalse();
 });

@@ -687,6 +687,7 @@ test('broadcast.prune removes generated files only and never vault originals', f
     expect($command->body['command']['state'])->toBe('completed')
         ->and($command->body['command']['result']['prune']['removed_count'])->toBeGreaterThan(0)
         ->and(is_file($root . '/stale-extra.txt'))->toBeFalse()
+        ->and(is_file($root . '/.stashd-broadcast'))->toBeTrue()
         ->and(is_file($vaultPath))->toBeTrue()
         ->and(is_file($publishedPath))->toBeTrue();
 });

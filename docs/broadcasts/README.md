@@ -217,7 +217,7 @@ a scan afterward.
 
 ### Series specifics
 
-- Episode/season identity uses stash item ordering (season/episode/position fallbacks), not the folder name.
+- Episode/season identity uses explicit stash season/episode values when present; otherwise each season is numbered by chronological publish date (then stash position), not the folder name.
 - Filenames use readable titles with broadcast-safe sanitization (spaces preserved in folder/episode names).
 - Generated paths may change on rebuild; Vault paths never change.
 
@@ -245,7 +245,7 @@ Creating a broadcast automatically queues its first rebuild. Broadcast work runs
 | Step | Command | Writes disk? |
 |---|---|---|
 | Plan | `broadcast.plan` | No — computes intended files + sidecars |
-| Rebuild | `broadcast.rebuild` | Yes — plan + publish + verify (+ optional auto scan trigger) |
+| Rebuild | `broadcast.rebuild` | Yes — plan + publish + verify (+ optional auto scan trigger); filesystem series broadcasts also prune obsolete generated files |
 | Rebuild item | `broadcast.rebuild_item` | Yes — republishes one `broadcast_item_id`, then verifies the broadcast (+ optional auto scan trigger). Podcast feeds are aggregate artifacts, so their shared `feed.xml` is regenerated. |
 | Verify | `broadcast.verify` | No — checks files + hardlink targets + sidecars |
 | Prune | `broadcast.prune` | Yes — removes stale generated files only |
@@ -264,7 +264,7 @@ A broadcast or item becomes `stale` when:
 - Hardlink target is invalid (inode mismatch)
 - Expected NFO sidecar is missing (jellyfin/plex types)
 
-Not yet implemented: settings-change detection, optional poster drift, season mapping changes.
+Not yet implemented: settings-change detection or optional poster drift.
 
 ## API
 

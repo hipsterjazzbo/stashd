@@ -112,11 +112,41 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
         $files = [];
         $sidecars = [];
         $skipped = [];
-        $position = 0;
+        $episodePositions = [];
         $tvShowNfoAdded = false;
         $seasonMapping = $context->seasonMapping();
+        $stashItems = $this->contextFactory->publishableStashItems($context);
 
-        foreach ($this->contextFactory->publishableStashItems($context) as $stashItem) {
+        usort($stashItems, function ($left, $right) use ($context, $seasonMapping): int {
+            $leftSeason = max(1, $seasonMapping->seasonFor($left->stashInputId?->toString()) ?? $left->seasonNumber ?? 1);
+            $rightSeason = max(1, $seasonMapping->seasonFor($right->stashInputId?->toString()) ?? $right->seasonNumber ?? 1);
+
+            if ($leftSeason !== $rightSeason) {
+                return $leftSeason <=> $rightSeason;
+            }
+
+            $leftPublishedAt = $context->mediaItems[(string) $left->mediaItemId]->publishedAt;
+            $rightPublishedAt = $context->mediaItems[(string) $right->mediaItemId]->publishedAt;
+
+            if ($leftPublishedAt !== null && $rightPublishedAt !== null) {
+                if ($leftPublishedAt->isBefore($rightPublishedAt)) {
+                    return -1;
+                }
+
+                if ($leftPublishedAt->isAfter($rightPublishedAt)) {
+                    return 1;
+                }
+            } elseif ($leftPublishedAt !== null) {
+                return -1;
+            } elseif ($rightPublishedAt !== null) {
+                return 1;
+            }
+
+            return [$left->position ?? PHP_INT_MAX, (string) $left->id]
+                <=> [$right->position ?? PHP_INT_MAX, (string) $right->id];
+        });
+
+        foreach ($stashItems as $stashItem) {
             $vault = $context->vaultOriginals[(string) $stashItem->mediaItemId] ?? null;
             $mediaItem = $context->mediaItems[(string) $stashItem->mediaItemId] ?? null;
 
@@ -126,8 +156,10 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
                 continue;
             }
 
-            $position++;
             $seasonOverride = $seasonMapping->seasonFor($stashItem->stashInputId?->toString());
+            $seasonNumber = max(1, $seasonOverride ?? $stashItem->seasonNumber ?? 1);
+            $position = ($episodePositions[$seasonNumber] ?? 0) + 1;
+            $episodePositions[$seasonNumber] = $position;
             $season = $this->filenames->seasonFolder($stashItem, $seasonOverride);
             $filename = $profile->mediaServerEpisodeNaming
                 ? $this->filenames->mediaServerEpisodeFilename($stashItem, $mediaItem, $vault->path, $position, $seasonOverride)
@@ -157,7 +189,6 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
                     $tvShowNfoAdded = true;
                 }
 
-                $seasonNumber = max(1, $seasonOverride ?? $stashItem->seasonNumber ?? 1);
                 $episodeNumber = max(1, $stashItem->episodeNumber ?? $position);
                 $episodeNfoName = $this->nfos->episodeNfoFilename($filename);
                 $sidecars[] = new BroadcastPlannedSidecar(
@@ -404,6 +435,7 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
             $keepPaths[] = $sidecar->absolutePath;
         }
 
+        $keepPaths[] = $root . '/.stashd-broadcast';
         $keepLookup = array_fill_keys($keepPaths, true);
         $removed = [];
 
@@ -644,7 +676,11 @@ abstract class AbstractSeriesBroadcastPlugin implements BroadcastPlugin
                 continue;
             }
 
-            @rmdir($path);
+            $contents = scandir($path);
+
+            if ($contents !== false && count($contents) === 2) {
+                @rmdir($path);
+            }
         }
     }
 }
