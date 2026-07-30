@@ -111,6 +111,7 @@ Rollback is "point the old image at the untouched SQLite file".
 | Importer tests (PostgreSQL) | 3 passed |
 | `composer test:docker-smoke` | passed |
 | `composer test:docker-upgrade` | passed |
+| Import of a real 1.4 GB NAS database | 64,534 rows / 23 tables, counts matched |
 | PHPStan (`level: max`) | no errors |
 | Pint | passed |
 
@@ -123,7 +124,12 @@ Rollback is "point the old image at the untouched SQLite file".
    harness lifecycle issue, not a production one (each runtime process holds a
    single connection), but it is worth fixing so the suite runs on a stock
    PostgreSQL. Until then, cap parallelism or raise `max_connections`.
-2. **Rare parallel schema race.** One early run showed 7 failures in `AuthTest` /
+2. **Do not run the two suites concurrently.** Running the PostgreSQL suite
+   (6 workers) and the SQLite suite (16 workers) at the same time produced 8–29
+   spurious failures — filesystem assertions (`file_get_contents` returning
+   false) plus the schema race below. Run in isolation each was clean: 515 and
+   524 passed.
+3. **Rare parallel schema race.** One early run showed 7 failures in `AuthTest` /
    `ActivityControllerTest` with a mix of `relation ... already exists` and
    `relation migrations does not exist`. Two subsequent full runs were clean and
    both files pass in isolation, so it is intermittent rather than a standing
@@ -131,14 +137,28 @@ Rollback is "point the old image at the untouched SQLite file".
    so a partial drop silently leaves a stale schema that the following
    `migrate()` replays over. Worth pinning down before treating the suite as a
    hard gate.
-3. **The upgrade proof runs on a freshly booted install (19 rows).**
-   `composer test:docker-upgrade` covers the real schema — enum, timestamp and
-   foreign-key columns all cross over, and it asserts import order, intact
-   migration history, an unchanged SQLite file, and that a second import refuses.
-   It does not yet import a heavily populated Vault with downloaded assets and
-   built broadcasts, which is the case most likely to surface a
-   column-type surprise.
-4. `MigrationSqlStatement` rewrites any quoted identifier containing a backslash
+3. **Byte columns were too narrow on PostgreSQL — found by importing the real
+   NAS database, fixed.** Tempest's `integer()` compiles to PostgreSQL `INTEGER`
+   (max 2147483647) unless a size is given, while SQLite's INTEGER is already
+   64-bit. The live Vault has a 4.9 GB asset and 16 assets over the int32 limit,
+   so the import failed with `value "2354062259" is out of range for type
+   integer`. This was never import-specific: a fresh PostgreSQL install could not
+   have stored an asset over ~2.1 GB either, and
+   `storage_locations.freeBytes`/`totalBytes` hold whole-disk capacity.
+   `assets.sizeBytes` and both `storage_locations` byte columns are now declared
+   `DatabaseIntegerSize::BIG`.
+
+   Declared in the original migrations rather than added as an `ALTER` migration:
+   fresh databases get the right type immediately, and the test harness does not
+   rewrite three tables on every reset. Safe for existing installs because the
+   migration hash is computed from the compiled SQL for the active dialect and
+   SQLite's `IntegerStatement` ignores the size argument — confirmed by running
+   `migrate:validate` against the real NAS database, which the previous code had
+   migrated.
+
+   **Lesson worth keeping:** any new byte/size column needs an explicit
+   `DatabaseIntegerSize::BIG`; SQLite will never tell you it is wrong.
+5. `MigrationSqlStatement` rewrites any quoted identifier containing a backslash
    to `TEXT`. That targets Tempest's PostgreSQL `enum()` support, which references
    a native type name built from the enum FQCN (`"App\Stashes\SyncMode"`) without
    ever emitting the matching `CREATE TYPE` (`CreateEnumTypeStatement` has no
