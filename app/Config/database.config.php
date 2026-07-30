@@ -26,7 +26,7 @@ $stringEnv = static function (string $key, string $default): string {
     return $value;
 };
 
-$connection = strtolower($stringEnv('DB_CONNECTION', 'sqlite'));
+$connection = strtolower($stringEnv('DB_CONNECTION', 'pgsql'));
 
 if ($connection === 'pgsql') {
     return new PostgresConfig(
