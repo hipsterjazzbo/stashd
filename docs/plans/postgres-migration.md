@@ -106,8 +106,8 @@ Rollback is "point the old image at the untouched SQLite file".
 
 | Check | Result |
 | --- | --- |
-| PostgreSQL suite (`--parallel --processes=6`) | 514 passed, 23 skipped |
-| SQLite suite (`--parallel`) | 524 passed, 11 skipped |
+| PostgreSQL suite (`--parallel --processes=6`) | 515 passed, 23 skipped |
+| SQLite suite (`composer test:sqlite:parallel`) | 524 passed, 14 skipped |
 | Importer tests (PostgreSQL) | 3 passed |
 | PHPStan (`level: max`) | no errors |
 | Pint | passed |
@@ -121,12 +121,14 @@ Rollback is "point the old image at the untouched SQLite file".
    harness lifecycle issue, not a production one (each runtime process holds a
    single connection), but it is worth fixing so the suite runs on a stock
    PostgreSQL. Until then, cap parallelism or raise `max_connections`.
-2. **Rare parallel schema race.** One run showed 7 failures in `AuthTest` /
+2. **Rare parallel schema race.** One early run showed 7 failures in `AuthTest` /
    `ActivityControllerTest` with a mix of `relation ... already exists` and
-   `relation migrations does not exist`; a rerun was clean and both files pass in
-   isolation. `MigrationManager::dropAll()` swallows every exception, so a
-   partial drop silently leaves a stale schema that the following `migrate()`
-   replays over. Worth pinning down before relying on the suite as a hard gate.
+   `relation migrations does not exist`. Two subsequent full runs were clean and
+   both files pass in isolation, so it is intermittent rather than a standing
+   failure. Likely cause: `MigrationManager::dropAll()` swallows every exception,
+   so a partial drop silently leaves a stale schema that the following
+   `migrate()` replays over. Worth pinning down before treating the suite as a
+   hard gate.
 3. **Docker smoke has not been executed** in this environment. The script was
    converted from a single SQLite container to a two-container PostgreSQL stack
    (network, `pg_isready` gate, `db_query` via `psql`, quoted camelCase

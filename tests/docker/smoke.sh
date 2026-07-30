@@ -806,11 +806,19 @@ override_name="stashd-smoke-override-$$"
 operator_key="$(head -c32 /dev/urandom | base64)"
 operator_mercure_secret="$(head -c32 /dev/urandom | base64)"
 
-$CONTAINER run -d --name "$override_name" \
+# Shares the smoke PostgreSQL instance: this check is only about secret
+# handling, and boot is idempotent against an already-migrated database.
+$CONTAINER run -d --name "$override_name" --network "$NETWORK" \
     -e STASHD_DATA_PATH=/data \
     -e STASHD_MEDIA_PATH=/media \
     -e PUID="$PUID" \
     -e PGID="$PGID" \
+    -e DB_CONNECTION=pgsql \
+    -e DB_HOST=postgres \
+    -e DB_PORT=5432 \
+    -e DB_DATABASE="$PG_DB" \
+    -e DB_USERNAME="$PG_USER" \
+    -e DB_PASSWORD="$PG_PASSWORD" \
     -e SIGNING_KEY="$operator_key" \
     -e MERCURE_JWT_SECRET="$operator_mercure_secret" \
     -v "$override_tmp/data:/data" \
