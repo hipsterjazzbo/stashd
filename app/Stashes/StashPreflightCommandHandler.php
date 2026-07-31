@@ -74,12 +74,22 @@ final readonly class StashPreflightCommandHandler implements CommandHandler
         $sourceTitle = is_string($sourceTitle) && $sourceTitle !== '' ? $sourceTitle : null;
         $originRaw = $options['origin'] ?? null;
         $origin = PreflightOrigin::tryFrom(is_string($originRaw) ? $originRaw : '') ?? PreflightOrigin::Api;
+        $stashInputIdRaw = $options['stashInputId'] ?? $options['stash_input_id'] ?? null;
+        $stashInputId = is_string($stashInputIdRaw) ? trim($stashInputIdRaw) : '';
 
-        return [
+        $payload = [
             'source_uri' => $sourceUri,
             'source_title' => $sourceTitle,
             'origin' => $origin->value,
             'command_id' => (string) $command->id,
         ];
+
+        // A scheduled re-check names the input it is refreshing; without this
+        // the id is dropped here and the preflight cannot chain an ingest.
+        if ($stashInputId !== '' && StashInputId::isValid($stashInputId)) {
+            $payload['stash_input_id'] = $stashInputId;
+        }
+
+        return $payload;
     }
 }
