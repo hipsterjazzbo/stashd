@@ -137,9 +137,15 @@ final readonly class PreflightJobHandler implements JobHandler
         }
 
         foreach ($result->discoveredItems as $item) {
-            $providerItemId = $item['provider_item_id'] ?? null;
+            $rawItemId = $item['provider_item_id'] ?? null;
+            $rawCanonicalUri = $item['canonical_uri'] ?? null;
+            $providerItemId = is_string($rawItemId) ? trim($rawItemId) : '';
+            $canonicalUri = is_string($rawCanonicalUri) ? trim($rawCanonicalUri) : '';
 
-            if (! is_string($providerItemId) || $providerItemId === '') {
+            // Same skip conditions as the commit path. An item it would never
+            // create must not read as new here, or we would dispatch an ingest
+            // that changes nothing -- and rebuild every broadcast -- each hour.
+            if ($providerItemId === '' || $canonicalUri === '') {
                 continue;
             }
 
