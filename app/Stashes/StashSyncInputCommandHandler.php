@@ -58,12 +58,22 @@ final readonly class StashSyncInputCommandHandler implements CommandHandler
         $command->targetId = $stashId;
         $this->commands->save($command);
 
+        // Two syncs of one input would both discover, both realign positions
+        // and both trigger broadcast rebuilds. The scheduler and the manual
+        // check both dispatch through here, so this one guard covers both:
+        // a double-click, or a click while the hourly check is still queued.
+        $entityId = PrefixedUlid::parse($stashInputId);
+
+        if ($this->jobs->hasPendingOrProcessing(JobIntent::SyncInput, $entityId)) {
+            return [];
+        }
+
         return [
             $this->jobs->create(
                 intent: JobIntent::SyncInput,
                 commandId: CommandId::fromPrimaryKey($command->id),
-                entityType: 'stash',
-                entityId: PrefixedUlid::parse($stashId),
+                entityType: 'stash_input',
+                entityId: $entityId,
                 payload: $payload,
             ),
         ];

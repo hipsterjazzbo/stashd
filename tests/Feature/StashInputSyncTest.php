@@ -119,6 +119,29 @@ test('the manual check endpoint syncs every input of the stash', function (): vo
         ->and(commandsOfType(CommandType::StashSyncInput))->toHaveCount(1);
 });
 
+test('a second check while one is still queued does not run twice', function (): void {
+    $stashId = $this->bootstrapFakeChannelStash('dedupe-sync');
+    $headers = $this->authHeaders();
+
+    $provider = $this->container->get(ProviderRegistry::class)->get('fake');
+    assert($provider instanceof FakeProvider);
+    $provider->advanceSyncGeneration('channel:dedupe-sync');
+
+    // Two clicks before the worker gets to either one.
+    $this->http->post('/api/v1/stashes/' . $stashId . '/sync', [], headers: $headers)
+        ->assertStatus(Status::ACCEPTED);
+    $this->http->post('/api/v1/stashes/' . $stashId . '/sync', [], headers: $headers)
+        ->assertStatus(Status::ACCEPTED);
+
+    $queued = \App\Jobs\JobRecord::select()->where('intent', \App\Jobs\JobIntent::SyncInput)->all();
+    expect($queued)->toHaveCount(1);
+
+    $this->processAllJobs();
+
+    // The new item still lands exactly once, from the one job that ran.
+    expect(itemsOf($stashId))->toHaveCount(4);
+});
+
 test('the manual check endpoint 404s for an unknown stash', function (): void {
     $this->http->post('/api/v1/stashes/stash_01JQZ0000000000000000000/sync', [], headers: $this->authHeaders())
         ->assertStatus(Status::NOT_FOUND);
