@@ -1,0 +1,11 @@
+{
+  "id": "bubblewrap-example",
+  "name": "Bubblewrap Example",
+  "version": "0.0.1",
+  "runtime": "php",
+  "entrypoint": "plugin.php",
+  "capabilities": {
+    "http": ["fixture.allowed"],
+    "staging": true
+  }
+}
