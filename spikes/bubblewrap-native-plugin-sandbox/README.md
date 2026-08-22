@@ -20,12 +20,14 @@ minimal runtime view, and a line-oriented broker on stdin/stdout.
 
 ## Upstream basis
 
-The run uses bubblewrap 0.11.2 from Debian Bookworm's package. The upstream
-documentation/source consulted on 2026-08-22 was:
+The run uses Debian Bookworm's `bubblewrap` package. Rebuilding the Dockerfile
+from this branch on 2026-08-22 reports `bubblewrap 0.8.0-2+deb12u1` and
+`bwrap 0.8.0`. An earlier report of 0.11.2 was stale; no upgrade is part of
+this spike. The upstream documentation/source consulted was:
 
 - https://github.com/containers/bubblewrap/blob/main/README.md
 - https://github.com/containers/bubblewrap/blob/main/bubblewrap.c
-- https://github.com/containers/bubblewrap/blob/v0.11.2/SECURITY.md
+- https://github.com/containers/bubblewrap/blob/main/SECURITY.md
 
 Upstream describes bubblewrap as an unprivileged sandbox-construction toolkit,
 not a complete policy. It always creates a mount namespace; the caller chooses
@@ -97,7 +99,7 @@ current Wasmtime host, even though PHP plugin development is simpler.
 
 Run on 2026-08-22:
 
-- host: Linux 7.1.8, x86_64; bubblewrap 0.11.2; Podman 6.1.0;
+- host: Linux 7.1.8, x86_64; bubblewrap 0.8.0-2+deb12u1 (`bwrap 0.8.0`); Podman 6.1.0;
 - image: PHP 8.5.9 CLI;
 - outer command: `podman run --rm --user 1000:1000 --cap-drop=ALL
   --security-opt=no-new-privileges ...`;
