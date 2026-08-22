@@ -120,6 +120,60 @@ namespace-escape research. It is evidence that the requested ordinary
 filesystem/network boundary can work without privileged execution, with the
 noted `/proc` mount limitation.
 
+## Jellyfin comparison result
+
+`test-jellyfin.sh` is the complete comparison exercise. It runs a native PHP
+Jellyfin lifecycle through the same sandbox policy and covers discovery,
+generic choices, publication descriptors, host materialization, finalization,
+`POST /Library/Refresh`, invalid credentials, refresh failure, unauthorized
+destinations, direct network denial, environment isolation, and mount
+invariants. It passed from a clean no-cache image build.
+
+The native plugin is 106 source lines, the Jellyfin-specific runner/RPC bridge
+is 99 lines, and the test is 45 lines. The production Rust Jellyfin source is
+209 lines before generated WIT bindings. The native plugin is shorter and more
+recognizable PHP, while the runner remains one-time infrastructure rather than
+per-plugin code.
+
+The natural PHP surface was small:
+
+```text
+RpcHttp::request(method, url, credential-name)
+JellyfinBroadcast::discoverLibraries()
+JellyfinBroadcast::publish()
+JellyfinBroadcast::finalize(publication)
+```
+
+The plugin never sees the raw credential. It sends the opaque credential name;
+the outer broker validates the destination and uses its private fixture token
+when deciding the response. The plugin receives only status/body. The runner
+materializes the publication before sending the `materialized` lifecycle event,
+so the plugin's POST refresh cannot occur first.
+
+The current WIT concepts map cleanly to this small RPC: operation, choices,
+publish files, finalize, HTTP request/response, credential name, generic
+errors, and staging/progress. Records, lists, optionals, variants, and result
+errors are straightforward JSON/NDJSON values. Resource handles and callbacks
+would need SDK conventions, but no fundamental Component-ABI dependency was
+found. WIT could remain the canonical IDL with generated language bindings over
+native RPC later.
+
+For development, the native loop is effectively edit PHP → run
+`test-jellyfin.sh`, with ordinary PHP syntax errors and stack traces. The Rust
+loop requires Rust compilation, Component packaging, host loading, and then
+the lifecycle test. Native packaging would need PHP plus declared extensions
+and bundled `vendor/` dependencies; the package can remain read-only. A future
+release tarball can contain `plugin.json`, PHP, `vendor/`, and optional helpers.
+
+Native runtime ownership would include bubblewrap policy, supported runtime
+images/extensions, process supervision/timeouts, RPC/SDK compatibility,
+package/version handling, and native-helper architecture builds. Wasmtime
+ownership includes the Rust host, WIT bindings, Component toolchains, Wasmtime,
+WASI constraints, and Component packaging. Native wins on plugin authoring and
+debugging; Wasmtime remains lower-dependency and more uniform for the runtime
+operator. No meaningful startup benchmark was collected because this is not a
+hot-path workload.
+
 ## Decision template
 
 Fill the final decision from the actual `test.sh` result. A positive result is

@@ -1,0 +1,10 @@
+{
+  "id": "bubblewrap-jellyfin-example",
+  "name": "Bubblewrap Jellyfin Example",
+  "version": "0.0.1",
+  "runtime": "php",
+  "entrypoint": "plugin.php",
+  "credential": {"name": "jellyfin-api-token", "parameter": "X-Emby-Token", "placement": "header"},
+  "operations": ["test-connection", "discover-libraries", "refresh-library"],
+  "capabilities": {"http": ["fixture.jellyfin"], "staging": true}
+}
